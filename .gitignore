@@ -1,0 +1,10 @@
+# Eclipse
+.settings/
+.metadata/
+
+# Build folders
+Debug/
+Release/
+
+# Locally stored "Eclipse launch configurations"
+*.launch
