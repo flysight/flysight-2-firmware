@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -53,8 +54,9 @@ void SystemClock_Config(void);
 static void MX_IPCC_Init(void);
 static void MX_RF_Init(void);
 static void MX_RTC_Init(void);
+static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void PeriphClock_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -90,12 +92,14 @@ int main(void)
    MX_IPCC_Init();
 
   /* USER CODE BEGIN SysInit */
-
+  PeriphClock_Config();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_RF_Init();
   MX_RTC_Init();
+  MX_GPIO_Init();
+  MX_USB_Device_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -134,11 +138,12 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE
-                              |RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
+                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -164,7 +169,8 @@ void SystemClock_Config(void)
   /** Initializes the peripherals clocks
   */
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SMPS|RCC_PERIPHCLK_RFWAKEUP
-                              |RCC_PERIPHCLK_RTC;
+                              |RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_USB;
+  PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
   PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   PeriphClkInitStruct.RFWakeUpClockSelection = RCC_RFWKPCLKSOURCE_LSE;
   PeriphClkInitStruct.SmpsClockSelection = RCC_SMPSCLKSOURCE_HSI;
@@ -260,8 +266,70 @@ static void MX_RTC_Init(void)
 
 }
 
-/* USER CODE BEGIN 4 */
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
 
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+}
+
+/* USER CODE BEGIN 4 */
+void PeriphClock_Config(void)
+{
+#if (CFG_USB_INTERFACE_ENABLE != 0)
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = { 0 };
+  RCC_CRSInitTypeDef RCC_CRSInitStruct = { 0 };
+
+  /**
+    * This prevents the CPU2 to disable the HSI48 oscillator when
+    * it does not use anymore the RNG IP
+    */
+
+  LL_HSEM_1StepLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID);
+
+  LL_RCC_HSI48_Enable();
+
+  while(!LL_RCC_HSI48_IsReady());
+
+  /* Select HSI48 as USB clock source */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
+  HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+
+  /**
+    * Configure the clock recovery system (CRS)
+    */
+
+  /* Enable CRS Clock */
+  __HAL_RCC_CRS_CLK_ENABLE();
+
+  /* Default Synchro Signal division factor (not divided) */
+  RCC_CRSInitStruct.Prescaler = RCC_CRS_SYNC_DIV1;
+
+  /* Set the SYNCSRC[1:0] bits according to CRS_Source value */
+  RCC_CRSInitStruct.Source = RCC_CRS_SYNC_SOURCE_USB;
+
+  /* HSI48 is synchronized with USB SOF at 1KHz rate */
+  RCC_CRSInitStruct.ReloadValue = RCC_CRS_RELOADVALUE_DEFAULT;
+  RCC_CRSInitStruct.ErrorLimitValue = RCC_CRS_ERRORLIMIT_DEFAULT;
+
+  RCC_CRSInitStruct.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
+
+  /* Set the TRIM[5:0] to the default value*/
+  RCC_CRSInitStruct.HSI48CalibrationValue = RCC_CRS_HSI48CALIBRATION_DEFAULT;
+
+  /* Start automatic synchronization */
+  HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
+#endif
+
+  return;
+}
 /* USER CODE END 4 */
 
 /**
