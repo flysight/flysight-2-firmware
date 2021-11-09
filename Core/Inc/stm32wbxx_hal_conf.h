@@ -55,7 +55,7 @@
 /*#define HAL_SPI_MODULE_ENABLED   */
 /*#define HAL_TIM_MODULE_ENABLED   */
 /*#define HAL_TSC_MODULE_ENABLED   */
-/*#define HAL_UART_MODULE_ENABLED   */
+#define HAL_UART_MODULE_ENABLED
 /*#define HAL_USART_MODULE_ENABLED   */
 /*#define HAL_WWDG_MODULE_ENABLED   */
 #define HAL_EXTI_MODULE_ENABLED
@@ -173,7 +173,7 @@
   */
 
 #define  VDD_VALUE				3300U                   /*!< Value of VDD in mv */
-#define  TICK_INT_PRIORITY            14U      /*!< tick interrupt priority */
+#define  TICK_INT_PRIORITY            0U      /*!< tick interrupt priority */
 #define  USE_RTOS                     0U
 #define  PREFETCH_ENABLE              1U
 #define  INSTRUCTION_CACHE_ENABLE     1U

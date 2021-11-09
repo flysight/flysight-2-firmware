@@ -61,6 +61,19 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define GNSS_TXD_Pin GPIO_PIN_10
+#define GNSS_TXD_GPIO_Port GPIOA
+#define GNSS_RXD_Pin GPIO_PIN_6
+#define GNSS_RXD_GPIO_Port GPIOB
+#define GNSS_EXTINT_Pin GPIO_PIN_12
+#define GNSS_EXTINT_GPIO_Port GPIOB
+#define VCC_EN_Pin GPIO_PIN_1
+#define VCC_EN_GPIO_Port GPIOH
+#define GNSS_SAFEBOOT_N_Pin GPIO_PIN_2
+#define GNSS_SAFEBOOT_N_GPIO_Port GPIOD
+#define GNSS_PPS_Pin GPIO_PIN_3
+#define GNSS_PPS_GPIO_Port GPIOD
+#define GNSS_PPS_EXTI_IRQn EXTI3_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
