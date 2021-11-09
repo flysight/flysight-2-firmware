@@ -873,6 +873,89 @@ __weak void FS_GNSS_TimeReady_Callback(void)
 }
 
 // Temporary functions for CDC interface
+void GNSS_Config(USBD_CDC_LineCodingTypeDef *lineCoding)
+{
+	// Stop DMA transfer
+	if (HAL_UART_Abort(&huart1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	if (HAL_UART_DeInit(&huart1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	// Set the stop bit
+	switch (lineCoding->format)
+	{
+	case 0:
+		huart1.Init.StopBits = UART_STOPBITS_1;
+		break;
+	case 2:
+		huart1.Init.StopBits = UART_STOPBITS_2;
+		break;
+	default :
+		huart1.Init.StopBits = UART_STOPBITS_1;
+		break;
+	}
+
+	// Set the parity bit
+	switch (lineCoding->paritytype)
+	{
+	case 0:
+		huart1.Init.Parity = UART_PARITY_NONE;
+		break;
+	case 1:
+		huart1.Init.Parity = UART_PARITY_ODD;
+		break;
+	case 2:
+		huart1.Init.Parity = UART_PARITY_EVEN;
+		break;
+	default :
+		huart1.Init.Parity = UART_PARITY_NONE;
+		break;
+	}
+
+	// Set the data type
+	switch (lineCoding->datatype)
+	{
+	case 0x07:
+		// With this configuration parity must be set
+		huart1.Init.WordLength = UART_WORDLENGTH_8B;
+		break;
+	case 0x08:
+		if (huart1.Init.Parity == UART_PARITY_NONE)
+		{
+			huart1.Init.WordLength = UART_WORDLENGTH_8B;
+		}
+		else
+		{
+			huart1.Init.WordLength = UART_WORDLENGTH_9B;
+		}
+		break;
+	default :
+		huart1.Init.WordLength = UART_WORDLENGTH_8B;
+		break;
+	}
+
+	huart1.Init.BaudRate     = lineCoding->bitrate;
+	huart1.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
+	huart1.Init.Mode         = UART_MODE_TX_RX;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+
+	if (HAL_UART_Init(&huart1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	// Begin DMA transfer
+	if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
 void GNSS_Transmit(uint8_t *buf, uint16_t len)
 {
 	// Transmit packet to GNSS

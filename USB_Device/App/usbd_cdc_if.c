@@ -95,7 +95,13 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
-
+USBD_CDC_LineCodingTypeDef LineCoding =
+{
+  115200, /* baud rate*/
+  0x00,   /* stop bits-1*/
+  0x00,   /* parity - none*/
+  0x08    /* nb. of bits 8*/
+};
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -110,7 +116,7 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
+extern UART_HandleTypeDef huart1;
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
@@ -221,11 +227,24 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
   /*******************************************************************************/
     case CDC_SET_LINE_CODING:
+    LineCoding.bitrate    = (uint32_t)(pbuf[0] | (pbuf[1] << 8) |\
+	    		(pbuf[2] << 16) | (pbuf[3] << 24));
+    LineCoding.format     = pbuf[4];
+    LineCoding.paritytype = pbuf[5];
+    LineCoding.datatype   = pbuf[6];
 
+    /* Set the new configuration */
+    GNSS_Config(&LineCoding);
     break;
 
     case CDC_GET_LINE_CODING:
-
+    pbuf[0] = (uint8_t)(LineCoding.bitrate);
+    pbuf[1] = (uint8_t)(LineCoding.bitrate >> 8);
+    pbuf[2] = (uint8_t)(LineCoding.bitrate >> 16);
+    pbuf[3] = (uint8_t)(LineCoding.bitrate >> 24);
+    pbuf[4] = LineCoding.format;
+    pbuf[5] = LineCoding.paritytype;
+    pbuf[6] = LineCoding.datatype;
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
@@ -316,10 +335,15 @@ static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
+/**
+  * @brief  Tx Transfer completed callback
+  * @param  huart: UART handle
+  * @retval None
+  */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-	// Do this when transmit is complete
-	USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  /* Initiate next USB packet transfer once UART completes transfer (transmitting data over Tx line) */
+  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 }
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
