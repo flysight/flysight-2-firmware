@@ -58,4 +58,7 @@ void FS_GNSS_Timepulse(void);
 const FS_GNSS_Time_t *FS_GNSS_GetTime(void);
 void FS_GNSS_TimeReady_Callback(void);
 
+// Temporary function for CDC interface
+void GNSS_Transmit(uint8_t *buf, uint16_t len);
+
 #endif /* GNSS_H_ */

@@ -871,3 +871,10 @@ __weak void FS_GNSS_TimeReady_Callback(void)
            the FS_Baro_DataReady_Callback could be implemented in the user file
    */
 }
+
+// Temporary functions for CDC interface
+void GNSS_Transmit(uint8_t *buf, uint16_t len)
+{
+	// Transmit packet to GNSS
+	HAL_UART_Transmit_IT(&huart1, buf, len);
+}
