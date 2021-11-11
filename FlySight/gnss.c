@@ -693,6 +693,7 @@ static void FS_GNSS_InitMessages(void)
 
 void FS_GNSS_Init(void)
 {
+#if 0
 	const ubxCfgPrt_t cfgPrt =
 	{
 		.portID       = 1,         // UART 1
@@ -705,14 +706,14 @@ void FS_GNSS_Init(void)
 		.flags        = 0,         // Flags bit mask
 		.reserved5    = 0          // Reserved, set to 0
 	};
-
+#endif
 	// Reset state
 	gnssDynModel = 3;
 	gnssMeasRate = 200;
 	gnssTimeOfWeek = 0;
 	gnssMsgReceived = 0;
 	validTime = false;
-
+#if 0
 	do
 	{
 		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
@@ -755,10 +756,20 @@ void FS_GNSS_Init(void)
 		FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_PRT, sizeof(cfgPrt), &cfgPrt);
 	}
 	while (!FS_GNSS_WaitForAck(UBX_CFG, UBX_CFG_PRT, GNSS_TIMEOUT));
-#if 0
+
 	// Configure UBX messages
 	FS_GNSS_InitMessages();
 #endif
+	// Begin DMA transfer
+	if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	// Reset state machine
+	gnssRxIndex = 0;
+	gnssState = st_sync_1;
+
 	// Initialize GNSS task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, UTIL_SEQ_RFU, FS_GNSS_Update);
 

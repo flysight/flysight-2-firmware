@@ -495,7 +495,9 @@ void APP_BLE_Init( void )
   /**
    * Start to Advertise to be connected by P2P Client
    */
+#if 0
    Adv_Request(APP_BLE_FAST_ADV);
+#endif
 
 /* USER CODE BEGIN APP_BLE_Init_2 */
 
