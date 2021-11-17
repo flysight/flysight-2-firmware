@@ -61,19 +61,34 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define IMU_MOSI_Pin GPIO_PIN_5
+#define IMU_MOSI_GPIO_Port GPIOB
+#define IMU_MISO_Pin GPIO_PIN_4
+#define IMU_MISO_GPIO_Port GPIOB
+#define IMU_NCS_Pin GPIO_PIN_15
+#define IMU_NCS_GPIO_Port GPIOA
 #define GNSS_TXD_Pin GPIO_PIN_10
 #define GNSS_TXD_GPIO_Port GPIOA
 #define GNSS_RXD_Pin GPIO_PIN_6
 #define GNSS_RXD_GPIO_Port GPIOB
 #define GNSS_EXTINT_Pin GPIO_PIN_12
 #define GNSS_EXTINT_GPIO_Port GPIOB
+#define IMU_SCK_Pin GPIO_PIN_5
+#define IMU_SCK_GPIO_Port GPIOA
 #define VCC_EN_Pin GPIO_PIN_1
 #define VCC_EN_GPIO_Port GPIOH
+#define LED_R_Pin GPIO_PIN_14
+#define LED_R_GPIO_Port GPIOD
 #define GNSS_SAFEBOOT_N_Pin GPIO_PIN_2
 #define GNSS_SAFEBOOT_N_GPIO_Port GPIOD
+#define IMU_INT1_Pin GPIO_PIN_9
+#define IMU_INT1_GPIO_Port GPIOC
+#define IMU_INT1_EXTI_IRQn EXTI9_5_IRQn
 #define GNSS_PPS_Pin GPIO_PIN_3
 #define GNSS_PPS_GPIO_Port GPIOD
 #define GNSS_PPS_EXTI_IRQn EXTI3_IRQn
+#define LED_G_Pin GPIO_PIN_15
+#define LED_G_GPIO_Port GPIOD
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

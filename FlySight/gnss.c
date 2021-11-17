@@ -855,7 +855,7 @@ const FS_GNSS_Data_t *FS_GNSS_GetData(void)
 __weak void FS_GNSS_DataReady_Callback(void)
 {
   /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_Baro_DataReady_Callback could be implemented in the user file
+           the FS_GNSS_DataReady_Callback could be implemented in the user file
    */
 }
 
@@ -879,7 +879,7 @@ const FS_GNSS_Time_t *FS_GNSS_GetTime(void)
 __weak void FS_GNSS_TimeReady_Callback(void)
 {
   /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_Baro_DataReady_Callback could be implemented in the user file
+           the FS_GNSS_TimeReady_Callback could be implemented in the user file
    */
 }
 
