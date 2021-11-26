@@ -16,6 +16,9 @@ extern UART_HandleTypeDef huart1;
 
 void FS_USBMode_Init(void)
 {
+	/* Set GNSS_SAFEBOOT_N */
+	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_SET);
+
 	/* Enable VCC */
 	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_SET);
 
@@ -70,4 +73,7 @@ void FS_USBMode_DeInit(void)
 
 	/* Disable VCC */
 	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
+
+	/* Reset GNSS_SAFEBOOT_N */
+	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_RESET);
 }

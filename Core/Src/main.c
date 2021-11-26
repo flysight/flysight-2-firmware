@@ -422,10 +422,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LED_R_Pin|LED_G_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOD, LED_R_Pin|GNSS_SAFEBOOT_N_Pin|LED_G_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : VBUS_DIV_Pin */
   GPIO_InitStruct.Pin = VBUS_DIV_Pin;
