@@ -57,14 +57,20 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void PeriphClock_Config(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define VBUS_DIV_Pin GPIO_PIN_2
+#define VBUS_DIV_GPIO_Port GPIOA
+#define VBUS_DIV_EXTI_IRQn EXTI2_IRQn
 #define IMU_MOSI_Pin GPIO_PIN_5
 #define IMU_MOSI_GPIO_Port GPIOB
 #define IMU_MISO_Pin GPIO_PIN_4
 #define IMU_MISO_GPIO_Port GPIOB
+#define BUTTON_Pin GPIO_PIN_12
+#define BUTTON_GPIO_Port GPIOC
+#define BUTTON_EXTI_IRQn EXTI15_10_IRQn
 #define IMU_NCS_Pin GPIO_PIN_15
 #define IMU_NCS_GPIO_Port GPIOA
 #define GNSS_TXD_Pin GPIO_PIN_10
@@ -89,6 +95,7 @@ void Error_Handler(void);
 #define GNSS_PPS_EXTI_IRQn EXTI3_IRQn
 #define LED_G_Pin GPIO_PIN_15
 #define LED_G_GPIO_Port GPIOD
+void   MX_USART1_UART_Init(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

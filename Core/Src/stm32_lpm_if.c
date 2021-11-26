@@ -315,7 +315,10 @@ static void ExitLowPower( void )
   {
 /* Restore the clock configuration of the application in this user section */
 /* USER CODE BEGIN ExitLowPower_1 */
-
+    LL_RCC_HSE_Enable( );
+    while(!LL_RCC_HSE_IsReady( ));
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_HSE);
+    while (LL_RCC_GetSysClkSource( ) != LL_RCC_SYS_CLKSOURCE_STATUS_HSE);
 /* USER CODE END ExitLowPower_1 */
   }
   else

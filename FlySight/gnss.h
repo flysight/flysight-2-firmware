@@ -45,7 +45,14 @@ typedef struct
 	uint16_t week;      // Time pulse week number
 } FS_GNSS_Time_t;
 
-void FS_GNSS_Init(void);
+typedef enum
+{
+	FS_GNSS_MODE_SLEEP,
+	FS_GNSS_MODE_ACTIVE,
+	FS_GNSS_MODE_USB
+} FS_GNSS_Mode_t;
+
+void FS_GNSS_Init(FS_GNSS_Mode_t newMode);
 void FS_GNSS_DeInit(void);
 
 void FS_GNSS_Start(void);

@@ -15,16 +15,16 @@
 #define CS_HIGH()	{ HAL_GPIO_WritePin(IMU_NCS_GPIO_Port, IMU_NCS_Pin, GPIO_PIN_SET); }
 #define CS_LOW()	{ HAL_GPIO_WritePin(IMU_NCS_GPIO_Port, IMU_NCS_Pin, GPIO_PIN_RESET); }
 
-#define LSM6DS3H_REG_FUNC_CFG_ACCESS 0x01
-#define LSM6DS3H_REG_INT1_CTRL       0x0d
-#define LSM6DS3H_REG_WHO_AM_I        0x0f
-#define LSM6DS3H_REG_CTRL1_XL        0x10
-#define LSM6DS3H_REG_CTRL2_G         0x11
-#define LSM6DS3H_REG_CTRL3_C         0x12
-#define LSM6DS3H_REG_CTRL4_C         0x13
-#define LSM6DS3H_REG_CTRL9_XL        0x18
-#define LSM6DS3H_REG_CTRL10_C        0x19
-#define LSM6DS3H_OUT_TEMP_L_REG      0x20
+#define LSM6DSO_REG_FUNC_CFG_ACCESS 0x01
+#define LSM6DSO_REG_INT1_CTRL       0x0d
+#define LSM6DSO_REG_WHO_AM_I        0x0f
+#define LSM6DSO_REG_CTRL1_XL        0x10
+#define LSM6DSO_REG_CTRL2_G         0x11
+#define LSM6DSO_REG_CTRL3_C         0x12
+#define LSM6DSO_REG_CTRL4_C         0x13
+#define LSM6DSO_REG_CTRL9_XL        0x18
+#define LSM6DSO_REG_CTRL10_C        0x19
+#define LSM6DSO_OUT_TEMP_L_REG      0x20
 
 static enum {
 	ACCEL_ODR_PD   = 0,
@@ -140,21 +140,21 @@ void FS_IMU_Init(void)
 	do
 	{
 		buf[0] = 0x01;
-		result = FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL3_C, buf, 1);
+		result = FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
 	}
 	while (result != HAL_OK);
 
 	// Wait for reset
 	do
 	{
-		result = FS_IMU_ReadRegister(LSM6DS3H_REG_CTRL3_C, buf, 1);
+		result = FS_IMU_ReadRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
 	}
 	while ((result != HAL_OK) || (buf[0] & 0x01));
 
 	// Check WHO_AM_I register value
 	do
 	{
-		result = FS_IMU_ReadRegister(LSM6DS3H_REG_WHO_AM_I, buf, 1);
+		result = FS_IMU_ReadRegister(LSM6DSO_REG_WHO_AM_I, buf, 1);
 	}
 	while (result != HAL_OK);
 	if (buf[0] != 0x6c)
@@ -166,25 +166,28 @@ void FS_IMU_Start(void)
 	uint8_t buf[1];
 	uint32_t primask_bit;
 
+	// Enable EXTI pin
+	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_9);
+
 	// Accelerometer Data Ready interrupt on INT1
 	buf[0] = 0x01;
-	FS_IMU_WriteRegister(LSM6DS3H_REG_INT1_CTRL, buf, 1);
+	FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, buf, 1);
 
 	// Set accelerometer ODR and FS
 	buf[0] = (accelODR << 4) | (accelFS << 2);
-	FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL1_XL, buf, 1);
+	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL1_XL, buf, 1);
 
 	// Set gyro ODR and FS
 	buf[0] = (gyroODR << 4) | (gyroFS << 2);
-	FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL2_G, buf, 1);
+	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL2_G, buf, 1);
 
 	// Set BDU and push-pull on INT1
 	buf[0] = 0x44;
-	FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL3_C, buf, 1);
+	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
 
 	// Disable I2C
 	buf[0] = 0x04;
-	FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL4_C, buf, 1);
+	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL4_C, buf, 1);
 
 	switch (accelFS)
 	{
@@ -235,7 +238,7 @@ void FS_IMU_Stop(void)
 
 	// Software reset
 	buf[0] = 0x01;
-	if (FS_IMU_WriteRegister(LSM6DS3H_REG_CTRL3_C, buf, 1) != HAL_OK)
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1) != HAL_OK)
 		Error_Handler();
 }
 
@@ -258,7 +261,7 @@ static void FS_IMU_BeginRead(void)
 	HAL_StatusTypeDef res;
 
 	/* Address with read flag */
-	dataBuf[0] = LSM6DS3H_OUT_TEMP_L_REG | 0x80;
+	dataBuf[0] = LSM6DSO_OUT_TEMP_L_REG | 0x80;
 
 	if (busy)
 		Error_Handler();

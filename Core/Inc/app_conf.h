@@ -379,7 +379,7 @@
  *  When set to 1, the low power mode is enable
  *  When set to 0, the device stays in RUN mode
  */
-#define CFG_LPM_SUPPORTED    0
+#define CFG_LPM_SUPPORTED    1
 
 /******************************************************************************
  * RTC interface
@@ -487,7 +487,7 @@ typedef enum
  * keep debugger enabled while in any low power mode when set to 1
  * should be set to 0 in production
  */
-#define CFG_DEBUGGER_SUPPORTED    1
+#define CFG_DEBUGGER_SUPPORTED    0
 
 /**
  * When set to 1, the traces are enabled in the BLE services
@@ -587,6 +587,7 @@ typedef enum
     CFG_FIRST_TASK_ID_WITH_NO_HCICMD = CFG_LAST_TASK_ID_WITH_HCICMD - 1,        /**< Shall be FIRST in the list */
     CFG_TASK_SYSTEM_HCI_ASYNCH_EVT_ID,
 /* USER CODE BEGIN CFG_Task_Id_With_NO_HCI_Cmd_t */
+    CFG_TASK_FS_MODE_UPDATE_ID,
     CFG_TASK_FS_GNSS_UPDATE_ID,
 /* USER CODE END CFG_Task_Id_With_NO_HCI_Cmd_t */
     CFG_LAST_TASK_ID_WITHO_NO_HCICMD                                            /**< Shall be LAST in the list */

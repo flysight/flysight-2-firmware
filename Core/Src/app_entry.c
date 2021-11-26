@@ -33,7 +33,7 @@
 
 /* Private includes -----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "mode.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -404,8 +404,11 @@ void MX_APPE_Process(void)
 
 void UTIL_SEQ_Idle( void )
 {
-#if ( CFG_LPM_SUPPORTED == 1)
-  UTIL_LPM_EnterLowPower( );
+#if (CFG_LPM_SUPPORTED == 1)
+  if (FS_Mode_State() == FS_MODE_STATE_SLEEP)
+  {
+    UTIL_LPM_EnterLowPower();
+  }
 #endif
   return;
 }
