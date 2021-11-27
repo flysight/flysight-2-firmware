@@ -68,6 +68,10 @@ void PeriphClock_Config(void);
 #define IMU_MOSI_GPIO_Port GPIOB
 #define IMU_MISO_Pin GPIO_PIN_4
 #define IMU_MISO_GPIO_Port GPIOB
+#define CHG_EN_HI_Pin GPIO_PIN_10
+#define CHG_EN_HI_GPIO_Port GPIOC
+#define CHG_EN_LO_Pin GPIO_PIN_11
+#define CHG_EN_LO_GPIO_Port GPIOC
 #define BUTTON_Pin GPIO_PIN_12
 #define BUTTON_GPIO_Port GPIOC
 #define BUTTON_EXTI_IRQn EXTI15_10_IRQn
@@ -85,6 +89,9 @@ void PeriphClock_Config(void);
 #define VCC_EN_GPIO_Port GPIOH
 #define LED_R_Pin GPIO_PIN_14
 #define LED_R_GPIO_Port GPIOD
+#define CHG_STAT_Pin GPIO_PIN_7
+#define CHG_STAT_GPIO_Port GPIOD
+#define CHG_STAT_EXTI_IRQn EXTI9_5_IRQn
 #define GNSS_SAFEBOOT_N_Pin GPIO_PIN_2
 #define GNSS_SAFEBOOT_N_GPIO_Port GPIOD
 #define IMU_INT1_Pin GPIO_PIN_9

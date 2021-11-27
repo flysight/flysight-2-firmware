@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "charge.h"
 #include "gnss.h"
 #include "usbd_core.h"
 #include "usb_device.h"
@@ -16,6 +17,9 @@ extern UART_HandleTypeDef huart1;
 
 void FS_USBMode_Init(void)
 {
+	/* Enable charge status */
+	FS_Charge_Init();
+
 	/* Set GNSS_SAFEBOOT_N */
 	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_SET);
 
@@ -42,6 +46,9 @@ void FS_USBMode_Init(void)
 
 void FS_USBMode_DeInit(void)
 {
+	/* Disable charge status */
+	FS_Charge_DeInit();
+
 	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
 
 	/* Disable USB interface */
