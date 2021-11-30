@@ -29,6 +29,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32wbxx_hal.h"
+
 #include "app_conf.h"
 #include "app_entry.h"
 #include "app_common.h"
@@ -40,7 +41,12 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef enum
+{
+  TRANSFER_WAIT,
+  TRANSFER_COMPLETE,
+  TRANSFER_ERROR
+} MAIN_TransferStateTypeDef;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -79,6 +85,14 @@ void PeriphClock_Config(void);
 #define IMU_NCS_GPIO_Port GPIOA
 #define GNSS_TXD_Pin GPIO_PIN_10
 #define GNSS_TXD_GPIO_Port GPIOA
+#define MMC_NCS_Pin GPIO_PIN_0
+#define MMC_NCS_GPIO_Port GPIOD
+#define MMC_CLK_Pin GPIO_PIN_1
+#define MMC_CLK_GPIO_Port GPIOD
+#define MMC_DO_Pin GPIO_PIN_14
+#define MMC_DO_GPIO_Port GPIOB
+#define MMC_DI_Pin GPIO_PIN_15
+#define MMC_DI_GPIO_Port GPIOB
 #define GNSS_RXD_Pin GPIO_PIN_6
 #define GNSS_RXD_GPIO_Port GPIOB
 #define GNSS_EXTINT_Pin GPIO_PIN_12
@@ -103,6 +117,7 @@ void PeriphClock_Config(void);
 #define LED_G_Pin GPIO_PIN_15
 #define LED_G_GPIO_Port GPIOD
 void   MX_USART1_UART_Init(void);
+void   MX_SPI2_Init(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

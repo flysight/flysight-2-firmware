@@ -103,7 +103,13 @@ typedef struct
 	uint8_t  ble_tx_power;
 } FS_Config_Data_t;
 
+typedef enum {
+	FS_CONFIG_OK = 0,
+	FS_CONFIG_ERR
+} FS_Config_Result_t;
+
 void FS_Config_Init(void);
+FS_Config_Result_t FS_Config_Read(const char *filename);
 const FS_Config_Data_t *FS_Config_Get(void);
 
 #endif /* CONFIG_H_ */
