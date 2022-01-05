@@ -16,9 +16,11 @@
 #include "imu.h"
 #include "mag.h"
 #include "sensor.h"
+#include "usb_device.h"
 
 static FATFS fs;
 
+extern USBD_HandleTypeDef hUsbDeviceFS;
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern ADC_HandleTypeDef hadc1;
@@ -90,7 +92,7 @@ void FS_ActiveMode_Init(void)
 	MX_USART1_UART_Init();
 
 	/* Initialize GNSS */
-	FS_GNSS_Init(FS_GNSS_MODE_ACTIVE);
+	FS_GNSS_Init(FS_GNSS_MODE_USB);
 
 	if (FS_Config_Get()->enable_gnss)
 	{
@@ -126,10 +128,41 @@ void FS_ActiveMode_Init(void)
 		/* Start reading sensors */
 		FS_Sensor_Start();
 	}
+
+	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
+
+	/* Configure peripheral clocks */
+	PeriphClock_Config();
+
+	/* Enable USB interface */
+	MX_USB_Device_Init();
 }
 
 void FS_ActiveMode_DeInit(void)
 {
+	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
+
+	/* Disable USB interface */
+	if (USBD_DeInit(&hUsbDeviceFS) != USBD_OK)
+	{
+		Error_Handler();
+	}
+
+	/* Disable USB power */
+	HAL_PWREx_DisableVddUSB();
+
+	/* Get Sem0 */
+	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
+
+	/* Disable HSI48 */
+	LL_RCC_HSI48_Disable();
+
+	/* Release Sem0 */
+	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
+
+	/* Release HSI48 semaphore */
+	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
+
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
 	{
 		/* Stop reading sensors */
