@@ -19,9 +19,14 @@
 #define LOG_UPDATE_MSEC 10
 #define LOG_UPDATE_RATE (LOG_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
+#define MAG_COUNT	2
 #define GNSS_COUNT	2
 #define TIME_COUNT	2
 #define IMU_COUNT   133
+
+static          FS_Mag_Data_t magBuf[MAG_COUNT];	// data buffer
+static          uint32_t      magRdI;				// read index
+static volatile uint32_t      magWrI;				// write index
 
 static          FS_GNSS_Data_t gnssBuf[GNSS_COUNT];	// data buffer
 static          uint32_t       gnssRdI;				// read index
@@ -46,6 +51,7 @@ static char date[15], time[15];
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
+	FS_LOG_SENSOR_MAG,
 	FS_LOG_SENSOR_TIME,
 	FS_LOG_SENSOR_IMU
 } FS_Log_SensorType_t ;
@@ -70,10 +76,39 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 			}											\
 		}
 
+	HANDLE_SENSOR(magRdI,  magWrI,  magBuf,  MAG_COUNT,  FS_LOG_SENSOR_MAG);
 	HANDLE_SENSOR(timeRdI, timeWrI, timeBuf, TIME_COUNT, FS_LOG_SENSOR_TIME);
 	HANDLE_SENSOR(imuRdI,  imuWrI,  imuBuf,  IMU_COUNT,  FS_LOG_SENSOR_IMU);
 
 	return nextType;
+}
+
+void FS_Log_UpdateMag(void)
+{
+	char row[150];
+
+	// Get current data point
+	FS_Mag_Data_t *data = &magBuf[magRdI % MAG_COUNT];
+
+	// Write to disk
+	char *ptr = row + sizeof(row);
+	*(--ptr) = 0;
+
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	ptr = writeInt32ToBuf(ptr, data->z,           3, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->y,           3, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->x,           3, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'G';
+	*(--ptr) = 'A';
+	*(--ptr) = 'M';
+	*(--ptr) = '$';
+
+	f_puts(ptr, &sensorFile);
+
+	// Increment read index
+	++magRdI;
 }
 
 void FS_Log_UpdateGNSS(void)
@@ -206,6 +241,9 @@ static void FS_Log_Update(void)
 
 		switch (next)
 		{
+		case FS_LOG_SENSOR_MAG:
+			FS_Log_UpdateMag();
+			break;
 		case FS_LOG_SENSOR_TIME:
 			FS_Log_UpdateTime();
 			break;
@@ -223,6 +261,8 @@ void FS_Log_Init(uint32_t sessionId)
 	char filename[50];
 
 	// Reset state
+	magRdI = 0;
+	magWrI = 0;
 	gnssRdI = 0;
 	gnssWrI = 0;
 	timeRdI = 0;
@@ -253,6 +293,8 @@ void FS_Log_Init(uint32_t sessionId)
 		Error_Handler();
 	}
 
+	f_printf(&sensorFile, "$HEAD,time,x,y,z,temperature\n");
+	f_printf(&sensorFile, "$HEAD,(s),(gauss),(gauss),(gauss),(degrees C)\n");
 	f_printf(&sensorFile, "$HEAD,time,wx,wy,wz,ax,ay,az,temperature\n");
 	f_printf(&sensorFile, "$HEAD,(s),(deg/s),(deg/s),(deg/s),(g),(g),(g),(degrees C)\n");
 	f_printf(&sensorFile, "$HEAD,time,towMS,week\n");
@@ -287,6 +329,16 @@ void FS_Log_DeInit(uint32_t sessionId)
 		sprintf(newPath, "/%s/%s", date, time);
 		f_rename(oldPath, newPath);
 	}
+}
+
+void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
+{
+	// Copy to circular buffer
+	FS_Mag_Data_t *saved = &magBuf[magWrI % MAG_COUNT];
+	memcpy(saved, current, sizeof(FS_Mag_Data_t));
+
+	// Increment write index
+	++magWrI;
 }
 
 void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current)

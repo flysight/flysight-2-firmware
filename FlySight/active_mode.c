@@ -12,6 +12,8 @@
 #include "control.h"
 #include "gnss.h"
 #include "imu.h"
+#include "mag.h"
+#include "sensor.h"
 
 static FATFS fs;
 
@@ -85,10 +87,34 @@ void FS_ActiveMode_Init(void)
 		/* Stop GNSS */
 		FS_GNSS_Stop();
 	}
+
+	if (FS_Config_Get()->enable_mag)
+	{
+		/* Start magnetometer */
+		FS_Mag_Start();
+	}
+
+	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
+	{
+		/* Start reading sensors */
+		FS_Sensor_Start();
+	}
 }
 
 void FS_ActiveMode_DeInit(void)
 {
+	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
+	{
+		/* Stop reading sensors */
+		FS_Sensor_Stop();
+	}
+
+	if (FS_Config_Get()->enable_mag)
+	{
+		/* Stop magnetometer */
+		FS_Mag_Stop();
+	}
+
 	/* Disable GNSS */
 	FS_GNSS_DeInit();
 

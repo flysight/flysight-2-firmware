@@ -14,6 +14,7 @@
 #include "imu.h"
 #include "led.h"
 #include "log.h"
+#include "mag.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
@@ -60,6 +61,15 @@ void FS_Control_DeInit(void)
 
 	// Increment session counter
 	++sessionId;
+}
+
+void FS_Mag_DataReady_Callback(void)
+{
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Save to log file
+		FS_Log_WriteMagData(FS_Mag_GetData());
+	}
 }
 
 void FS_GNSS_DataReady_Callback(void)

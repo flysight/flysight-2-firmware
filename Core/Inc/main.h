@@ -70,6 +70,10 @@ void PeriphClock_Config(void);
 #define VBUS_DIV_Pin GPIO_PIN_2
 #define VBUS_DIV_GPIO_Port GPIOA
 #define VBUS_DIV_EXTI_IRQn EXTI2_IRQn
+#define SENSOR_SDA_Pin GPIO_PIN_1
+#define SENSOR_SDA_GPIO_Port GPIOC
+#define SENSOR_SCL_Pin GPIO_PIN_0
+#define SENSOR_SCL_GPIO_Port GPIOC
 #define IMU_MOSI_Pin GPIO_PIN_5
 #define IMU_MOSI_GPIO_Port GPIOB
 #define IMU_MISO_Pin GPIO_PIN_4
@@ -89,6 +93,9 @@ void PeriphClock_Config(void);
 #define MMC_NCS_GPIO_Port GPIOD
 #define MMC_CLK_Pin GPIO_PIN_1
 #define MMC_CLK_GPIO_Port GPIOD
+#define MAG_INT_Pin GPIO_PIN_6
+#define MAG_INT_GPIO_Port GPIOC
+#define MAG_INT_EXTI_IRQn EXTI9_5_IRQn
 #define MMC_DO_Pin GPIO_PIN_14
 #define MMC_DO_GPIO_Port GPIOB
 #define MMC_DI_Pin GPIO_PIN_15
