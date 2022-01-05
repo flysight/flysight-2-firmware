@@ -9,8 +9,10 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "baro.h"
 #include "config.h"
 #include "gnss.h"
+#include "hum.h"
 #include "imu.h"
 #include "led.h"
 #include "log.h"
@@ -61,6 +63,24 @@ void FS_Control_DeInit(void)
 
 	// Increment session counter
 	++sessionId;
+}
+
+void FS_Baro_DataReady_Callback(void)
+{
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Save to log file
+		FS_Log_WriteBaroData(FS_Baro_GetData());
+	}
+}
+
+void FS_Hum_DataReady_Callback(void)
+{
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Save to log file
+		FS_Log_WriteHumData(FS_Hum_GetData());
+	}
 }
 
 void FS_Mag_DataReady_Callback(void)

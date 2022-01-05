@@ -8,9 +8,11 @@
 #include "main.h"
 #include "app_common.h"
 #include "app_fatfs.h"
+#include "baro.h"
 #include "config.h"
 #include "control.h"
 #include "gnss.h"
+#include "hum.h"
 #include "imu.h"
 #include "mag.h"
 #include "sensor.h"
@@ -88,6 +90,18 @@ void FS_ActiveMode_Init(void)
 		FS_GNSS_Stop();
 	}
 
+	if (FS_Config_Get()->enable_baro)
+	{
+		/* Start barometer */
+		FS_Baro_Start();
+	}
+
+	if (FS_Config_Get()->enable_hum)
+	{
+		/* Start humidity and temperature */
+		FS_Hum_Start();
+	}
+
 	if (FS_Config_Get()->enable_mag)
 	{
 		/* Start magnetometer */
@@ -113,6 +127,18 @@ void FS_ActiveMode_DeInit(void)
 	{
 		/* Stop magnetometer */
 		FS_Mag_Stop();
+	}
+
+	if (FS_Config_Get()->enable_hum)
+	{
+		/* Stop humidity and temperature */
+		FS_Hum_Stop();
+	}
+
+	if (FS_Config_Get()->enable_baro)
+	{
+		/* Stop barometer */
+		FS_Baro_Stop();
 	}
 
 	/* Disable GNSS */

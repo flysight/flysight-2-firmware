@@ -23,8 +23,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "baro.h"
 #include "button.h"
 #include "gnss.h"
+#include "hum.h"
 #include "imu.h"
 #include "led.h"
 #include "mag.h"
@@ -130,6 +132,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   FS_IMU_Init();
   FS_Mag_Init();
+  FS_Baro_Init();
+  FS_Hum_Init();
   /* USER CODE END 2 */
 
   /* Init code for STM32_WPAN */
@@ -525,6 +529,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
@@ -580,12 +585,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : BARO_INT_Pin */
+  GPIO_InitStruct.Pin = BARO_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BARO_INT_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : GNSS_EXTINT_Pin */
   GPIO_InitStruct.Pin = GNSS_EXTINT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GNSS_EXTINT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : HUM_DRDY_Pin */
+  GPIO_InitStruct.Pin = HUM_DRDY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(HUM_DRDY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : VCC_EN_Pin */
   GPIO_InitStruct.Pin = VCC_EN_Pin;
@@ -626,6 +643,9 @@ static void MX_GPIO_Init(void)
 
   HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -730,6 +750,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     break;
   case VBUS_DIV_Pin:
     FS_VBUS_Triggered();
+    break;
+  case BARO_INT_Pin:
+    FS_Baro_Read();
+    break;
+  case HUM_DRDY_Pin:
+    FS_Hum_Read();
     break;
   case MAG_INT_Pin:
     FS_Mag_Read();

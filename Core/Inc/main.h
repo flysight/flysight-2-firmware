@@ -102,8 +102,14 @@ void PeriphClock_Config(void);
 #define MMC_DI_GPIO_Port GPIOB
 #define GNSS_RXD_Pin GPIO_PIN_6
 #define GNSS_RXD_GPIO_Port GPIOB
+#define BARO_INT_Pin GPIO_PIN_13
+#define BARO_INT_GPIO_Port GPIOC
+#define BARO_INT_EXTI_IRQn EXTI15_10_IRQn
 #define GNSS_EXTINT_Pin GPIO_PIN_12
 #define GNSS_EXTINT_GPIO_Port GPIOB
+#define HUM_DRDY_Pin GPIO_PIN_4
+#define HUM_DRDY_GPIO_Port GPIOE
+#define HUM_DRDY_EXTI_IRQn EXTI4_IRQn
 #define IMU_SCK_Pin GPIO_PIN_5
 #define IMU_SCK_GPIO_Port GPIOA
 #define VCC_EN_Pin GPIO_PIN_1

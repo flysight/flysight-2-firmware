@@ -19,10 +19,20 @@
 #define LOG_UPDATE_MSEC 10
 #define LOG_UPDATE_RATE (LOG_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
+#define BARO_COUNT	4
+#define HUM_COUNT	2
 #define MAG_COUNT	2
 #define GNSS_COUNT	2
 #define TIME_COUNT	2
 #define IMU_COUNT   133
+
+static          FS_Baro_Data_t baroBuf[BARO_COUNT];	// data buffer
+static          uint32_t       baroRdI;				// read index
+static volatile uint32_t       baroWrI;				// write index
+
+static          FS_Hum_Data_t humBuf[HUM_COUNT];	// data buffer
+static          uint32_t      humRdI;				// read index
+static volatile uint32_t      humWrI;				// write index
 
 static          FS_Mag_Data_t magBuf[MAG_COUNT];	// data buffer
 static          uint32_t      magRdI;				// read index
@@ -51,6 +61,8 @@ static char date[15], time[15];
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
+	FS_LOG_SENSOR_BARO,
+	FS_LOG_SENSOR_HUM,
 	FS_LOG_SENSOR_MAG,
 	FS_LOG_SENSOR_TIME,
 	FS_LOG_SENSOR_IMU
@@ -76,11 +88,66 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 			}											\
 		}
 
+	HANDLE_SENSOR(baroRdI, baroWrI, baroBuf, BARO_COUNT, FS_LOG_SENSOR_BARO);
+	HANDLE_SENSOR(humRdI,  humWrI,  humBuf,  HUM_COUNT,  FS_LOG_SENSOR_HUM);
 	HANDLE_SENSOR(magRdI,  magWrI,  magBuf,  MAG_COUNT,  FS_LOG_SENSOR_MAG);
 	HANDLE_SENSOR(timeRdI, timeWrI, timeBuf, TIME_COUNT, FS_LOG_SENSOR_TIME);
 	HANDLE_SENSOR(imuRdI,  imuWrI,  imuBuf,  IMU_COUNT,  FS_LOG_SENSOR_IMU);
 
 	return nextType;
+}
+
+void FS_Log_UpdateHum(void)
+{
+	char row[150];
+
+	// Get current data point
+	FS_Hum_Data_t *data = &humBuf[humRdI % HUM_COUNT];
+
+	// Write to disk
+	char *ptr = row + sizeof(row);
+	*(--ptr) = 0;
+
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	ptr = writeInt32ToBuf(ptr, data->humidity,    1, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'M';
+	*(--ptr) = 'U';
+	*(--ptr) = 'H';
+	*(--ptr) = '$';
+
+	f_puts(ptr, &sensorFile);
+
+	// Increment read index
+	++humRdI;
+}
+
+void FS_Log_UpdateBaro(void)
+{
+	char row[150];
+
+	// Get current data point
+	FS_Baro_Data_t *data = &baroBuf[baroRdI % BARO_COUNT];
+
+	// Write to disk
+	char *ptr = row + sizeof(row);
+	*(--ptr) = 0;
+
+	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
+	ptr = writeInt32ToBuf(ptr, data->pressure,    2, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'O';
+	*(--ptr) = 'R';
+	*(--ptr) = 'A';
+	*(--ptr) = 'B';
+	*(--ptr) = '$';
+
+	f_puts(ptr, &sensorFile);
+
+	// Increment read index
+	++baroRdI;
 }
 
 void FS_Log_UpdateMag(void)
@@ -241,6 +308,12 @@ static void FS_Log_Update(void)
 
 		switch (next)
 		{
+		case FS_LOG_SENSOR_BARO:
+			FS_Log_UpdateBaro();
+			break;
+		case FS_LOG_SENSOR_HUM:
+			FS_Log_UpdateHum();
+			break;
 		case FS_LOG_SENSOR_MAG:
 			FS_Log_UpdateMag();
 			break;
@@ -261,6 +334,10 @@ void FS_Log_Init(uint32_t sessionId)
 	char filename[50];
 
 	// Reset state
+	baroRdI = 0;
+	baroWrI = 0;
+	humRdI = 0;
+	humWrI = 0;
 	magRdI = 0;
 	magWrI = 0;
 	gnssRdI = 0;
@@ -293,6 +370,10 @@ void FS_Log_Init(uint32_t sessionId)
 		Error_Handler();
 	}
 
+	f_printf(&sensorFile, "$HEAD,time,pressure,temperature\n");
+	f_printf(&sensorFile, "$HEAD,(s),(Pa),(degrees C)\n");
+	f_printf(&sensorFile, "$HEAD,time,humidity,temperature\n");
+	f_printf(&sensorFile, "$HEAD,(s),(percent),(degrees C)\n");
 	f_printf(&sensorFile, "$HEAD,time,x,y,z,temperature\n");
 	f_printf(&sensorFile, "$HEAD,(s),(gauss),(gauss),(gauss),(degrees C)\n");
 	f_printf(&sensorFile, "$HEAD,time,wx,wy,wz,ax,ay,az,temperature\n");
@@ -329,6 +410,26 @@ void FS_Log_DeInit(uint32_t sessionId)
 		sprintf(newPath, "/%s/%s", date, time);
 		f_rename(oldPath, newPath);
 	}
+}
+
+void FS_Log_WriteBaroData(const FS_Baro_Data_t *current)
+{
+	// Copy to circular buffer
+	FS_Baro_Data_t *saved = &baroBuf[baroWrI % BARO_COUNT];
+	memcpy(saved, current, sizeof(FS_Baro_Data_t));
+
+	// Increment write index
+	++baroWrI;
+}
+
+void FS_Log_WriteHumData(const FS_Hum_Data_t *current)
+{
+	// Copy to circular buffer
+	FS_Hum_Data_t *saved = &humBuf[humWrI % HUM_COUNT];
+	memcpy(saved, current, sizeof(FS_Hum_Data_t));
+
+	// Increment write index
+	++humWrI;
 }
 
 void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
