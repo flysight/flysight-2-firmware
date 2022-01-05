@@ -110,12 +110,16 @@ void PeriphClock_Config(void);
 #define HUM_DRDY_Pin GPIO_PIN_4
 #define HUM_DRDY_GPIO_Port GPIOE
 #define HUM_DRDY_EXTI_IRQn EXTI4_IRQn
+#define VBAT_DIV_Pin GPIO_PIN_7
+#define VBAT_DIV_GPIO_Port GPIOA
 #define IMU_SCK_Pin GPIO_PIN_5
 #define IMU_SCK_GPIO_Port GPIOA
 #define VCC_EN_Pin GPIO_PIN_1
 #define VCC_EN_GPIO_Port GPIOH
 #define LED_R_Pin GPIO_PIN_14
 #define LED_R_GPIO_Port GPIOD
+#define VBAT_EN_Pin GPIO_PIN_12
+#define VBAT_EN_GPIO_Port GPIOD
 #define CHG_STAT_Pin GPIO_PIN_7
 #define CHG_STAT_GPIO_Port GPIOD
 #define CHG_STAT_EXTI_IRQn EXTI9_5_IRQn
@@ -131,6 +135,7 @@ void PeriphClock_Config(void);
 #define LED_G_GPIO_Port GPIOD
 void   MX_USART1_UART_Init(void);
 void   MX_SPI2_Init(void);
+void   MX_ADC1_Init(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

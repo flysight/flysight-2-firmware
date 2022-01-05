@@ -21,6 +21,7 @@ static FATFS fs;
 
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
+extern ADC_HandleTypeDef hadc1;
 
 void FS_ActiveMode_Init(void)
 {
@@ -66,6 +67,18 @@ void FS_ActiveMode_Init(void)
 
 	/* Initialize controller */
 	FS_Control_Init();
+
+	if (FS_Config_Get()->enable_vbat)
+	{
+		// Enable battery measurement
+		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_SET);
+	}
+
+	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
+	{
+		// Enable ADC
+		MX_ADC1_Init();
+	}
 
 	if (FS_Config_Get()->enable_imu)
 	{
@@ -151,6 +164,21 @@ void FS_ActiveMode_DeInit(void)
 	{
 		/* Stop IMU */
 		FS_IMU_Stop();
+	}
+
+	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
+	{
+		// Disable ADC
+		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
+		{
+			Error_Handler();
+		}
+	}
+
+	if (FS_Config_Get()->enable_vbat)
+	{
+		// Disable battery measurement
+		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_RESET);
 	}
 
 	/* Disable controller */
