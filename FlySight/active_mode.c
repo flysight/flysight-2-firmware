@@ -8,6 +8,7 @@
 #include "main.h"
 #include "app_common.h"
 #include "app_fatfs.h"
+#include "audio.h"
 #include "baro.h"
 #include "config.h"
 #include "control.h"
@@ -69,6 +70,18 @@ void FS_ActiveMode_Init(void)
 
 	/* Initialize controller */
 	FS_Control_Init();
+
+	if (FS_Config_Get()->enable_audio)
+	{
+		/* Initialize audio */
+		FS_Audio_Init();
+	}
+
+	if (FS_Config_Get()->enable_audio && FS_Config_Get()->enable_tone)
+	{
+		/* Play tone */
+		FS_Audio_Beep(220, 220, -1, 0);
+	}
 
 	if (FS_Config_Get()->enable_vbat)
 	{
@@ -212,6 +225,12 @@ void FS_ActiveMode_DeInit(void)
 	{
 		// Disable battery measurement
 		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_RESET);
+	}
+
+	if (FS_Config_Get()->enable_audio)
+	{
+		/* Disable audio */
+		FS_Audio_DeInit();
 	}
 
 	/* Disable controller */

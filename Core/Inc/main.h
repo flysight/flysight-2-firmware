@@ -70,10 +70,18 @@ void PeriphClock_Config(void);
 #define VBUS_DIV_Pin GPIO_PIN_2
 #define VBUS_DIV_GPIO_Port GPIOA
 #define VBUS_DIV_EXTI_IRQn EXTI2_IRQn
+#define AUDIO_SDIN_Pin GPIO_PIN_3
+#define AUDIO_SDIN_GPIO_Port GPIOC
 #define SENSOR_SDA_Pin GPIO_PIN_1
 #define SENSOR_SDA_GPIO_Port GPIOC
+#define AUDIO_LRCLK_Pin GPIO_PIN_9
+#define AUDIO_LRCLK_GPIO_Port GPIOB
 #define SENSOR_SCL_Pin GPIO_PIN_0
 #define SENSOR_SCL_GPIO_Port GPIOC
+#define AUDIO_SCL_Pin GPIO_PIN_8
+#define AUDIO_SCL_GPIO_Port GPIOB
+#define AUDIO_SDA_Pin GPIO_PIN_7
+#define AUDIO_SDA_GPIO_Port GPIOB
 #define IMU_MOSI_Pin GPIO_PIN_5
 #define IMU_MOSI_GPIO_Port GPIOB
 #define IMU_MISO_Pin GPIO_PIN_4
@@ -93,6 +101,8 @@ void PeriphClock_Config(void);
 #define MMC_NCS_GPIO_Port GPIOD
 #define MMC_CLK_Pin GPIO_PIN_1
 #define MMC_CLK_GPIO_Port GPIOD
+#define AUDIO_BCLK_Pin GPIO_PIN_13
+#define AUDIO_BCLK_GPIO_Port GPIOB
 #define MAG_INT_Pin GPIO_PIN_6
 #define MAG_INT_GPIO_Port GPIOC
 #define MAG_INT_EXTI_IRQn EXTI9_5_IRQn
@@ -114,6 +124,8 @@ void PeriphClock_Config(void);
 #define VBAT_DIV_GPIO_Port GPIOA
 #define IMU_SCK_Pin GPIO_PIN_5
 #define IMU_SCK_GPIO_Port GPIOA
+#define AUDIO_MCLK_Pin GPIO_PIN_3
+#define AUDIO_MCLK_GPIO_Port GPIOA
 #define VCC_EN_Pin GPIO_PIN_1
 #define VCC_EN_GPIO_Port GPIOH
 #define LED_R_Pin GPIO_PIN_14
@@ -136,6 +148,8 @@ void PeriphClock_Config(void);
 void   MX_USART1_UART_Init(void);
 void   MX_SPI2_Init(void);
 void   MX_ADC1_Init(void);
+void   MX_I2C1_Init(void);
+void   MX_SAI1_Init(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

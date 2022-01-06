@@ -588,8 +588,11 @@ typedef enum
     CFG_TASK_SYSTEM_HCI_ASYNCH_EVT_ID,
 /* USER CODE BEGIN CFG_Task_Id_With_NO_HCI_Cmd_t */
     CFG_TASK_FS_MODE_UPDATE_ID,
+    CFG_TASK_FS_AUDIO_UPDATE_ID,
     CFG_TASK_FS_GNSS_UPDATE_ID,
     CFG_TASK_FS_LOG_UPDATE_ID,
+    CFG_TASK_FS_AUDIO_CONTROL_PRODUCER_ID,
+    CFG_TASK_FS_AUDIO_CONTROL_CONSUMER_ID,
 /* USER CODE END CFG_Task_Id_With_NO_HCI_Cmd_t */
     CFG_LAST_TASK_ID_WITHO_NO_HCICMD                                            /**< Shall be LAST in the list */
 } CFG_Task_Id_With_NO_HCI_Cmd_t;

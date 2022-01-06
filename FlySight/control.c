@@ -9,6 +9,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "audio_control.h"
 #include "baro.h"
 #include "config.h"
 #include "gnss.h"
@@ -40,6 +41,12 @@ void FS_Control_Init(void)
 	// Initialize LED timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_Control_LED_Timer);
 
+	if (FS_Config_Get()->enable_audio)
+	{
+		// Enable audio control
+		FS_AudioControl_Init();
+	}
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Enable logging
@@ -54,6 +61,12 @@ void FS_Control_DeInit(void)
 
 	// Turn off LEDs
 	FS_LED_Off();
+
+	if (FS_Config_Get()->enable_audio)
+	{
+		// Disable audio control
+		FS_AudioControl_DeInit();
+	}
 
 	if (FS_Config_Get()->enable_logging)
 	{
@@ -95,6 +108,12 @@ void FS_Mag_DataReady_Callback(void)
 void FS_GNSS_DataReady_Callback(void)
 {
 	const FS_GNSS_Data_t *data = FS_GNSS_GetData();
+
+	if (FS_Config_Get()->enable_audio && !FS_Config_Get()->enable_tone)
+	{
+		// Update audio
+		FS_AudioControl_UpdateGNSS(data);
+	}
 
 	if (FS_Config_Get()->enable_logging)
 	{
