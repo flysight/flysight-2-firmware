@@ -89,6 +89,12 @@ void FS_ActiveMode_Init(void)
 		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_SET);
 	}
 
+	if (FS_Config_Get()->enable_mic)
+	{
+		// Enable microphone
+		HAL_GPIO_WritePin(MIC_EN_GPIO_Port, MIC_EN_Pin, GPIO_PIN_SET);
+	}
+
 	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
 	{
 		// Enable ADC
@@ -219,6 +225,12 @@ void FS_ActiveMode_DeInit(void)
 		{
 			Error_Handler();
 		}
+	}
+
+	if (FS_Config_Get()->enable_mic)
+	{
+		// Disable microphone
+		HAL_GPIO_WritePin(MIC_EN_GPIO_Port, MIC_EN_Pin, GPIO_PIN_RESET);
 	}
 
 	if (FS_Config_Get()->enable_vbat)

@@ -710,7 +710,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LED_R_Pin|VBAT_EN_Pin|GNSS_SAFEBOOT_N_Pin|LED_G_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, LED_R_Pin|MIC_EN_Pin|VBAT_EN_Pin|GNSS_SAFEBOOT_N_Pin
+                          |LED_G_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : VBUS_DIV_Pin */
   GPIO_InitStruct.Pin = VBUS_DIV_Pin;
@@ -776,8 +777,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(VCC_EN_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LED_R_Pin VBAT_EN_Pin LED_G_Pin */
-  GPIO_InitStruct.Pin = LED_R_Pin|VBAT_EN_Pin|LED_G_Pin;
+  /*Configure GPIO pins : LED_R_Pin MIC_EN_Pin VBAT_EN_Pin LED_G_Pin */
+  GPIO_InitStruct.Pin = LED_R_Pin|MIC_EN_Pin|VBAT_EN_Pin|LED_G_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

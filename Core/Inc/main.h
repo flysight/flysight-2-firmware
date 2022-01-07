@@ -72,6 +72,8 @@ void PeriphClock_Config(void);
 #define VBUS_DIV_EXTI_IRQn EXTI2_IRQn
 #define AUDIO_SDIN_Pin GPIO_PIN_3
 #define AUDIO_SDIN_GPIO_Port GPIOC
+#define MIC_OUT_Pin GPIO_PIN_2
+#define MIC_OUT_GPIO_Port GPIOC
 #define SENSOR_SDA_Pin GPIO_PIN_1
 #define SENSOR_SDA_GPIO_Port GPIOC
 #define AUDIO_LRCLK_Pin GPIO_PIN_9
@@ -130,6 +132,8 @@ void PeriphClock_Config(void);
 #define VCC_EN_GPIO_Port GPIOH
 #define LED_R_Pin GPIO_PIN_14
 #define LED_R_GPIO_Port GPIOD
+#define MIC_EN_Pin GPIO_PIN_13
+#define MIC_EN_GPIO_Port GPIOD
 #define VBAT_EN_Pin GPIO_PIN_12
 #define VBAT_EN_GPIO_Port GPIOD
 #define CHG_STAT_Pin GPIO_PIN_7
