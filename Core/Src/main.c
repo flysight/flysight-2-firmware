@@ -125,7 +125,7 @@ int main(void)
    MX_IPCC_Init();
 
   /* USER CODE BEGIN SysInit */
-  PeriphClock_Config();
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
