@@ -13,10 +13,13 @@
 #include "usb_device.h"
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
+extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 
 void FS_USBMode_Init(void)
 {
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
 	/* Enable charge status */
 	FS_Charge_Init();
 
@@ -26,11 +29,20 @@ void FS_USBMode_Init(void)
 	/* Enable VCC */
 	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_SET);
 
+	/* Configure MMC_NCS pin */
+	HAL_GPIO_WritePin(MMC_NCS_GPIO_Port, MMC_NCS_Pin, GPIO_PIN_SET);
+
+	GPIO_InitStruct.Pin = MMC_NCS_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
+
 	/* Enable USART */
 	MX_USART1_UART_Init();
 
 	/* Initialize GNSS */
-	FS_GNSS_Init(FS_GNSS_MODE_USB);
+	FS_GNSS_Init();
 
 	/* Stop GNSS */
 	FS_GNSS_Stop();
@@ -77,6 +89,12 @@ void FS_USBMode_DeInit(void)
 
 	/* Disable USART */
 	HAL_UART_DeInit(&huart1);
+
+	/* Disable SPI */
+	HAL_SPI_DeInit(&hspi2);
+
+	/* Disable MMC_NCS pin */
+	HAL_GPIO_DeInit(MMC_NCS_GPIO_Port, MMC_NCS_Pin);
 
 	/* Disable VCC */
 	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);

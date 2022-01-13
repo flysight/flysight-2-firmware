@@ -45,14 +45,7 @@ typedef struct
 	uint16_t week;      // Time pulse week number
 } FS_GNSS_Time_t;
 
-typedef enum
-{
-	FS_GNSS_MODE_SLEEP,
-	FS_GNSS_MODE_ACTIVE,
-	FS_GNSS_MODE_USB
-} FS_GNSS_Mode_t;
-
-void FS_GNSS_Init(FS_GNSS_Mode_t newMode);
+void FS_GNSS_Init(void);
 void FS_GNSS_DeInit(void);
 
 void FS_GNSS_Start(void);
@@ -64,10 +57,5 @@ void FS_GNSS_DataReady_Callback(void);
 void FS_GNSS_Timepulse(void);
 const FS_GNSS_Time_t *FS_GNSS_GetTime(void);
 void FS_GNSS_TimeReady_Callback(void);
-
-// Temporary functions for CDC interface
-#include "usbd_cdc.h"
-void GNSS_Config(USBD_CDC_LineCodingTypeDef *lineCoding);
-void GNSS_Transmit(uint8_t *buf, uint16_t len);
 
 #endif /* GNSS_H_ */

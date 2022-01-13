@@ -11,9 +11,8 @@
 #include "app_common.h"
 #include "gnss.h"
 #include "stm32_seq.h"
-#include "usbd_cdc_if.h"
 
-#define GNSS_RATE           115200	// Baud rate
+#define GNSS_RATE           230400	// Baud rate
 #define GNSS_TIMEOUT        100		// ACK/NAK timeout (ms)
 
 #define GNSS_RX_BUF_LEN		512		// Circular buffer for UART
@@ -329,8 +328,6 @@ static FS_GNSS_Data_t gnssData;
 static FS_GNSS_Time_t gnssTime;
 
 static uint8_t timer_id;
-
-static FS_GNSS_Mode_t currentMode = FS_GNSS_MODE_SLEEP;
 
 static enum
 {
@@ -693,7 +690,7 @@ static void FS_GNSS_InitMessages(void)
 	#undef SEND_MESSAGE
 }
 
-void FS_GNSS_Init(FS_GNSS_Mode_t newMode)
+void FS_GNSS_Init(void)
 {
 	const ubxCfgPrt_t cfgPrt =
 	{
@@ -715,56 +712,34 @@ void FS_GNSS_Init(FS_GNSS_Mode_t newMode)
 	gnssMsgReceived = 0;
 	validTime = false;
 
-	if (newMode == FS_GNSS_MODE_ACTIVE)
+	do
 	{
-		do
+		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
+
+		// Stop DMA transfer
+		if (HAL_UART_Abort(&huart1) != HAL_OK)
 		{
-			while (huart1.gState == HAL_UART_STATE_BUSY_TX);
-
-			// Stop DMA transfer
-			if (HAL_UART_Abort(&huart1) != HAL_OK)
-			{
-				Error_Handler();
-			}
-
-			// Configure port baud rate
-			huart1.Init.BaudRate = 9600;
-			if (HAL_UART_Init(&huart1) != HAL_OK)
-			{
-				Error_Handler();
-			}
-
-			// Configure UBX baud rate
-			FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_PRT, sizeof(cfgPrt), &cfgPrt);
-			while (huart1.gState == HAL_UART_STATE_BUSY_TX);
-
-			// Configure port baud rate
-			huart1.Init.BaudRate = GNSS_RATE;
-			if (HAL_UART_Init(&huart1) != HAL_OK)
-			{
-				Error_Handler();
-			}
-
-			// Begin DMA transfer
-			if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
-			{
-				Error_Handler();
-			}
-
-			// Reset state machine
-			gnssRxIndex = 0;
-			gnssState = st_sync_1;
-
-			// Configure UBX baud rate
-			FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_PRT, sizeof(cfgPrt), &cfgPrt);
+			Error_Handler();
 		}
-		while (!FS_GNSS_WaitForAck(UBX_CFG, UBX_CFG_PRT, GNSS_TIMEOUT));
 
-		// Configure UBX messages
-		FS_GNSS_InitMessages();
-	}
-	else if (newMode == FS_GNSS_MODE_USB)
-	{
+		// Configure port baud rate
+		huart1.Init.BaudRate = 9600;
+		if (HAL_UART_Init(&huart1) != HAL_OK)
+		{
+			Error_Handler();
+		}
+
+		// Configure UBX baud rate
+		FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_PRT, sizeof(cfgPrt), &cfgPrt);
+		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
+
+		// Configure port baud rate
+		huart1.Init.BaudRate = GNSS_RATE;
+		if (HAL_UART_Init(&huart1) != HAL_OK)
+		{
+			Error_Handler();
+		}
+
 		// Begin DMA transfer
 		if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
 		{
@@ -774,7 +749,14 @@ void FS_GNSS_Init(FS_GNSS_Mode_t newMode)
 		// Reset state machine
 		gnssRxIndex = 0;
 		gnssState = st_sync_1;
+
+		// Configure UBX baud rate
+		FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_PRT, sizeof(cfgPrt), &cfgPrt);
 	}
+	while (!FS_GNSS_WaitForAck(UBX_CFG, UBX_CFG_PRT, GNSS_TIMEOUT));
+
+	// Configure UBX messages
+	FS_GNSS_InitMessages();
 
 	// Initialize GNSS task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, UTIL_SEQ_RFU, FS_GNSS_Update);
@@ -782,8 +764,6 @@ void FS_GNSS_Init(FS_GNSS_Mode_t newMode)
 	// Initialize GNSS update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_GNSS_Timer);
 	HW_TS_Start(timer_id, GNSS_UPDATE_RATE);
-
-	currentMode = newMode;
 }
 
 void FS_GNSS_DeInit(void)
@@ -793,8 +773,6 @@ void FS_GNSS_DeInit(void)
 
 	// Delete GNSS update timer
 	HW_TS_Delete(timer_id);
-
-	currentMode = FS_GNSS_MODE_SLEEP;
 }
 
 void FS_GNSS_Start(void)
@@ -830,39 +808,13 @@ static void FS_GNSS_Timer(void)
 
 static void FS_GNSS_Update(void)
 {
-	if (currentMode == FS_GNSS_MODE_ACTIVE)
+	uint32_t writeIndex = GNSS_RX_BUF_LEN - huart1.hdmarx->Instance->CNDTR;
+
+	while (gnssRxIndex != writeIndex)
 	{
-		uint32_t writeIndex = GNSS_RX_BUF_LEN - huart1.hdmarx->Instance->CNDTR;
-
-		while (gnssRxIndex != writeIndex)
+		if (FS_GNSS_HandleByte(FS_GNSS_GetChar()))
 		{
-			if (FS_GNSS_HandleByte(FS_GNSS_GetChar()))
-			{
-				FS_GNSS_HandleMessage();
-			}
-		}
-	}
-	else if (currentMode == FS_GNSS_MODE_USB)
-	{
-		uint32_t writeIndex = GNSS_RX_BUF_LEN - huart1.hdmarx->Instance->CNDTR;
-
-		if (gnssRxIndex != writeIndex)
-		{
-			uint32_t len;
-
-			if (gnssRxIndex > writeIndex)
-			{
-				len = GNSS_RX_BUF_LEN - gnssRxIndex;
-			}
-			else
-			{
-				len = writeIndex - gnssRxIndex;
-			}
-
-			if (CDC_Transmit_FS(&gnssRxData[gnssRxIndex], len) == USBD_OK)
-			{
-				gnssRxIndex = (gnssRxIndex + len) % GNSS_RX_BUF_LEN;
-			}
+			FS_GNSS_HandleMessage();
 		}
 	}
 }
@@ -901,94 +853,4 @@ __weak void FS_GNSS_TimeReady_Callback(void)
   /* NOTE: This function should not be modified, when the callback is needed,
            the FS_GNSS_TimeReady_Callback could be implemented in the user file
    */
-}
-
-// Temporary functions for CDC interface
-void GNSS_Config(USBD_CDC_LineCodingTypeDef *lineCoding)
-{
-	// Stop DMA transfer
-	if (HAL_UART_Abort(&huart1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	if (HAL_UART_DeInit(&huart1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	// Set the stop bit
-	switch (lineCoding->format)
-	{
-	case 0:
-		huart1.Init.StopBits = UART_STOPBITS_1;
-		break;
-	case 2:
-		huart1.Init.StopBits = UART_STOPBITS_2;
-		break;
-	default :
-		huart1.Init.StopBits = UART_STOPBITS_1;
-		break;
-	}
-
-	// Set the parity bit
-	switch (lineCoding->paritytype)
-	{
-	case 0:
-		huart1.Init.Parity = UART_PARITY_NONE;
-		break;
-	case 1:
-		huart1.Init.Parity = UART_PARITY_ODD;
-		break;
-	case 2:
-		huart1.Init.Parity = UART_PARITY_EVEN;
-		break;
-	default :
-		huart1.Init.Parity = UART_PARITY_NONE;
-		break;
-	}
-
-	// Set the data type
-	switch (lineCoding->datatype)
-	{
-	case 0x07:
-		// With this configuration parity must be set
-		huart1.Init.WordLength = UART_WORDLENGTH_8B;
-		break;
-	case 0x08:
-		if (huart1.Init.Parity == UART_PARITY_NONE)
-		{
-			huart1.Init.WordLength = UART_WORDLENGTH_8B;
-		}
-		else
-		{
-			huart1.Init.WordLength = UART_WORDLENGTH_9B;
-		}
-		break;
-	default :
-		huart1.Init.WordLength = UART_WORDLENGTH_8B;
-		break;
-	}
-
-	huart1.Init.BaudRate     = lineCoding->bitrate;
-	huart1.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
-	huart1.Init.Mode         = UART_MODE_TX_RX;
-	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-
-	if (HAL_UART_Init(&huart1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-
-	// Begin DMA transfer
-	if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
-	{
-		Error_Handler();
-	}
-}
-
-void GNSS_Transmit(uint8_t *buf, uint16_t len)
-{
-	// Transmit packet to GNSS
-	HAL_UART_Transmit_IT(&huart1, buf, len);
 }
