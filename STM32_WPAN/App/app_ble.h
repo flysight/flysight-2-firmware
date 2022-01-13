@@ -69,6 +69,8 @@ extern "C" {
 
 /* Exported functions ---------------------------------------------*/
   void APP_BLE_Init( void );
+  void Adv_Request( APP_BLE_ConnStatus_t New_Status );
+  void Adv_Cancel_Req( void );
 
   APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
 
