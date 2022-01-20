@@ -151,6 +151,13 @@ typedef struct
 {
   BleGlobalContext_t BleApplicationContext_legacy;
   APP_BLE_ConnStatus_t Device_Connection_Status;
+
+  /**
+   * ID of the Advertising Timeout
+   */
+  uint8_t Advertising_mgr_timer_Id;
+
+  uint8_t SwitchOffGPIO_timer_Id;
 }BleApplicationContext_t;
 /* USER CODE BEGIN PTD */
 
@@ -346,7 +353,10 @@ static void BLE_StatusNot( HCI_TL_CmdStatus_t status );
 static void Ble_Tl_Init( void );
 static void Ble_Hci_Gap_Gatt_Init(void);
 static const uint8_t* BleGetBdAddress( void );
+static void Adv_Request( APP_BLE_ConnStatus_t New_Status );
 static void Adv_Cancel( void );
+static void Adv_Cancel_Req( void );
+static void Switch_OFF_GPIO( void );
 #if(L2CAP_REQUEST_NEW_CONN_PARAM != 0)
 static void BLE_SVC_L2CAP_Conn_Update(uint16_t Connection_Handle);
 static void Connection_Interval_Update_Req( void );
@@ -462,6 +472,15 @@ void APP_BLE_Init( void )
 /* USER CODE BEGIN APP_BLE_Init_3 */
 
 /* USER CODE END APP_BLE_Init_3 */
+
+  /**
+   * Create timer to handle the Advertising Stop
+   */
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &(BleApplicationContext.Advertising_mgr_timer_Id), hw_ts_SingleShot, Adv_Cancel_Req);
+  /**
+   * Create timer to handle the Led Switch OFF
+   */
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &(BleApplicationContext.SwitchOffGPIO_timer_Id), hw_ts_SingleShot, Switch_OFF_GPIO);
 
   /**
    * Make device discoverable
@@ -582,6 +601,8 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification( void *pckt )
            * The connection is done, there is no need anymore to schedule the LP ADV
            */
           connection_complete_event = (hci_le_connection_complete_event_rp0 *) meta_evt->data;
+
+          HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
 
           APP_DBG_MSG("HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE for connection handle 0x%x\n", connection_complete_event->Connection_Handle);
           if (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_CONNECTING)
@@ -889,7 +910,7 @@ static void Ble_Hci_Gap_Gatt_Init(void){
    }
 }
 
-void Adv_Request(APP_BLE_ConnStatus_t New_Status)
+static void Adv_Request(APP_BLE_ConnStatus_t New_Status)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   uint16_t Min_Inter, Max_Inter;
@@ -904,6 +925,12 @@ void Adv_Request(APP_BLE_ConnStatus_t New_Status)
     Min_Inter = CFG_LP_CONN_ADV_INTERVAL_MIN;
     Max_Inter = CFG_LP_CONN_ADV_INTERVAL_MAX;
   }
+
+    /**
+     * Stop the timer, it will be restarted for a new shot
+     * It does not hurt if the timer was not running
+     */
+    HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
 
     APP_DBG_MSG("First index in %d state \n", BleApplicationContext.Device_Connection_Status);
 
@@ -945,6 +972,8 @@ void Adv_Request(APP_BLE_ConnStatus_t New_Status)
       if (New_Status == APP_BLE_FAST_ADV)
       {
         APP_DBG_MSG("Successfully Start Fast Advertising \n" );
+        /* Start Timer to STOP ADV - TIMEOUT */
+        HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, INITIAL_ADV_TIMEOUT);
       }
       else
       {
@@ -1055,7 +1084,7 @@ static void Adv_Cancel( void )
   return;
 }
 
-void Adv_Cancel_Req( void )
+static void Adv_Cancel_Req( void )
 {
 /* USER CODE BEGIN Adv_Cancel_Req_1 */
 
@@ -1065,6 +1094,12 @@ void Adv_Cancel_Req( void )
 
 /* USER CODE END Adv_Cancel_Req_2 */
   return;
+}
+
+static void Switch_OFF_GPIO(){
+/* USER CODE BEGIN Switch_OFF_GPIO */
+
+/* USER CODE END Switch_OFF_GPIO */
 }
 
 #if(L2CAP_REQUEST_NEW_CONN_PARAM != 0)

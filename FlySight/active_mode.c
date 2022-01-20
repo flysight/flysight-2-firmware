@@ -6,12 +6,10 @@
  */
 
 #include "main.h"
-#include "app_ble.h"
 #include "app_common.h"
 #include "app_fatfs.h"
 #include "audio.h"
 #include "baro.h"
-#include "ble.h"
 #include "config.h"
 #include "control.h"
 #include "gnss.h"
@@ -19,8 +17,6 @@
 #include "imu.h"
 #include "mag.h"
 #include "sensor.h"
-
-#define BLE_TEST 3
 
 static FATFS fs;
 
@@ -149,49 +145,10 @@ void FS_ActiveMode_Init(void)
 		/* Start reading sensors */
 		FS_Sensor_Start();
 	}
-
-	if (FS_Config_Get()->enable_ble)
-	{
-#if BLE_TEST == 0
-		/* No transmitting */
-#elif BLE_TEST == 1
-		/* Start sending tone */
-		hci_reset();
-		aci_hal_set_tx_power_level(1, FS_Config_Get()->ble_tx_power);
-		aci_hal_tone_start(0x00, 0x00);
-#elif BLE_TEST == 2
-		/* Begin transmitter test */
-		hci_le_transmitter_test(0x00, 0x25, 0x00);
-#else
-		/* Set transmit power */
-		aci_hal_set_tx_power_level(1, FS_Config_Get()->ble_tx_power);
-
-		/* Start advertising */
-		Adv_Request(APP_BLE_FAST_ADV);
-#endif
-	}
 }
 
 void FS_ActiveMode_DeInit(void)
 {
-	if (FS_Config_Get()->enable_ble)
-	{
-#if BLE_TEST == 0
-		/* No transmitting */
-#elif BLE_TEST == 1
-		/* Stop sending tone */
-		aci_hal_tone_stop();
-#elif BLE_TEST == 2
-		uint16_t n_packets;
-
-		/* End transmitter test */
-		hci_le_test_end(&n_packets);
-#else
-		/* Stop advertising */
-		Adv_Cancel_Req();
-#endif
-	}
-
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
 	{
 		/* Stop reading sensors */
