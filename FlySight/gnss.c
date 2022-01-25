@@ -316,7 +316,7 @@ static union
 	ubxTimTp_t      timTp;
 } gnssPayload;
 
-uint8_t  gnssDynModel = 3;		// Pedestrian
+uint8_t  gnssDynModel = 7;		// Pedestrian
 uint16_t gnssMeasRate = 200;	// Measurement rate (ms)
 
 // Saved GNSS messages
