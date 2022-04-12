@@ -723,7 +723,7 @@ void FS_GNSS_Init(void)
 		}
 
 		// Configure port baud rate
-		huart1.Init.BaudRate = 9600;
+		huart1.Init.BaudRate = 38400;
 		if (HAL_UART_Init(&huart1) != HAL_OK)
 		{
 			Error_Handler();
