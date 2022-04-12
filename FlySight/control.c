@@ -135,6 +135,15 @@ void FS_GNSS_TimeReady_Callback(void)
 	}
 }
 
+void FS_GNSS_RawReady_Callback(void)
+{
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Save to log file
+		FS_Log_WriteGNSSRaw(FS_GNSS_GetRaw());
+	}
+}
+
 void FS_IMU_DataReady_Callback(void)
 {
 	if (FS_Config_Get()->enable_logging)

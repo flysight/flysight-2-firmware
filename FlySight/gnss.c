@@ -15,8 +15,6 @@
 #define GNSS_RATE           230400	// Baud rate
 #define GNSS_TIMEOUT        100		// ACK/NAK timeout (ms)
 
-#define GNSS_RX_BUF_LEN		512		// Circular buffer for UART
-
 #define GNSS_UPDATE_MSEC    10
 #define GNSS_UPDATE_RATE    (GNSS_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
@@ -296,8 +294,14 @@ typedef struct
 }
 ubxAckNak_t;
 
-uint8_t  gnssRxData[GNSS_RX_BUF_LEN];	// data buffer
+union
+{
+	uint8_t       whole[GNSS_RX_BUF_LEN];	// data buffer
+	FS_GNSS_Raw_t split[2];					// raw output buffers
+} gnssRxData;
+
 uint32_t gnssRxIndex = 0;				// read index
+uint8_t  gnssRawIndex = 0;				// raw output index
 
 // Current UBX message
 static uint8_t   gnssMsgClass;
@@ -359,7 +363,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 
 static uint8_t FS_GNSS_GetChar(void)
 {
-	uint8_t ch = gnssRxData[gnssRxIndex];
+	uint8_t ch = gnssRxData.whole[gnssRxIndex];
 	gnssRxIndex = (gnssRxIndex + 1) % GNSS_RX_BUF_LEN;
 	return ch;
 }
@@ -741,7 +745,7 @@ void FS_GNSS_Init(void)
 		}
 
 		// Begin DMA transfer
-		if (HAL_UART_Receive_DMA(&huart1, gnssRxData, GNSS_RX_BUF_LEN) != HAL_OK)
+		if (HAL_UART_Receive_DMA(&huart1, gnssRxData.whole, GNSS_RX_BUF_LEN) != HAL_OK)
 		{
 			Error_Handler();
 		}
@@ -817,6 +821,12 @@ static void FS_GNSS_Update(void)
 			FS_GNSS_HandleMessage();
 		}
 	}
+
+	if (writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex)
+	{
+		FS_GNSS_RawReady_Callback();
+		gnssRawIndex = writeIndex / GNSS_RAW_BUF_LEN;
+	}
 }
 
 const FS_GNSS_Data_t *FS_GNSS_GetData(void)
@@ -852,5 +862,17 @@ __weak void FS_GNSS_TimeReady_Callback(void)
 {
   /* NOTE: This function should not be modified, when the callback is needed,
            the FS_GNSS_TimeReady_Callback could be implemented in the user file
+   */
+}
+
+const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void)
+{
+	return &gnssRxData.split[gnssRawIndex];
+}
+
+__weak void FS_GNSS_RawReady_Callback(void)
+{
+  /* NOTE: This function should not be modified, when the callback is needed,
+           the FS_GNSS_RawReady_Callback could be implemented in the user file
    */
 }

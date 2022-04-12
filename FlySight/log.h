@@ -23,6 +23,7 @@ void FS_Log_WriteHumData(const FS_Hum_Data_t *current);
 void FS_Log_WriteMagData(const FS_Mag_Data_t *current);
 void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current);
 void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current);
+void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current);
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current);
 
 #endif /* LOG_H_ */

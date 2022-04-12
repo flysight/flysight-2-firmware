@@ -24,6 +24,7 @@
 #define MAG_COUNT	2
 #define GNSS_COUNT	2
 #define TIME_COUNT	2
+#define RAW_COUNT	2
 #define IMU_COUNT   133
 
 static          FS_Baro_Data_t baroBuf[BARO_COUNT];	// data buffer
@@ -46,12 +47,17 @@ static          FS_GNSS_Time_t timeBuf[TIME_COUNT];	// data buffer
 static          uint32_t       timeRdI;				// read index
 static volatile uint32_t       timeWrI;				// write index
 
+static          FS_GNSS_Raw_t  rawBuf[RAW_COUNT];	// data buffer
+static          uint32_t       rawRdI;				// read index
+static volatile uint32_t       rawWrI;				// write index
+
 static          FS_IMU_Data_t  imuBuf[IMU_COUNT];	// data buffer
 static          uint32_t       imuRdI;				// read index
 static volatile uint32_t       imuWrI;				// write index
 
 static FIL gnssFile;
 static FIL sensorFile;
+static FIL rawFile;
 
 static uint8_t timer_id;
 
@@ -257,6 +263,20 @@ void FS_Log_UpdateTime(void)
 	++timeRdI;
 }
 
+void FS_Log_UpdateRaw(void)
+{
+	UINT bw;
+
+	// Get current data point
+	FS_GNSS_Raw_t *data = &rawBuf[rawRdI % RAW_COUNT];
+
+	// Write to disk
+	f_write(&rawFile, data, sizeof(FS_GNSS_Raw_t), &bw);
+
+	// Increment read index
+	++rawRdI;
+}
+
 void FS_Log_UpdateIMU(void)
 {
 	char row[150];
@@ -291,11 +311,18 @@ void FS_Log_UpdateIMU(void)
 static void FS_Log_Update(void)
 {
 	const uint32_t ms = HAL_GetTick();
-	const uint32_t writeIndex = gnssWrI;
+	const uint32_t gnssIndex = gnssWrI;
+	const uint32_t rawIndex = rawWrI;
 	FS_Log_SensorType_t next;
 
+	// Write all raw GNSS output
+	while (rawRdI != rawIndex)
+	{
+		FS_Log_UpdateRaw();
+	}
+
 	// Write all GNSS log entries
-	while (gnssRdI != writeIndex)
+	while (gnssRdI != gnssIndex)
 	{
 		FS_Log_UpdateGNSS();
 	}
@@ -363,6 +390,13 @@ void FS_Log_Init(uint32_t sessionId)
 	f_printf(&gnssFile, "$HEAD,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
 	f_printf(&gnssFile, "$HEAD,,(deg),(deg),(m),(m/s),(m/s),(m/s),(m),(m),(m/s),,\n");
 
+	// Open raw GNSS file
+	sprintf(filename, "/temp/%04lu/raw.ubx", sessionId);
+	if (f_open(&rawFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	{
+		Error_Handler();
+	}
+
 	// Open sensor log file
 	sprintf(filename, "/temp/%04lu/sensor.csv", sessionId);
 	if (f_open(&sensorFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
@@ -397,6 +431,7 @@ void FS_Log_DeInit(uint32_t sessionId)
 	HW_TS_Delete(timer_id);
 
 	// Close files
+	f_close(&rawFile);
 	f_close(&gnssFile);
 	f_close(&sensorFile);
 
@@ -460,6 +495,16 @@ void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
 
 	// Increment write index
 	++timeWrI;
+}
+
+void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current)
+{
+	// Copy to circular buffer
+	FS_GNSS_Raw_t *saved = &rawBuf[rawWrI % RAW_COUNT];
+	memcpy(saved, current, sizeof(FS_GNSS_Raw_t));
+
+	// Increment write index
+	++rawWrI;
 }
 
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)
