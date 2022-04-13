@@ -515,8 +515,8 @@ static void updateAlarms(
 					break ;
 				case 4:	// play file
 					filename[0] = '\0';
-					strncat(filename, config->alarms[i].filename, sizeof(filename));
-					strncat(filename, ".wav", sizeof(filename));
+					strncat(filename, config->alarms[i].filename, sizeof(filename) - 1);
+					strncat(filename, ".wav", sizeof(filename) - 1);
 					FS_Audio_Play(filename, config->sp_volume * 5);
 					break;
 				}
