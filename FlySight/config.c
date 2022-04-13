@@ -71,6 +71,7 @@ void FS_Config_Init(void)
 	config.enable_mag     = 1;
 	config.enable_ble     = 1;
 	config.ble_tx_power   = 25;
+	config.enable_raw     = 1;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -147,6 +148,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Enable_Mag",     config.enable_mag,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Ble",     config.enable_ble,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Ble_Tx_Power",   config.ble_tx_power,   val, val >= 0 || val <= 31);
+		HANDLE_VALUE("Enable_Raw",     config.enable_raw,     val, val == 0 || val == 1);
 
 		#undef HANDLE_VALUE
 

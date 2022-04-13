@@ -10,6 +10,7 @@
 #include "main.h"
 #include "app_common.h"
 #include "common.h"
+#include "config.h"
 #include "ff.h"
 #include "log.h"
 #include "stm32_seq.h"
@@ -316,7 +317,8 @@ static void FS_Log_Update(void)
 	FS_Log_SensorType_t next;
 
 	// Write all raw GNSS output
-	while (rawRdI != rawIndex)
+	while (FS_Config_Get()->enable_raw &&
+			(rawRdI != rawIndex))
 	{
 		FS_Log_UpdateRaw();
 	}
@@ -371,6 +373,8 @@ void FS_Log_Init(uint32_t sessionId)
 	gnssWrI = 0;
 	timeRdI = 0;
 	timeWrI = 0;
+	rawRdI = 0;
+	rawWrI = 0;
 	imuRdI = 0;
 	imuWrI = 0;
 	validDateTime = false;
@@ -390,11 +394,14 @@ void FS_Log_Init(uint32_t sessionId)
 	f_printf(&gnssFile, "$HEAD,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
 	f_printf(&gnssFile, "$HEAD,,(deg),(deg),(m),(m/s),(m/s),(m/s),(m),(m),(m/s),,\n");
 
-	// Open raw GNSS file
-	sprintf(filename, "/temp/%04lu/raw.ubx", sessionId);
-	if (f_open(&rawFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	if (FS_Config_Get()->enable_raw)
 	{
-		Error_Handler();
+		// Open raw GNSS file
+		sprintf(filename, "/temp/%04lu/raw.ubx", sessionId);
+		if (f_open(&rawFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+		{
+			Error_Handler();
+		}
 	}
 
 	// Open sensor log file
@@ -431,7 +438,10 @@ void FS_Log_DeInit(uint32_t sessionId)
 	HW_TS_Delete(timer_id);
 
 	// Close files
-	f_close(&rawFile);
+	if (FS_Config_Get()->enable_raw)
+	{
+		f_close(&rawFile);
+	}
 	f_close(&gnssFile);
 	f_close(&sensorFile);
 
@@ -499,12 +509,15 @@ void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
 
 void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current)
 {
-	// Copy to circular buffer
-	FS_GNSS_Raw_t *saved = &rawBuf[rawWrI % RAW_COUNT];
-	memcpy(saved, current, sizeof(FS_GNSS_Raw_t));
+	if (FS_Config_Get()->enable_raw)
+	{
+		// Copy to circular buffer
+		FS_GNSS_Raw_t *saved = &rawBuf[rawWrI % RAW_COUNT];
+		memcpy(saved, current, sizeof(FS_GNSS_Raw_t));
 
-	// Increment write index
-	++rawWrI;
+		// Increment write index
+		++rawWrI;
+	}
 }
 
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)

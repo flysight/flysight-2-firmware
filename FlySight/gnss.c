@@ -9,6 +9,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "config.h"
 #include "gnss.h"
 #include "stm32_seq.h"
 
@@ -51,6 +52,9 @@
 #define UBX_CFG_NAV5        0x24
 #define UBX_CFG_TP5         0x31
 #define UBX_CFG_PM2         0x3b
+
+#define UBX_MON             0x0a
+#define UBX_MON_HW          0x09
 
 #define UBX_TIM             0x0d
 #define UBX_TIM_TP          0x01
@@ -647,7 +651,14 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_TIM,  UBX_TIM_TP ,     1}
 	};
 
-	size_t i, n = sizeof(cfgMsg) / sizeof(ubxCfgMsg_t);
+	const ubxCfgMsg_t cfgMsgRaw[] =
+	{
+		{UBX_MON,  UBX_MON_HW,      1000 / gnssMeasRate},
+		{UBX_NAV,  UBX_NAV_SAT,     1000 / gnssMeasRate},
+		{UBX_NAV,  UBX_NAV_STATUS,  1000 / gnssMeasRate}
+	};
+
+	size_t i, n;
 
 	const ubxCfgRate_t cfgRate =
 	{
@@ -682,9 +693,19 @@ static void FS_GNSS_InitMessages(void)
 			FS_GNSS_SendMessage(c,m,sizeof(d),&d);			\
 		} while (!FS_GNSS_WaitForAck(c,m,GNSS_TIMEOUT));
 
+	n = sizeof(cfgMsg) / sizeof(ubxCfgMsg_t);
 	for (i = 0; i < n; ++i)
 	{
 		SEND_MESSAGE(UBX_CFG, UBX_CFG_MSG, cfgMsg[i]);
+	}
+
+	if (FS_Config_Get()->enable_raw)
+	{
+		n = sizeof(cfgMsgRaw) / sizeof(ubxCfgMsg_t);
+		for (i = 0; i < n; ++i)
+		{
+			SEND_MESSAGE(UBX_CFG, UBX_CFG_MSG, cfgMsgRaw[i]);
+		}
 	}
 
 	SEND_MESSAGE(UBX_CFG, UBX_CFG_RATE, cfgRate);
@@ -822,7 +843,8 @@ static void FS_GNSS_Update(void)
 		}
 	}
 
-	if (writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex)
+	if (FS_Config_Get()->enable_raw &&
+			(writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex))
 	{
 		FS_GNSS_RawReady_Callback();
 		gnssRawIndex = writeIndex / GNSS_RAW_BUF_LEN;

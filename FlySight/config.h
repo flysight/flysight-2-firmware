@@ -101,6 +101,7 @@ typedef struct
 	uint8_t  enable_mag;
 	uint8_t  enable_ble;
 	uint8_t  ble_tx_power;
+	uint8_t  enable_raw;
 } FS_Config_Data_t;
 
 typedef enum {
