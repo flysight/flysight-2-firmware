@@ -5,6 +5,7 @@
 # Build folders
 Debug/
 Release/
+Binary/
 
 # Locally stored "Eclipse launch configurations"
 *.launch
