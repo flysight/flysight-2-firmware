@@ -102,6 +102,7 @@ typedef struct
 	uint8_t  enable_ble;
 	uint8_t  ble_tx_power;
 	uint8_t  enable_raw;
+	uint8_t  cold_start;
 } FS_Config_Data_t;
 
 typedef enum {

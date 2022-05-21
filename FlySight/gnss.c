@@ -805,13 +805,24 @@ void FS_GNSS_Start(void)
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_3);
 
-	const ubxCfgRst_t cfgRst =
+	if (FS_Config_Get()->cold_start)
+	{
+		const ubxCfgRst_t cfgRst1 =
+		{
+			.navBbrMask = 0xffff,   // Cold start
+			.resetMode  = 0x02      // Controlled software reset (GNSS only)
+		};
+
+		FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_RST, sizeof(cfgRst1), &cfgRst1);
+	}
+
+	const ubxCfgRst_t cfgRst2 =
 	{
 		.navBbrMask = 0x0000,   // Hot start
 		.resetMode  = 0x09      // Controlled GPS start
 	};
 
-	FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_RST, sizeof(cfgRst), &cfgRst);
+	FS_GNSS_SendMessage(UBX_CFG, UBX_CFG_RST, sizeof(cfgRst2), &cfgRst2);
 }
 
 void FS_GNSS_Stop(void)
