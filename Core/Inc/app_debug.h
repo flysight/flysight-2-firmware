@@ -65,5 +65,3 @@ extern "C" {
 #endif
 
 #endif /*__APP_DEBUG_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

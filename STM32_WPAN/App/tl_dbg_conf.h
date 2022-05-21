@@ -132,5 +132,3 @@ extern "C" {
 #endif
 
 #endif /*__TL_DBG_CONF_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

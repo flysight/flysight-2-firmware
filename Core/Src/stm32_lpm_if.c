@@ -277,19 +277,11 @@ static void EnterLowPower( void )
       /* Release ENTRY_STOP_MODE semaphore */
       LL_HSEM_ReleaseLock( HSEM, CFG_HW_ENTRY_STOP_MODE_SEMID, 0 );
 
-      /**
-       * The switch on HSI before entering Stop Mode is required on Cut2.0
-       * It is useless from Cut2.1
-       */
       Switch_On_HSI( );
     }
   }
   else
   {
-    /**
-     * The switch on HSI before entering Stop Mode is required on Cut2.0
-     * It is useless from Cut2.1
-     */
     Switch_On_HSI( );
   }
 
@@ -353,6 +345,4 @@ static void Switch_On_HSI( void )
 /* USER CODE BEGIN Private_Functions */
 
 /* USER CODE END Private_Functions */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 

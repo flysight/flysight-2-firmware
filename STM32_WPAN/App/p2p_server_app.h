@@ -76,5 +76,3 @@ typedef struct
 #endif
 
 #endif /*__P2P_SERVER_APP_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

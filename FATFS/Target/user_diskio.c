@@ -82,6 +82,7 @@ Diskio_drvTypeDef  USER_Driver =
 };
 
 /* Private functions ---------------------------------------------------------*/
+
 static DSTATUS SD_CheckStatus(BYTE pdrv)
 {
   Stat = STA_NOINIT;
@@ -252,4 +253,3 @@ DRESULT USER_ioctl (
 }
 #endif /* _USE_IOCTL == 1 */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

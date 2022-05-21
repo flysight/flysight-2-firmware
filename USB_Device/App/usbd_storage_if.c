@@ -317,4 +317,3 @@ int8_t STORAGE_GetMaxLun_FS(void)
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

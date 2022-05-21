@@ -81,5 +81,3 @@ extern "C" {
 #endif
 
 #endif /*APP_BLE_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

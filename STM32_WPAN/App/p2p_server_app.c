@@ -152,5 +152,3 @@ void P2PS_APP_Init(void)
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

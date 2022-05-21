@@ -125,5 +125,3 @@ int32_t MX_FATFS_DeInit(void)
   /* USER CODE END FATFS_Init */
 }
 /* USER CODE END Application */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

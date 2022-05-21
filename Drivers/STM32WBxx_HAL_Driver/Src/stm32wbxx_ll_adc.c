@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -322,6 +321,9 @@ ErrorStatus LL_ADC_CommonDeInit(ADC_Common_TypeDef *ADCxy_COMMON)
   /* Check the parameters */
   assert_param(IS_ADC_COMMON_INSTANCE(ADCxy_COMMON));
 
+  /* Prevent unused argument compilation warning */
+  (void)(ADCxy_COMMON);
+
 #if defined (ADC_SUPPORT_2_5_MSPS)
   /* Force reset of ADC clock (core clock) */
   LL_APB2_GRP1_ForceReset(LL_APB2_GRP1_PERIPH_ADC);
@@ -629,13 +631,13 @@ ErrorStatus LL_ADC_DeInit(ADC_TypeDef *ADCx)
                | ADC_CFGR1_EXTEN   | ADC_CFGR1_EXTSEL | ADC_CFGR1_ALIGN   | ADC_CFGR1_RES
                | ADC_CFGR1_SCANDIR | ADC_CFGR1_DMACFG | ADC_CFGR1_DMAEN                     )
              );
-    
+
     /* Reset register SMPR */
     CLEAR_BIT(ADCx->SMPR, ADC_SMPR_SMP1 | ADC_SMPR_SMP2 | ADC_SMPR_SMPSEL);
-    
-    /* Reset register TR1 */
-    MODIFY_REG(ADCx->TR1, ADC_TR1_HT1 | ADC_TR1_LT1, ADC_TR1_HT1);
-    
+
+    /* Reset register TR */
+    MODIFY_REG(ADCx->TR, ADC_TR_HT | ADC_TR_LT, ADC_TR_HT);
+
     /* Reset register CHSELR */
     CLEAR_BIT(ADCx->CHSELR,
               (  ADC_CHSELR_CHSEL18 | ADC_CHSELR_CHSEL17 | ADC_CHSELR_CHSEL16
@@ -644,7 +646,7 @@ ErrorStatus LL_ADC_DeInit(ADC_TypeDef *ADCx)
                | ADC_CHSELR_CHSEL7  | ADC_CHSELR_CHSEL6  | ADC_CHSELR_CHSEL5  | ADC_CHSELR_CHSEL4
                | ADC_CHSELR_CHSEL3  | ADC_CHSELR_CHSEL2  | ADC_CHSELR_CHSEL1  | ADC_CHSELR_CHSEL0 )
              );
-    
+
     /* Wait for ADC channel configuration ready */
     timeout_cpu_cycles = ADC_TIMEOUT_CCRDY_CPU_CYCLES;
     while (LL_ADC_IsActiveFlag_CCRDY(ADCx) == 0UL)
@@ -657,7 +659,7 @@ ErrorStatus LL_ADC_DeInit(ADC_TypeDef *ADCx)
         break;
       }
     }
-    
+
     /* Clear flag ADC channel configuration ready */
     LL_ADC_ClearFlag_CCRDY(ADCx);
     
@@ -1258,5 +1260,3 @@ void LL_ADC_INJ_StructInit(LL_ADC_INJ_InitTypeDef *ADC_INJ_InitStruct)
   */
 
 #endif /* USE_FULL_LL_DRIVER */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -1,19 +1,18 @@
 /******************************************************************************
  * @file    ble_std.h
- * @author  MCD
+ * @author  MDG
  * @brief   BLE standard definitions
  ******************************************************************************
  * @attention
  *
- * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
- * All rights reserved.</center></h2>
+ * Copyright (c) 2018-2022 STMicroelectronics.
+ * All rights reserved.
  *
- * This software component is licensed by ST under Ultimate Liberty license
- * SLA0044, the "License"; You may not use this file except in compliance with
- * the License. You may obtain a copy of the License at:
- *                             www.st.com/SLA0044
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
  *
- ******************************************************************************
+ *****************************************************************************
  */
 
 #ifndef BLE_STD_H__
@@ -81,6 +80,7 @@
 #define HCI_PIN_OR_KEY_MISSING_ERR_CODE                        0x06U
 #define HCI_MEMORY_CAPACITY_EXCEEDED_ERR_CODE                  0x07U
 #define HCI_CONNECTION_TIMEOUT_ERR_CODE                        0x08U
+#define HCI_CONNECTION_ALREADY_EXISTS_ERR_CODE                 0x0BU
 #define HCI_COMMAND_DISALLOWED_ERR_CODE                        0x0CU
 #define HCI_UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERR_CODE    0x11U
 #define HCI_INVALID_HCI_COMMAND_PARAMETERS_ERR_CODE            0x12U
@@ -89,6 +89,7 @@
 #define HCI_LMP_FEATURE_ERR_CODE                               0x1AU
 #define HCI_INVALID_LL_PARAMETERS_ERR_CODE                     0x1EU
 #define HCI_UNSPECIFIED_ERROR_ERR_CODE                         0x1FU
+#define HCI_UNSUPPORTED_LL_PARAMETER_VALUE_ERR_CODE            0x20U
 #define HCI_LL_RESPONSE_TIMEOUT_ERR_CODE                       0x22U
 #define HCI_LL_PROCEDURE_COLLISION_ERR_CODE                    0x23U
 #define HCI_LMP_PDU_NOT_ALLOWED_ERR_CODE                       0x24U
@@ -100,46 +101,109 @@
 #define HCI_ADVERTISING_TIMEOUT_ERR_CODE                       0x3CU
 #define HCI_CONNECTION_TERMINATED_DUE_TO_MIC_FAILURE_ERR_CODE  0x3DU
 #define HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERR_CODE       0x3EU
+#define HCI_UNKNOWN_ADVERTISING_IDENTIFIER_ERR_CODE            0x42U
+#define HCI_ADVERTISING_LIMIT_REACHED_ERR_CODE                 0x43U
+#define HCI_PACKET_TOO_LONG_ERR_CODE                           0x45U
 
-/* HCI_LE_Read_PHY */
-#define HCI_TX_PHY_LE_1M                          0x01U
-#define HCI_TX_PHY_LE_2M                          0x02U
-#define HCI_TX_PHY_LE_CODED                       0x03U
-#define HCI_RX_PHY_LE_1M                          0x01U
-#define HCI_RX_PHY_LE_2M                          0x02U
-#define HCI_RX_PHY_LE_CODED                       0x03U
+/* HCI_LE_Set_Advertising_Parameters: Advertising_Type */
+#define HCI_ADV_TYPE_ADV_IND                           0x00U
+#define HCI_ADV_TYPE_ADV_DIRECT_IND_HDC                0x01U
+#define HCI_ADV_TYPE_ADV_SCAN_IND                      0x02U
+#define HCI_ADV_TYPE_ADV_NONCONN_IND                   0x03U
+#define HCI_ADV_TYPE_ADV_DIRECT_IND_LDC                0x04U
 
-/* HCI_LE_Set_PHY */
-#define HCI_ALL_PHYS_TX_NO_PREF                   0x01U
-#define HCI_ALL_PHYS_RX_NO_PREF                   0x02U
-#define HCI_TX_PHYS_LE_1M_PREF                    0x01U
-#define HCI_TX_PHYS_LE_2M_PREF                    0x02U
-#define HCI_TX_PHYS_LE_CODED_PREF                 0x04U
-#define HCI_RX_PHYS_LE_1M_PREF                    0x01U
-#define HCI_RX_PHYS_LE_2M_PREF                    0x02U
-#define HCI_RX_PHYS_LE_CODED_PREF                 0x04U
+/* HCI_LE_Set_Advertising_Parameters: Advertising_Filter_Policy */
+#define HCI_ADV_FILTER_NO                              0x00U
+#define HCI_ADV_FILTER_WHITELIST_SCAN                  0x01U
+#define HCI_ADV_FILTER_WHITELIST_CONNECT               0x02U
+#define HCI_ADV_FILTER_WHITELIST_SCAN_CONNECT          0x03U
 
-/* HCI_LE_Advertising_Report */
-#define HCI_ADV_EVT_TYPE_ADV_IND                  0x00U
-#define HCI_ADV_EVT_TYPE_ADV_DIRECT_IND           0x01U
-#define HCI_ADV_EVT_TYPE_ADV_SCAN_IND             0x02U
-#define HCI_ADV_EVT_TYPE_ADV_NONCONN_IND          0x03U
-#define HCI_ADV_EVT_TYPE_SCAN_RSP                 0x04U
+/* HCI_LE_Set_[Advertising/Scan]_Parameters: Own_Address_Type */
+#define HCI_OWN_ADDR_TYPE_PUBLIC                       0x00U
+#define HCI_OWN_ADDR_TYPE_RANDOM                       0x01U
+#define HCI_OWN_ADDR_TYPE_RP_OR_PUBLIC                 0x02U
+#define HCI_OWN_ADDR_TYPE_RP_OR_RANDOM                 0x03U
 
-/* HCI_LE_Set_Advertising_Parameters */
-#define HCI_ADV_TYPE_ADV_IND                      0x00U
-#define HCI_ADV_TYPE_ADV_DIRECT_IND_HDC           0x01U
-#define HCI_ADV_TYPE_ADV_SCAN_IND                 0x02U
-#define HCI_ADV_TYPE_ADV_NONCONN_IND              0x03U
-#define HCI_ADV_TYPE_ADV_DIRECT_IND_LDC           0x04U
+/* HCI_LE_Set_Scan_Parameters: LE_Scan_Type */
+#define HCI_SCAN_TYPE_PASSIVE                          0x00U
+#define HCI_SCAN_TYPE_ACTIVE                           0x01U
 
-/* HCI_LE_Set_Scan_Parameters */
-#define HCI_SCAN_FILTER_NO                        0x00U
-#define HCI_SCAN_FILTER_WHITELIST                 0x01U
-#define HCI_SCAN_FILTER_NO_EVEN_RPA               0x02U
-#define HCI_SCAN_FILTER_WHITELIST_BUT_RPA         0x03U
+/* HCI_LE_Set_Scan_Parameters: Scanning_Filter_Policy */
+#define HCI_SCAN_FILTER_NO                             0x00U
+#define HCI_SCAN_FILTER_WHITELIST                      0x01U
+#define HCI_SCAN_FILTER_NO_EVEN_RPA                    0x02U
+#define HCI_SCAN_FILTER_WHITELIST_BUT_RPA              0x03U
+
+/* HCI_LE_Create_Connection: Initiator_Filter_Policy */
+#define HCI_INIT_FILTER_NO                             0x00U
+#define HCI_INIT_FILTER_WHITELIST                      0x01U
+
+/* HCI_LE_Read_PHY: TX_PHY */
+#define HCI_TX_PHY_LE_1M                               0x01U
+#define HCI_TX_PHY_LE_2M                               0x02U
+#define HCI_TX_PHY_LE_CODED                            0x03U
+
+/* HCI_LE_Read_PHY: RX_PHY */
+#define HCI_RX_PHY_LE_1M                               0x01U
+#define HCI_RX_PHY_LE_2M                               0x02U
+#define HCI_RX_PHY_LE_CODED                            0x03U
+
+/* HCI_LE_Set_PHY: ALL_PHYS */
+#define HCI_ALL_PHYS_TX_NO_PREF                        0x01U
+#define HCI_ALL_PHYS_RX_NO_PREF                        0x02U
+
+/* HCI_LE_Set_PHY: TX_PHYS */
+#define HCI_TX_PHYS_LE_1M_PREF                         0x01U
+#define HCI_TX_PHYS_LE_2M_PREF                         0x02U
+#define HCI_TX_PHYS_LE_CODED_PREF                      0x04U
+
+/* HCI_LE_Set_PHY: RX_PHYS */
+#define HCI_RX_PHYS_LE_1M_PREF                         0x01U
+#define HCI_RX_PHYS_LE_2M_PREF                         0x02U
+#define HCI_RX_PHYS_LE_CODED_PREF                      0x04U
+
+/* HCI_LE_Set_Extended_Advertising_Parameters: Advertising_Event_Properties */
+#define HCI_ADV_EVENT_PROP_CONNECTABLE                 0x0001U
+#define HCI_ADV_EVENT_PROP_SCANNABLE                   0x0002U
+#define HCI_ADV_EVENT_PROP_DIRECTED                    0x0004U
+#define HCI_ADV_EVENT_PROP_HDC_DIRECTED                0x0008U
+#define HCI_ADV_EVENT_PROP_LEGACY                      0x0010U
+#define HCI_ADV_EVENT_PROP_ANONYMOUS                   0x0020U
+#define HCI_ADV_EVENT_PROP_TXPOWER_INC                 0x0040U
+
+/* HCI_LE_Set_Extended_Advertising_Parameters: Primary_Advertising_PHY */
+#define HCI_PRIMARY_ADV_PHY_LE_1M                      0x01U
+#define HCI_PRIMARY_ADV_PHY_LE_CODED                   0x03U
+
+/* HCI_LE_Set_Extended_Advertising_Data: Operation */
+#define HCI_SET_ADV_DATA_OPERATION_INTERMEDIATE        0x00U
+#define HCI_SET_ADV_DATA_OPERATION_FIRST               0x01U
+#define HCI_SET_ADV_DATA_OPERATION_LAST                0x02U
+#define HCI_SET_ADV_DATA_OPERATION_COMPLETE            0x03U
+#define HCI_SET_ADV_DATA_OPERATION_UNCHANGED           0x04U
+
+/* HCI_LE_Advertising_Report: Event_Type */
+#define HCI_ADV_EVT_TYPE_ADV_IND                       0x00U
+#define HCI_ADV_EVT_TYPE_ADV_DIRECT_IND                0x01U
+#define HCI_ADV_EVT_TYPE_ADV_SCAN_IND                  0x02U
+#define HCI_ADV_EVT_TYPE_ADV_NONCONN_IND               0x03U
+#define HCI_ADV_EVT_TYPE_SCAN_RSP                      0x04U
+
+/* HCI_LE_Set_Extended_Scan_Parameters: Scanning_PHYs */
+#define HCI_SCANNING_PHYS_LE_1M                        0x01U
+#define HCI_SCANNING_PHYS_LE_CODED                     0x04U
+
+/* HCI_LE_Receiver_Test/HCI_LE_Transmitter_Test [v2]: PHY */
+#define HCI_TEST_PHY_LE_1M                             0x01U
+#define HCI_TEST_PHY_LE_2M                             0x02U
+
+/* HCI_LE_Connection_Complete/HCI_LE_Enhanced_Connection_Complete: Role */
+#define HCI_ROLE_CENTRAL                               0x00U
+#define HCI_ROLE_PERIPHERAL                            0x01U
+
+/* HCI_LE_Set_Privacy_Mode: Privacy_Mode */
+#define HCI_PRIV_MODE_NETWORK                          0x00U
+#define HCI_PRIV_MODE_DEVICE                           0x01U
 
 
 #endif /* BLE_STD_H__ */
-
-/*********************** (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

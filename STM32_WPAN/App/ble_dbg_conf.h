@@ -197,5 +197,3 @@
 #endif
 
 #endif /*__BLE_DBG_CONF_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

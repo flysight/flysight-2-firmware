@@ -69,5 +69,3 @@ extern "C" {
 #endif
 
 #endif /*APP_ENTRY_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

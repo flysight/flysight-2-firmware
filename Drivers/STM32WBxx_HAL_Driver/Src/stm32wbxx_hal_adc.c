@@ -18,7 +18,17 @@
   *             ++ Interrupts and flags management
   *          Other functions (extended functions) are available in file
   *          "stm32wbxx_hal_adc_ex.c".
+  ******************************************************************************
+  * @attention
   *
+  * Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   @verbatim
   ==============================================================================
                      ##### ADC peripheral features #####
@@ -283,17 +293,6 @@
      are set to the corresponding weak functions.
 
   @endverbatim
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
   ******************************************************************************
   */
 
@@ -729,7 +728,7 @@ HAL_StatusTypeDef HAL_ADC_Init(ADC_HandleTypeDef *hadc)
         /*  - Set ADC group regular sequencer to value memorized              */
         /*    in HAL ADC handle                                               */
         /*    Note: This value maybe be initialized at a unknown value,       */
-        /*          therefore afer the first call of "HAL_ADC_Init()",        */
+        /*          therefore after the first call of "HAL_ADC_Init()",        */
         /*          each rank corresponding to parameter "NbrOfConversion"    */
         /*          must be set using "HAL_ADC_ConfigChannel()".              */
         /*  - Set sequencer scan length by clearing ranks above maximum rank  */
@@ -1015,10 +1014,10 @@ HAL_StatusTypeDef HAL_ADC_DeInit(ADC_HandleTypeDef *hadc)
   
   /* Reset register CFGR1 */
   hadc->Instance->CFGR1 &= ~(ADC_CFGR1_AWD1CH   | ADC_CFGR1_AWD1EN  | ADC_CFGR1_AWD1SGL | ADC_CFGR1_DISCEN |
-                             ADC_CFGR1_AUTOFF  | ADC_CFGR1_WAIT   | ADC_CFGR1_CONT   | ADC_CFGR1_OVRMOD |     
+                             ADC_CFGR1_AUTOFF  | ADC_CFGR1_WAIT   | ADC_CFGR1_CONT   | ADC_CFGR1_OVRMOD |
                              ADC_CFGR1_EXTEN   | ADC_CFGR1_EXTSEL | ADC_CFGR1_ALIGN  | ADC_CFGR1_RES    |
                              ADC_CFGR1_SCANDIR | ADC_CFGR1_DMACFG | ADC_CFGR1_DMAEN                      );
-  
+
   /* Reset register CFGR2 */
   /* Note: Update of ADC clock mode is conditioned to ADC state disabled:   */
   /*       already done above.                                              */
@@ -1026,13 +1025,13 @@ HAL_StatusTypeDef HAL_ADC_DeInit(ADC_HandleTypeDef *hadc)
   
   /* Reset register SMPR */
   hadc->Instance->SMPR &= ~ADC_SMPR_SMP1;
-  
-  /* Reset register TR1 */
-  hadc->Instance->TR1 &= ~(ADC_TR1_HT1 | ADC_TR1_LT1);
-  
+
+  /* Reset register TR */
+  hadc->Instance->TR &= ~(ADC_TR_HT | ADC_TR_LT);
+
   /* Reset register CHSELR */
   hadc->Instance->CHSELR &= ~(ADC_CHSELR_SQ_ALL);
-  
+
   /* Reset register DR */
   /* bits in access mode read only, no direct reset applicable */
 
@@ -1044,7 +1043,7 @@ HAL_StatusTypeDef HAL_ADC_DeInit(ADC_HandleTypeDef *hadc)
                               ADC_IT_EOCAL | ADC_IT_CCRDY |
 #else
                               ADC_IT_AWD3  | ADC_IT_AWD2 | ADC_IT_AWD1 |
-                              ADC_IT_JEOS  | ADC_IT_JEOC | ADC_IT_JQOVF | 
+                              ADC_IT_JEOS  | ADC_IT_JEOC | ADC_IT_JQOVF |
 #endif
                               ADC_IT_EOS   | ADC_IT_EOC  | ADC_IT_OVR   |
                               ADC_IT_EOSMP | ADC_IT_RDY));
@@ -2245,7 +2244,7 @@ HAL_StatusTypeDef HAL_ADC_Stop_DMA(ADC_HandleTypeDef *hadc)
   /* Disable ADC peripheral if conversions are effectively stopped */
   if (tmp_hal_status == HAL_OK)
   {
-    /* Disable ADC DMA (ADC DMA configuration of continous requests is kept) */
+    /* Disable ADC DMA (ADC DMA configuration of continuous requests is kept) */
 #if defined (ADC_SUPPORT_2_5_MSPS)
     CLEAR_BIT(hadc->Instance->CFGR1, ADC_CFGR1_DMAEN);
 #else
@@ -3993,5 +3992,3 @@ void ADC_DMAError(DMA_HandleTypeDef *hdma)
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
