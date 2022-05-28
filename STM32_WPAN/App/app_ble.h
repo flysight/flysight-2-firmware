@@ -70,8 +70,6 @@ extern "C" {
 /* Exported functions ---------------------------------------------*/
   void APP_BLE_Init( void );
 
-  APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
-
 /* USER CODE BEGIN EF */
 
 /* USER CODE END EF */
