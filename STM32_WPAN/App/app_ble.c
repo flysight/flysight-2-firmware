@@ -351,11 +351,6 @@ void APP_BLE_Init( void )
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
-  /**
-   * Start to Advertise to be connected by a Client
-   */
-   Adv_Request(APP_BLE_FAST_ADV);
-
 /* USER CODE BEGIN APP_BLE_Init_2 */
 
 /* USER CODE END APP_BLE_Init_2 */
