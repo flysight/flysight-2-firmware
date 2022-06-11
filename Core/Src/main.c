@@ -42,6 +42,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define WATCHDOG_TIMER_TIMEOUT (3000000UL/CFG_TS_TICK_VAL)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,6 +78,7 @@ DMA_HandleTypeDef hdma_usart1_rx;
 /* USER CODE BEGIN PV */
 /* Transfer state */
 volatile MAIN_TransferStateTypeDef main_transfer_state = TRANSFER_WAIT;
+static uint8_t watchdog_timer_id;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,7 +97,10 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+static void FS_Watchdog_Timer(void)
+{
+  WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
+}
 /* USER CODE END 0 */
 
 /**
@@ -151,6 +156,13 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  // Reload watchdog timer
+  WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
+
+  // Create reload timer
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &watchdog_timer_id, hw_ts_Repeated, FS_Watchdog_Timer);
+  HW_TS_Start(watchdog_timer_id, WATCHDOG_TIMER_TIMEOUT);
+
   FS_Mode_Init();
   FS_Button_Init();
   FS_VBUS_Init();
