@@ -19,14 +19,45 @@
 #include "sensor.h"
 
 static FATFS fs;
+static uint32_t session_id[6];
 
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern ADC_HandleTypeDef hadc1;
+extern RNG_HandleTypeDef hrng;
 
 void FS_ActiveMode_Init(void)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	HAL_StatusTypeDef res;
+	uint32_t counter;
+
+	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
+
+	/* Poll Sem0 until granted */
+	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
+
+	/* Configure and switch on RNG clock*/
+	MX_RNG_Init();
+
+	/* Generate random session ID */
+	for (counter = 0; counter < 6; ++counter)
+	{
+		res = HAL_RNG_GenerateRandomNumber(&hrng, &session_id[counter]);
+		if (res != HAL_OK)
+		{
+			Error_Handler();
+		}
+	}
+
+	/* Switch off RNG IP and clock */
+	HAL_RNG_DeInit(&hrng);
+
+	/* Set RNGSEL = CLK48 */
+    LL_RCC_SetRNGClockSource(RCC_RNGCLKSOURCE_CLK48);
+
+	/* Release Sem0 */
+	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
 
 	// Enable charging
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_RESET);

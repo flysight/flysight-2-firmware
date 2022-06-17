@@ -154,6 +154,7 @@ void   MX_I2C1_Init(void);
 void   MX_SAI1_Init(void);
 void   MX_SPI2_Init(void);
 void   MX_USART1_UART_Init(void);
+void   MX_RNG_Init(void);
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
