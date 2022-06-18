@@ -15,6 +15,7 @@
 #define MAG_REG_CFG_REG_A     (0x60 | 0x80)
 #define MAG_REG_CFG_REG_C     (0x62 | 0x80)
 #define MAG_REG_OUTX_L_REG    (0x68 | 0x80)
+#define MAG_TEMP_OUT_L_REG    (0x6e | 0x80)
 
 static enum {
 	MAG_ODR_10  = 0,
@@ -91,7 +92,7 @@ void FS_Mag_Stop(void)
 		Error_Handler();
 }
 
-static void FS_Mag_Read_Callback(HAL_StatusTypeDef result)
+static void FS_Mag_Read_Callback_1(HAL_StatusTypeDef result)
 {
 	if (result != HAL_OK)
 		Error_Handler();
@@ -99,7 +100,14 @@ static void FS_Mag_Read_Callback(HAL_StatusTypeDef result)
 	magData.x = (((int16_t) ((dataBuf[1] << 8) | dataBuf[0])) * (int32_t) 3) / 2;
 	magData.y = (((int16_t) ((dataBuf[3] << 8) | dataBuf[2])) * (int32_t) 3) / 2;
 	magData.z = -(((int16_t) ((dataBuf[5] << 8) | dataBuf[4])) * (int32_t) 3) / 2;
-	magData.temperature = (((int16_t) ((dataBuf[7] << 8) | dataBuf[6])) * (int32_t) 10) / 8 + 250;
+}
+
+static void FS_Mag_Read_Callback_2(HAL_StatusTypeDef result)
+{
+	if (result != HAL_OK)
+		Error_Handler();
+
+	magData.temperature = (((int16_t) ((dataBuf[1] << 8) | dataBuf[0])) * (int32_t) 10) / 8 + 250;
 
 	FS_Mag_DataReady_Callback();
 }
@@ -108,7 +116,8 @@ void FS_Mag_Read(void)
 {
 	magData.time = HAL_GetTick();
 
-	FS_Sensor_ReadAsync(MAG_ADDR, MAG_REG_OUTX_L_REG, dataBuf, 8, FS_Mag_Read_Callback);
+	FS_Sensor_ReadAsync(MAG_ADDR, MAG_REG_OUTX_L_REG, dataBuf, 6, FS_Mag_Read_Callback_1);
+	FS_Sensor_ReadAsync(MAG_ADDR, MAG_TEMP_OUT_L_REG, dataBuf, 2, FS_Mag_Read_Callback_2);
 }
 
 const FS_Mag_Data_t *FS_Mag_GetData(void)

@@ -11,7 +11,7 @@
 #include "app_common.h"
 #include "stm32_seq.h"
 
-#define HANDLER_COUNT 4
+#define HANDLER_COUNT 5
 
 typedef enum
 {
