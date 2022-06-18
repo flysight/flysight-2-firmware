@@ -377,7 +377,7 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 
 	// Write session ID
 	f_printf(file, "$VAR,SESSION_ID,");
-	FS_Log_WriteHex(file, FS_Config_Get()->session_id, 6);
+	FS_Log_WriteHex(file, FS_Config_Get()->session_id, 3);
 	f_printf(file, "\n");
 }
 

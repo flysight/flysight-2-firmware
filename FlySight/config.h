@@ -105,7 +105,7 @@ typedef struct
 	uint8_t  cold_start;
 
 	uint32_t device_id[3];
-	uint32_t session_id[6];
+	uint32_t session_id[3];
 } FS_Config_Data_t;
 
 typedef enum {

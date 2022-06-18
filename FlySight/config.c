@@ -41,7 +41,7 @@ void FS_Config_Init(void)
 	MX_RNG_Init();
 
 	/* Generate random session ID */
-	for (counter = 0; counter < 6; ++counter)
+	for (counter = 0; counter < 3; ++counter)
 	{
 	    tickstart = HAL_GetTick();
 
