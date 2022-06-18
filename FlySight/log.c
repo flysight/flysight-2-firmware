@@ -415,8 +415,8 @@ void FS_Log_Init(uint32_t sessionId)
 	}
 
 	FS_Log_WriteCommonHeader(&gnssFile);
-	f_printf(&gnssFile, "$HEAD,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
-	f_printf(&gnssFile, "$HEAD,,(deg),(deg),(m),(m/s),(m/s),(m/s),(m),(m),(m/s),,\n");
+	f_printf(&gnssFile, "$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
+	f_printf(&gnssFile, "$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,,\n");
 
 	if (FS_Config_Get()->enable_raw)
 	{
@@ -436,16 +436,16 @@ void FS_Log_Init(uint32_t sessionId)
 	}
 
 	FS_Log_WriteCommonHeader(&sensorFile);
-	f_printf(&sensorFile, "$HEAD,time,pressure,temperature\n");
-	f_printf(&sensorFile, "$HEAD,(s),(Pa),(degrees C)\n");
-	f_printf(&sensorFile, "$HEAD,time,humidity,temperature\n");
-	f_printf(&sensorFile, "$HEAD,(s),(percent),(degrees C)\n");
-	f_printf(&sensorFile, "$HEAD,time,x,y,z,temperature\n");
-	f_printf(&sensorFile, "$HEAD,(s),(gauss),(gauss),(gauss),(degrees C)\n");
-	f_printf(&sensorFile, "$HEAD,time,wx,wy,wz,ax,ay,az,temperature\n");
-	f_printf(&sensorFile, "$HEAD,(s),(deg/s),(deg/s),(deg/s),(g),(g),(g),(degrees C)\n");
-	f_printf(&sensorFile, "$HEAD,time,towMS,week\n");
-	f_printf(&sensorFile, "$HEAD,(ms),(ms),\n");
+	f_printf(&sensorFile, "$COL,BARO,time,pressure,temperature\n");
+	f_printf(&sensorFile, "$UNIT,BARO,s,Pa,deg C\n");
+	f_printf(&sensorFile, "$COL,HUM,time,humidity,temperature\n");
+	f_printf(&sensorFile, "$UNIT,HUM,s,percent,deg C\n");
+	f_printf(&sensorFile, "$COL,MAG,time,x,y,z,temperature\n");
+	f_printf(&sensorFile, "$UNIT,MAG,s,gauss,gauss,gauss,deg C\n");
+	f_printf(&sensorFile, "$COL,IMU,time,wx,wy,wz,ax,ay,az,temperature\n");
+	f_printf(&sensorFile, "$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n");
+	f_printf(&sensorFile, "$COL,TIME,time,towMS,week\n");
+	f_printf(&sensorFile, "$UNIT,TIME,ms,ms,\n");
 
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
