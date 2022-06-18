@@ -14,6 +14,8 @@
 #define CONFIG_FIRST_WINDOW 0x02
 #define CONFIG_FIRST_SPEECH 0x04
 
+#define TIMEOUT_VALUE 100
+
 static FS_Config_Data_t config;
 static FIL configFile;
 
@@ -23,6 +25,7 @@ void FS_Config_Init(void)
 {
 	HAL_StatusTypeDef res;
 	uint32_t counter;
+	uint32_t tickstart;
 
 	/* Get device ID */
 	config.device_id[0] = HAL_GetUIDw0();
@@ -40,7 +43,14 @@ void FS_Config_Init(void)
 	/* Generate random session ID */
 	for (counter = 0; counter < 6; ++counter)
 	{
-		res = HAL_RNG_GenerateRandomNumber(&hrng, &config.session_id[counter]);
+	    tickstart = HAL_GetTick();
+
+	    res = HAL_ERROR;
+		while ((res != HAL_OK) && (HAL_GetTick() - tickstart < TIMEOUT_VALUE))
+		{
+			res = HAL_RNG_GenerateRandomNumber(&hrng, &config.session_id[counter]);
+		}
+
 		if (res != HAL_OK)
 		{
 			Error_Handler();
