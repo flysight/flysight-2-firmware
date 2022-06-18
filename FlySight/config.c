@@ -17,8 +17,45 @@
 static FS_Config_Data_t config;
 static FIL configFile;
 
+extern RNG_HandleTypeDef hrng;
+
 void FS_Config_Init(void)
 {
+	HAL_StatusTypeDef res;
+	uint32_t counter;
+
+	/* Get device ID */
+	config.device_id[0] = HAL_GetUIDw0();
+	config.device_id[1] = HAL_GetUIDw1();
+	config.device_id[2] = HAL_GetUIDw2();
+
+	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
+
+	/* Poll Sem0 until granted */
+	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
+
+	/* Configure and switch on RNG clock*/
+	MX_RNG_Init();
+
+	/* Generate random session ID */
+	for (counter = 0; counter < 6; ++counter)
+	{
+		res = HAL_RNG_GenerateRandomNumber(&hrng, &config.session_id[counter]);
+		if (res != HAL_OK)
+		{
+			Error_Handler();
+		}
+	}
+
+	/* Switch off RNG IP and clock */
+	HAL_RNG_DeInit(&hrng);
+
+	/* Set RNGSEL = CLK48 */
+    LL_RCC_SetRNGClockSource(RCC_RNGCLKSOURCE_CLK48);
+
+	/* Release Sem0 */
+	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
+
 	config.model         = 7;
 	config.rate          = 200;
 

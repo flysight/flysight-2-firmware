@@ -358,6 +358,29 @@ static void FS_Log_Update(void)
 	}
 }
 
+static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
+{
+	uint32_t i;
+
+	for (i = 0; i < count; ++i)
+	{
+		f_printf(file, "%08x", data[i]);
+	}
+}
+
+static void FS_Log_WriteCommonHeader(FIL *file)
+{
+	// Write device ID
+	f_printf(file, "$VAR,DEVICE_ID,");
+	FS_Log_WriteHex(file, FS_Config_Get()->device_id, 3);
+	f_printf(file, "\n");
+
+	// Write session ID
+	f_printf(file, "$VAR,SESSION_ID,");
+	FS_Log_WriteHex(file, FS_Config_Get()->session_id, 6);
+	f_printf(file, "\n");
+}
+
 void FS_Log_Init(uint32_t sessionId)
 {
 	char filename[50];
@@ -391,6 +414,7 @@ void FS_Log_Init(uint32_t sessionId)
 		Error_Handler();
 	}
 
+	FS_Log_WriteCommonHeader(&gnssFile);
 	f_printf(&gnssFile, "$HEAD,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
 	f_printf(&gnssFile, "$HEAD,,(deg),(deg),(m),(m/s),(m/s),(m/s),(m),(m),(m/s),,\n");
 
@@ -411,6 +435,7 @@ void FS_Log_Init(uint32_t sessionId)
 		Error_Handler();
 	}
 
+	FS_Log_WriteCommonHeader(&sensorFile);
 	f_printf(&sensorFile, "$HEAD,time,pressure,temperature\n");
 	f_printf(&sensorFile, "$HEAD,(s),(Pa),(degrees C)\n");
 	f_printf(&sensorFile, "$HEAD,time,humidity,temperature\n");
