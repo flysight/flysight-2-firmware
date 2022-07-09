@@ -753,7 +753,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(IMU_NCS_GPIO_Port, IMU_NCS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GNSS_EXTINT_Pin|DEBUG_TX_Pin|DEBUG_RX_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
@@ -806,12 +806,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BARO_INT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : GNSS_EXTINT_Pin */
-  GPIO_InitStruct.Pin = GNSS_EXTINT_Pin;
+  /*Configure GPIO pins : GNSS_EXTINT_Pin DEBUG_TX_Pin DEBUG_RX_Pin */
+  GPIO_InitStruct.Pin = GNSS_EXTINT_Pin|DEBUG_TX_Pin|DEBUG_RX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GNSS_EXTINT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : HUM_DRDY_Pin */
   GPIO_InitStruct.Pin = HUM_DRDY_Pin;

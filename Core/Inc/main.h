@@ -122,6 +122,10 @@ void PeriphClock_Config(void);
 #define HUM_DRDY_Pin GPIO_PIN_4
 #define HUM_DRDY_GPIO_Port GPIOE
 #define HUM_DRDY_EXTI_IRQn EXTI4_IRQn
+#define DEBUG_TX_Pin GPIO_PIN_11
+#define DEBUG_TX_GPIO_Port GPIOB
+#define DEBUG_RX_Pin GPIO_PIN_10
+#define DEBUG_RX_GPIO_Port GPIOB
 #define VBAT_DIV_Pin GPIO_PIN_7
 #define VBAT_DIV_GPIO_Port GPIOA
 #define IMU_SCK_Pin GPIO_PIN_5
