@@ -351,6 +351,11 @@ void APP_BLE_Init( void )
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
+  /**
+   * Start to Advertise to be connected by a Client
+   */
+   Adv_Request(APP_BLE_LP_ADV);
+
 /* USER CODE BEGIN APP_BLE_Init_2 */
 
 /* USER CODE END APP_BLE_Init_2 */
@@ -748,8 +753,8 @@ static void Adv_Request(APP_BLE_ConnStatus_t New_Status)
     /* Start Fast or Low Power Advertising */
     ret = aci_gap_set_discoverable(
         ADV_TYPE,
-        CFG_FAST_CONN_ADV_INTERVAL_MIN,
-        CFG_FAST_CONN_ADV_INTERVAL_MAX,
+        CFG_LP_CONN_ADV_INTERVAL_MIN,
+        CFG_LP_CONN_ADV_INTERVAL_MAX,
         CFG_BLE_ADDRESS_TYPE,
         ADV_FILTER,
         0,
@@ -764,7 +769,7 @@ static void Adv_Request(APP_BLE_ConnStatus_t New_Status)
 
     if (ret == BLE_STATUS_SUCCESS)
     {
-        APP_DBG_MSG("Successfully Start Fast Advertising \n" );
+        APP_DBG_MSG("Successfully Start Low Power Advertising \n" );
     }
     else
     {
