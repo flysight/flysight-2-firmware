@@ -206,7 +206,6 @@ void FS_Log_UpdateGNSS(void)
 	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\n');
-	ptr = writeInt32ToBuf(ptr, data->gpsFix,  0, 0, ',');
 	ptr = writeInt32ToBuf(ptr, data->sAcc,    2, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
@@ -418,8 +417,8 @@ void FS_Log_Init(uint32_t sessionId)
 	}
 
 	FS_Log_WriteCommonHeader(&gnssFile);
-	f_printf(&gnssFile, "$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
-	f_printf(&gnssFile, "$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,,\n");
+	f_printf(&gnssFile, "$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,numSV\n");
+	f_printf(&gnssFile, "$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,\n");
 	f_printf(&gnssFile, "$DATA\n");
 
 	if (FS_Config_Get()->enable_raw)
