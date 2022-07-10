@@ -324,9 +324,6 @@ static union
 	ubxTimTp_t      timTp;
 } gnssPayload;
 
-uint8_t  gnssDynModel = 7;		// Pedestrian
-uint16_t gnssMeasRate = 200;	// Measurement rate (ms)
-
 // Saved GNSS messages
 static uint32_t gnssTimeOfWeek;
 static uint8_t  gnssMsgReceived;
@@ -636,6 +633,8 @@ static void FS_GNSS_HandleMessage(void)
 
 static void FS_GNSS_InitMessages(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
+
 	const ubxCfgMsg_t cfgMsg[] =
 	{
 		{UBX_NMEA, UBX_NMEA_GPGGA,  0},
@@ -653,16 +652,16 @@ static void FS_GNSS_InitMessages(void)
 
 	const ubxCfgMsg_t cfgMsgRaw[] =
 	{
-		{UBX_MON,  UBX_MON_HW,      1000 / gnssMeasRate},
-		{UBX_NAV,  UBX_NAV_SAT,     1000 / gnssMeasRate},
-		{UBX_NAV,  UBX_NAV_STATUS,  1000 / gnssMeasRate}
+		{UBX_MON,  UBX_MON_HW,      1000 / config->rate},
+		{UBX_NAV,  UBX_NAV_SAT,     1000 / config->rate},
+		{UBX_NAV,  UBX_NAV_STATUS,  1000 / config->rate}
 	};
 
 	size_t i, n;
 
 	const ubxCfgRate_t cfgRate =
 	{
-		.measRate   = gnssMeasRate, // Measurement rate (ms)
+		.measRate   = config->rate, // Measurement rate (ms)
 		.navRate    = 1,        // Navigation rate (cycles)
 		.timeRef    = 0         // UTC time
 	};
@@ -670,7 +669,7 @@ static void FS_GNSS_InitMessages(void)
 	const ubxCfgNav5_t cfgNav5 =
 	{
 		.mask       = 0x0001,   // Apply dynamic model settings
-		.dynModel   = gnssDynModel
+		.dynModel   = config->model
 	};
 
 	const ubxCfgTp5_t cfgTp5 =
@@ -731,8 +730,6 @@ void FS_GNSS_Init(void)
 	};
 
 	// Reset state
-	gnssDynModel = 3;
-	gnssMeasRate = 200;
 	gnssTimeOfWeek = 0;
 	gnssMsgReceived = 0;
 	validTime = false;
