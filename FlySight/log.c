@@ -370,6 +370,9 @@ static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
 
 static void FS_Log_WriteCommonHeader(FIL *file)
 {
+	// Write file format
+	f_printf(file, "$FLYS,1\n");
+
 	// Write device ID
 	f_printf(file, "$VAR,DEVICE_ID,");
 	FS_Log_WriteHex(file, FS_Config_Get()->device_id, 3);
@@ -417,6 +420,7 @@ void FS_Log_Init(uint32_t sessionId)
 	FS_Log_WriteCommonHeader(&gnssFile);
 	f_printf(&gnssFile, "$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,gpsFix,numSV\n");
 	f_printf(&gnssFile, "$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,,\n");
+	f_printf(&gnssFile, "$DATA\n");
 
 	if (FS_Config_Get()->enable_raw)
 	{
@@ -446,6 +450,7 @@ void FS_Log_Init(uint32_t sessionId)
 	f_printf(&sensorFile, "$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n");
 	f_printf(&sensorFile, "$COL,TIME,time,towMS,week\n");
 	f_printf(&sensorFile, "$UNIT,TIME,ms,ms,\n");
+	f_printf(&sensorFile, "$DATA\n");
 
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
