@@ -514,12 +514,15 @@ void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
 
 void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_GNSS_Data_t *saved = &gnssBuf[gnssWrI % GNSS_COUNT];
-	memcpy(saved, current, sizeof(FS_GNSS_Data_t));
+	if (current->gpsFix == 3)
+	{
+		// Copy to circular buffer
+		FS_GNSS_Data_t *saved = &gnssBuf[gnssWrI % GNSS_COUNT];
+		memcpy(saved, current, sizeof(FS_GNSS_Data_t));
 
-	// Increment write index
-	++gnssWrI;
+		// Increment write index
+		++gnssWrI;
+	}
 }
 
 void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
