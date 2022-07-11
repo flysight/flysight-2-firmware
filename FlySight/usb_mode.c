@@ -8,7 +8,6 @@
 #include "main.h"
 #include "app_common.h"
 #include "charge.h"
-#include "gnss.h"
 #include "usbd_core.h"
 #include "usb_device.h"
 
@@ -37,15 +36,6 @@ void FS_USBMode_Init(void)
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
-
-	/* Enable USART */
-	MX_USART1_UART_Init();
-
-	/* Initialize GNSS */
-	FS_GNSS_Init();
-
-	/* Stop GNSS */
-	FS_GNSS_Stop();
 
 	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
 
@@ -83,12 +73,6 @@ void FS_USBMode_DeInit(void)
 
 	/* Release HSI48 semaphore */
 	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
-
-	/* Disable GNSS */
-	FS_GNSS_DeInit();
-
-	/* Disable USART */
-	HAL_UART_DeInit(&huart1);
 
 	/* Disable SPI */
 	HAL_SPI_DeInit(&hspi2);
