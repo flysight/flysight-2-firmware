@@ -447,8 +447,8 @@ void FS_Log_Init(uint32_t sessionId)
 	f_printf(&sensorFile, "$UNIT,MAG,s,gauss,gauss,gauss,deg C\n");
 	f_printf(&sensorFile, "$COL,IMU,time,wx,wy,wz,ax,ay,az,temperature\n");
 	f_printf(&sensorFile, "$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n");
-	f_printf(&sensorFile, "$COL,TIME,time,towMS,week\n");
-	f_printf(&sensorFile, "$UNIT,TIME,ms,ms,\n");
+	f_printf(&sensorFile, "$COL,TIME,time,tow,week\n");
+	f_printf(&sensorFile, "$UNIT,TIME,s,s,\n");
 	f_printf(&sensorFile, "$DATA\n");
 
 	// Initialize update task
