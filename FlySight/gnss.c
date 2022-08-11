@@ -55,6 +55,7 @@
 
 #define UBX_MON             0x0a
 #define UBX_MON_HW          0x09
+#define UBX_MON_SPAN        0x31
 
 #define UBX_TIM             0x0d
 #define UBX_TIM_TP          0x01
@@ -653,6 +654,7 @@ static void FS_GNSS_InitMessages(void)
 	const ubxCfgMsg_t cfgMsgRaw[] =
 	{
 		{UBX_MON,  UBX_MON_HW,      1000 / config->rate},
+		{UBX_MON,  UBX_MON_SPAN,    1000 / config->rate},
 		{UBX_NAV,  UBX_NAV_SAT,     1000 / config->rate},
 		{UBX_NAV,  UBX_NAV_STATUS,  1000 / config->rate}
 	};
