@@ -9,12 +9,14 @@
 #include "app_common.h"
 #include "app_fatfs.h"
 #include "audio.h"
+#include "audio_control.h"
 #include "baro.h"
 #include "config.h"
 #include "control.h"
 #include "gnss.h"
 #include "hum.h"
 #include "imu.h"
+#include "log.h"
 #include "mag.h"
 #include "sensor.h"
 
@@ -28,7 +30,10 @@ void FS_ActiveMode_Init(void)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	// Enable charging
+	/* Initialize controller */
+	FS_Control_Init();
+
+	/* Enable charging */
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
 
@@ -66,19 +71,19 @@ void FS_ActiveMode_Init(void)
 		Error_Handler();
 	}
 
-	/* Initialize controller */
-	FS_Control_Init();
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Enable logging
+		FS_Log_Init(FS_Control_SessionID());
+	}
 
 	if (FS_Config_Get()->enable_audio)
 	{
 		/* Initialize audio */
 		FS_Audio_Init();
-	}
 
-	if (FS_Config_Get()->enable_audio && FS_Config_Get()->enable_tone)
-	{
-		/* Play tone */
-		FS_Audio_Beep(220, 220, -1, 0);
+		// Enable audio control
+		FS_AudioControl_Init();
 	}
 
 	if (FS_Config_Get()->enable_vbat)
@@ -149,6 +154,11 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
+	const uint32_t sessionID = FS_Control_SessionID();
+
+	/* Disable controller */
+	FS_Control_DeInit();
+
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
 	{
 		/* Stop reading sensors */
@@ -208,12 +218,18 @@ void FS_ActiveMode_DeInit(void)
 
 	if (FS_Config_Get()->enable_audio)
 	{
-		/* Disable audio */
+		// Disable audio control
+		FS_AudioControl_DeInit();
+
+		// Disable audio
 		FS_Audio_DeInit();
 	}
 
-	/* Disable controller */
-	FS_Control_DeInit();
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Disable logging
+		FS_Log_DeInit(sessionID);
+	}
 
 	/* Disable microSD card */
 	if (f_mount(0, "0:/", 0) != FR_OK)
@@ -239,7 +255,7 @@ void FS_ActiveMode_DeInit(void)
 	/* Reset GNSS_SAFEBOOT_N */
 	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_RESET);
 
-	// Disable charging
+	/* Disable charging */
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
 }

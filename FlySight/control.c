@@ -26,6 +26,11 @@ static uint32_t sessionId = 0;
 
 static uint8_t led_timer_id;
 
+static volatile enum {
+	FS_CONTROL_INACTIVE = 0,
+	FS_CONTROL_ACTIVE
+} state = FS_CONTROL_INACTIVE;
+
 static void FS_Control_LED_Timer(void)
 {
 	// Turn on LED
@@ -41,38 +46,20 @@ void FS_Control_Init(void)
 	// Initialize LED timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_Control_LED_Timer);
 
-	if (FS_Config_Get()->enable_audio)
-	{
-		// Enable audio control
-		FS_AudioControl_Init();
-	}
-
-	if (FS_Config_Get()->enable_logging)
-	{
-		// Enable logging
-		FS_Log_Init(sessionId);
-	}
+	// Update state
+	state = FS_CONTROL_ACTIVE;
 }
 
 void FS_Control_DeInit(void)
 {
+	// Update state
+	state = FS_CONTROL_INACTIVE;
+
 	// Delete timer
 	HW_TS_Delete(led_timer_id);
 
 	// Turn off LEDs
 	FS_LED_Off();
-
-	if (FS_Config_Get()->enable_audio)
-	{
-		// Disable audio control
-		FS_AudioControl_DeInit();
-	}
-
-	if (FS_Config_Get()->enable_logging)
-	{
-		// Disable logging
-		FS_Log_DeInit(sessionId);
-	}
 
 	// Increment session counter
 	++sessionId;
@@ -80,6 +67,8 @@ void FS_Control_DeInit(void)
 
 void FS_Baro_DataReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
@@ -89,6 +78,8 @@ void FS_Baro_DataReady_Callback(void)
 
 void FS_Hum_DataReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
@@ -98,6 +89,8 @@ void FS_Hum_DataReady_Callback(void)
 
 void FS_Mag_DataReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
@@ -109,7 +102,9 @@ void FS_GNSS_DataReady_Callback(void)
 {
 	const FS_GNSS_Data_t *data = FS_GNSS_GetData();
 
-	if (FS_Config_Get()->enable_audio && !FS_Config_Get()->enable_tone)
+	if (state != FS_CONTROL_ACTIVE) return;
+
+	if (FS_Config_Get()->enable_audio)
 	{
 		// Update audio
 		FS_AudioControl_UpdateGNSS(data);
@@ -124,6 +119,8 @@ void FS_GNSS_DataReady_Callback(void)
 
 void FS_GNSS_TimeReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	// Turn off LED
 	FS_LED_Off();
 	HW_TS_Start(led_timer_id, LED_BLINK_TICKS);
@@ -137,6 +134,8 @@ void FS_GNSS_TimeReady_Callback(void)
 
 void FS_GNSS_RawReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
@@ -146,9 +145,16 @@ void FS_GNSS_RawReady_Callback(void)
 
 void FS_IMU_DataReady_Callback(void)
 {
+	if (state != FS_CONTROL_ACTIVE) return;
+
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
 		FS_Log_WriteIMUData(FS_IMU_GetData());
 	}
+}
+
+uint32_t FS_Control_SessionID(void)
+{
+	return sessionId;
 }

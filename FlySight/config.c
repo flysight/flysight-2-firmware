@@ -107,7 +107,6 @@ void FS_Config_Init(void)
 	config.num_windows   = 0;
 
 	config.enable_audio   = 1;
-	config.enable_tone    = 0;
 	config.enable_logging = 1;
 	config.enable_vbat    = 1;
 	config.enable_mic     = 1;
@@ -185,7 +184,6 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Alt_Step",  config.alt_step,     val, val >= 0);
 
 		HANDLE_VALUE("Enable_Audio",   config.enable_audio,   val, val == 0 || val == 1);
-		HANDLE_VALUE("Enable_Tone",    config.enable_tone,    val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Logging", config.enable_logging, val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Vbat",    config.enable_vbat,    val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Mic",     config.enable_mic,     val, val == 0 || val == 1);

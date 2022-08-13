@@ -90,7 +90,6 @@ typedef struct
 	uint8_t  num_windows;
 
 	uint8_t  enable_audio;
-	uint8_t  enable_tone;
 	uint8_t  enable_logging;
 	uint8_t  enable_vbat;
 	uint8_t  enable_mic;
