@@ -156,7 +156,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 			if ((t) && !strcmp(name, (s))) { (w) = (r); }
 
 		HANDLE_VALUE("Model",     config.model,        val, val >= 0 && val <= 8);
-		HANDLE_VALUE("Rate",      config.rate,         val, val >= 100);
+		HANDLE_VALUE("Rate",      config.rate,         val, val >= 40 && val <= 1000);
 		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 4) || (val == 11));
 		HANDLE_VALUE("Min",       config.min,          val, TRUE);
 		HANDLE_VALUE("Max",       config.max,          val, TRUE);
