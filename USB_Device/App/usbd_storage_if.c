@@ -32,7 +32,8 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+void (*beginActivityCallback)(void) = 0;
+void (*endActivityCallback)(void) = 0;
 /* USER CODE END PV */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
@@ -255,7 +256,11 @@ int8_t STORAGE_Read_FS(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t bl
   /* USER CODE BEGIN 6 */
   int8_t ret = -1;
   uint32_t timeout = 100000;
+
+  if (beginActivityCallback) beginActivityCallback();
   BSP_SD_ReadBlocks((uint32_t *)buf, blk_addr, blk_len, SD_DATATIMEOUT);
+  if (endActivityCallback) endActivityCallback();
+
   while(BSP_SD_GetCardState() != BSP_SD_OK)
   {
 	if (timeout-- == 0)
@@ -279,7 +284,11 @@ int8_t STORAGE_Write_FS(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t b
   /* USER CODE BEGIN 7 */
   int8_t ret = -1;
   uint32_t timeout = 100000;
+
+  if (beginActivityCallback) beginActivityCallback();
   BSP_SD_WriteBlocks((uint32_t *)buf, blk_addr, blk_len, SD_DATATIMEOUT);
+  if (endActivityCallback) endActivityCallback();
+
   while(BSP_SD_GetCardState() != BSP_SD_OK)
   {
 	if (timeout-- == 0)
@@ -306,7 +315,11 @@ int8_t STORAGE_GetMaxLun_FS(void)
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
-
+void USBD_SetActivityCallbacks(void (*begin)(void), void (*end)(void))
+{
+  beginActivityCallback = begin;
+  endActivityCallback = end;
+}
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
 /**

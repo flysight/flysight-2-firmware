@@ -47,7 +47,6 @@ static void FS_Charge_Timer(void)
 		/* Turn on green LED */
 		FS_LED_SetColour(FS_LED_GREEN);
 	}
-	FS_LED_On();
 }
 
 void FS_Charge_Init(void)
@@ -69,9 +68,6 @@ void FS_Charge_DeInit(void)
 	// Stop update timer
 	HW_TS_Stop(timer_id);
 	HW_TS_Delete(timer_id);
-
-	/* Turn off both LEDs */
-	FS_LED_Off();
 
 	// Disable charging
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_SET);

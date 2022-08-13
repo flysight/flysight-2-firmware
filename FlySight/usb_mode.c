@@ -8,12 +8,25 @@
 #include "main.h"
 #include "app_common.h"
 #include "charge.h"
-#include "usbd_core.h"
+#include "led.h"
 #include "usb_device.h"
+#include "usbd_core.h"
+#include "usbd_storage_if.h"
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
+
+static void FS_USBMode_BeginActivity(void)
+{
+	FS_LED_Off();
+}
+
+
+static void FS_USBMode_EndActivity(void)
+{
+	FS_LED_On();
+}
 
 void FS_USBMode_Init(void)
 {
@@ -21,6 +34,9 @@ void FS_USBMode_Init(void)
 
 	/* Enable charge status */
 	FS_Charge_Init();
+
+	/* Turn on LEDs */
+	FS_LED_On();
 
 	/* Set GNSS_SAFEBOOT_N */
 	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_SET);
@@ -44,10 +60,19 @@ void FS_USBMode_Init(void)
 
 	/* Enable USB interface */
 	MX_USB_Device_Init();
+
+	/* Set disk activity callbacks */
+	USBD_SetActivityCallbacks(FS_USBMode_BeginActivity, FS_USBMode_EndActivity);
 }
 
 void FS_USBMode_DeInit(void)
 {
+	/* Clear disk activity callbacks */
+	USBD_SetActivityCallbacks(0, 0);
+
+	/* Turn off LEDs */
+	FS_LED_Off();
+
 	/* Disable charge status */
 	FS_Charge_DeInit();
 
