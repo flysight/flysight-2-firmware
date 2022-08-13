@@ -26,6 +26,8 @@ static uint32_t sessionId = 0;
 
 static uint8_t led_timer_id;
 
+static volatile bool hasFix = false;
+
 static volatile enum {
 	FS_CONTROL_INACTIVE = 0,
 	FS_CONTROL_ACTIVE
@@ -46,7 +48,8 @@ void FS_Control_Init(void)
 	// Initialize LED timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_Control_LED_Timer);
 
-	// Update state
+	// Initialize state
+	hasFix = false;
 	state = FS_CONTROL_ACTIVE;
 }
 
@@ -115,17 +118,22 @@ void FS_GNSS_DataReady_Callback(void)
 		// Save to log file
 		FS_Log_WriteGNSSData(data);
 	}
+
+	hasFix = (data->gpsFix == 3);
 }
 
-void FS_GNSS_TimeReady_Callback(void)
+void FS_GNSS_TimeReady_Callback(bool validTime)
 {
 	if (state != FS_CONTROL_ACTIVE) return;
 
-	// Turn off LED
-	FS_LED_Off();
-	HW_TS_Start(led_timer_id, LED_BLINK_TICKS);
+	if (hasFix)
+	{
+		// Turn off LED
+		FS_LED_Off();
+		HW_TS_Start(led_timer_id, LED_BLINK_TICKS);
+	}
 
-	if (FS_Config_Get()->enable_logging)
+	if (validTime && FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
 		FS_Log_WriteGNSSTime(FS_GNSS_GetTime());

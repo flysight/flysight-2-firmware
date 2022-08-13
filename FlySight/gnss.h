@@ -8,6 +8,8 @@
 #ifndef GNSS_H_
 #define GNSS_H_
 
+#include <stdbool.h>
+
 #define GNSS_RX_BUF_LEN		512						// Circular buffer for UART
 #define GNSS_RAW_BUF_LEN	(GNSS_RX_BUF_LEN / 2)	// Circular buffer for raw output
 
@@ -64,7 +66,7 @@ void FS_GNSS_DataReady_Callback(void);
 
 void FS_GNSS_Timepulse(void);
 const FS_GNSS_Time_t *FS_GNSS_GetTime(void);
-void FS_GNSS_TimeReady_Callback(void);
+void FS_GNSS_TimeReady_Callback(bool validTime);
 
 const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void);
 void FS_GNSS_RawReady_Callback(void);

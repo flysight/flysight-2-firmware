@@ -5,8 +5,6 @@
  *      Author: Michael Cooper
  */
 
-#include <stdbool.h>
-
 #include "main.h"
 #include "app_common.h"
 #include "config.h"
@@ -648,7 +646,7 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
 		{UBX_NAV,  UBX_NAV_TIMEUTC, 1},
-		{UBX_TIM,  UBX_TIM_TP ,     1}
+		{UBX_TIM,  UBX_TIM_TP ,     1000 / config->rate}
 	};
 
 	const ubxCfgMsg_t cfgMsgRaw[] =
@@ -682,11 +680,9 @@ static void FS_GNSS_InitMessages(void)
 		.antCableDelay     = 50,      // Antenna cable delay (ns)
 		.rfGroupDelay      = 0,       // RF group delay (ns)
 		.freqPeriod        = 1000000, // Frequency or period time
-		.freqPeriodLock    = 1000000, // Frequency or period time when locked to GPS time
-		.pulseLenRatio     = 0,       // Pulse length or duty cycle
-		.pulseLenRatioLock = 100000,  // Pulse length or duty cycle when locked to GPS time
+		.pulseLenRatio     = 100000,  // Pulse length or duty cycle
 		.userConfigDelay   = 0,       // User configurable time pulse delay
-		.flags             = 0x77     // Configuration flags
+		.flags             = 0x73     // Configuration flags
 	};
 
 	#define SEND_MESSAGE(c,m,d)							\
@@ -875,14 +871,11 @@ __weak void FS_GNSS_DataReady_Callback(void)
 
 void FS_GNSS_Timepulse(void)
 {
-	if (validTime)
-	{
-		gnssTime.time = HAL_GetTick();
+	gnssTime.time = HAL_GetTick();
 
-		FS_GNSS_TimeReady_Callback();
+	FS_GNSS_TimeReady_Callback(validTime);
 
-		validTime = false;
-	}
+	validTime = false;
 }
 
 const FS_GNSS_Time_t *FS_GNSS_GetTime(void)
@@ -890,7 +883,7 @@ const FS_GNSS_Time_t *FS_GNSS_GetTime(void)
 	return &gnssTime;
 }
 
-__weak void FS_GNSS_TimeReady_Callback(void)
+__weak void FS_GNSS_TimeReady_Callback(bool validTime)
 {
   /* NOTE: This function should not be modified, when the callback is needed,
            the FS_GNSS_TimeReady_Callback could be implemented in the user file
