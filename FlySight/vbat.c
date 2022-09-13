@@ -7,7 +7,6 @@
 
 #include "main.h"
 #include "app_common.h"
-#include "mode.h"
 #include "vbat.h"
 
 #define VBAT_TIMER_MSEC     1000
@@ -55,7 +54,7 @@ static void FS_VBAT_Timer(void)
 
 void FS_VBAT_Init(void)
 {
-	// Initialize LED timer
+	// Initialize measurement timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &vbat_timer_id, hw_ts_Repeated, FS_VBAT_Timer);
 	HW_TS_Start(vbat_timer_id, VBAT_TIMER_TICKS);
 }
