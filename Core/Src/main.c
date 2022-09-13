@@ -32,6 +32,7 @@
 #include "mag.h"
 #include "mode.h"
 #include "sensor.h"
+#include "vbat.h"
 #include "vbus.h"
 /* USER CODE END Includes */
 
@@ -304,7 +305,7 @@ void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -954,6 +955,17 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c3)
     FS_Sensor_TransferError();
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+  if (hadc == &hadc1)
+    FS_VBAT_ConversionComplete();
+}
+
+void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
+{
+  Error_Handler();
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)

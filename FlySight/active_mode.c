@@ -19,6 +19,7 @@
 #include "log.h"
 #include "mag.h"
 #include "sensor.h"
+#include "vbat.h"
 
 static FATFS fs;
 
@@ -86,22 +87,29 @@ void FS_ActiveMode_Init(void)
 		FS_AudioControl_Init();
 	}
 
+	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
+	{
+		// Enable ADC
+		MX_ADC1_Init();
+
+		// Run the ADC calibration in single-ended mode
+		if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+		{
+			// Calibration Error
+			Error_Handler();
+		}
+	}
+
 	if (FS_Config_Get()->enable_vbat)
 	{
 		// Enable battery measurement
-		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_SET);
+		FS_VBAT_Init();
 	}
 
 	if (FS_Config_Get()->enable_mic)
 	{
 		// Enable microphone
 		HAL_GPIO_WritePin(MIC_EN_GPIO_Port, MIC_EN_Pin, GPIO_PIN_SET);
-	}
-
-	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
-	{
-		// Enable ADC
-		MX_ADC1_Init();
 	}
 
 	if (FS_Config_Get()->enable_imu)
@@ -195,15 +203,6 @@ void FS_ActiveMode_DeInit(void)
 		FS_IMU_Stop();
 	}
 
-	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
-	{
-		// Disable ADC
-		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
-		{
-			Error_Handler();
-		}
-	}
-
 	if (FS_Config_Get()->enable_mic)
 	{
 		// Disable microphone
@@ -213,7 +212,16 @@ void FS_ActiveMode_DeInit(void)
 	if (FS_Config_Get()->enable_vbat)
 	{
 		// Disable battery measurement
-		HAL_GPIO_WritePin(VBAT_EN_GPIO_Port, VBAT_EN_Pin, GPIO_PIN_RESET);
+		FS_VBAT_DeInit();
+	}
+
+	if (FS_Config_Get()->enable_vbat || FS_Config_Get()->enable_mic)
+	{
+		// Disable ADC
+		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
+		{
+			Error_Handler();
+		}
 	}
 
 	if (FS_Config_Get()->enable_audio)

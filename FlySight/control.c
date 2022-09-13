@@ -18,6 +18,7 @@
 #include "led.h"
 #include "log.h"
 #include "mag.h"
+#include "vbat.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
@@ -160,6 +161,14 @@ void FS_IMU_DataReady_Callback(void)
 		// Save to log file
 		FS_Log_WriteIMUData(FS_IMU_GetData());
 	}
+}
+
+void FS_VBAT_ValueReady_Callback(void)
+{
+	if (state != FS_CONTROL_ACTIVE) return;
+
+	// Save to log file
+	FS_Log_WriteVBATData(FS_VBAT_GetData());
 }
 
 uint32_t FS_Control_SessionID(void)

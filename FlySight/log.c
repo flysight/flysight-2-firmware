@@ -27,6 +27,7 @@
 #define TIME_COUNT	2
 #define RAW_COUNT	2
 #define IMU_COUNT   133
+#define VBAT_COUNT  2
 
 static          FS_Baro_Data_t baroBuf[BARO_COUNT];	// data buffer
 static          uint32_t       baroRdI;				// read index
@@ -56,6 +57,10 @@ static          FS_IMU_Data_t  imuBuf[IMU_COUNT];	// data buffer
 static          uint32_t       imuRdI;				// read index
 static volatile uint32_t       imuWrI;				// write index
 
+static          FS_VBAT_Data_t vbatBuf[VBAT_COUNT];	// data buffer
+static          uint32_t       vbatRdI;				// read index
+static volatile uint32_t       vbatWrI;				// write index
+
 static FIL gnssFile;
 static FIL sensorFile;
 static FIL rawFile;
@@ -72,7 +77,8 @@ typedef enum
 	FS_LOG_SENSOR_HUM,
 	FS_LOG_SENSOR_MAG,
 	FS_LOG_SENSOR_TIME,
-	FS_LOG_SENSOR_IMU
+	FS_LOG_SENSOR_IMU,
+	FS_LOG_SENSOR_VBAT
 } FS_Log_SensorType_t ;
 
 static void FS_Log_Timer(void)
@@ -100,6 +106,7 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 	HANDLE_SENSOR(magRdI,  magWrI,  magBuf,  MAG_COUNT,  FS_LOG_SENSOR_MAG);
 	HANDLE_SENSOR(timeRdI, timeWrI, timeBuf, TIME_COUNT, FS_LOG_SENSOR_TIME);
 	HANDLE_SENSOR(imuRdI,  imuWrI,  imuBuf,  IMU_COUNT,  FS_LOG_SENSOR_IMU);
+	HANDLE_SENSOR(vbatRdI, vbatWrI, vbatBuf, VBAT_COUNT, FS_LOG_SENSOR_VBAT);
 
 	return nextType;
 }
@@ -308,6 +315,32 @@ void FS_Log_UpdateIMU(void)
 	++imuRdI;
 }
 
+void FS_Log_UpdateVBAT(void)
+{
+	char row[150];
+
+	// Get current data point
+	FS_VBAT_Data_t *data = &vbatBuf[vbatRdI % VBAT_COUNT];
+
+	// Write to disk
+	char *ptr = row + sizeof(row);
+	*(--ptr) = 0;
+
+	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\n');
+	ptr = writeInt32ToBuf(ptr, data->time,    3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'T';
+	*(--ptr) = 'A';
+	*(--ptr) = 'B';
+	*(--ptr) = 'V';
+	*(--ptr) = '$';
+
+	f_puts(ptr, &sensorFile);
+
+	// Increment read index
+	++vbatRdI;
+}
+
 static void FS_Log_Update(void)
 {
 	const uint32_t ms = HAL_GetTick();
@@ -350,6 +383,9 @@ static void FS_Log_Update(void)
 			break;
 		case FS_LOG_SENSOR_IMU:
 			FS_Log_UpdateIMU();
+			break;
+		case FS_LOG_SENSOR_VBAT:
+			FS_Log_UpdateVBAT();
 			break;
 		case FS_LOG_SENSOR_NONE:
 			break;		// should never be called
@@ -402,6 +438,8 @@ void FS_Log_Init(uint32_t sessionId)
 	rawWrI = 0;
 	imuRdI = 0;
 	imuWrI = 0;
+	vbatRdI = 0;
+	vbatWrI = 0;
 	validDateTime = false;
 
 	// Create temporary folder
@@ -449,6 +487,8 @@ void FS_Log_Init(uint32_t sessionId)
 	f_printf(&sensorFile, "$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n");
 	f_printf(&sensorFile, "$COL,TIME,time,tow,week\n");
 	f_printf(&sensorFile, "$UNIT,TIME,s,s,\n");
+	f_printf(&sensorFile, "$COL,VBAT,time,voltage\n");
+	f_printf(&sensorFile, "$UNIT,VBAT,s,volt\n");
 	f_printf(&sensorFile, "$DATA\n");
 
 	// Initialize update task
@@ -560,4 +600,14 @@ void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)
 
 	// Increment write index
 	++imuWrI;
+}
+
+void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current)
+{
+	// Copy to circular buffer
+	FS_VBAT_Data_t *saved = &vbatBuf[vbatWrI % VBAT_COUNT];
+	memcpy(saved, current, sizeof(FS_VBAT_Data_t));
+
+	// Increment write index
+	++vbatWrI;
 }

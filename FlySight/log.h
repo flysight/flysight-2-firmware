@@ -14,6 +14,7 @@
 #include "imu.h"
 #include "led.h"
 #include "mag.h"
+#include "vbat.h"
 
 void FS_Log_Init(uint32_t sessionId);
 void FS_Log_DeInit(uint32_t sessionId);
@@ -25,5 +26,6 @@ void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current);
 void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current);
 void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current);
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current);
+void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current);
 
 #endif /* LOG_H_ */
