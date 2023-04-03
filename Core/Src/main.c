@@ -43,7 +43,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define WATCHDOG_RESET_MSEC 3000
+#define WATCHDOG_RESET_RATE (WATCHDOG_RESET_MSEC*1000/CFG_TS_TICK_VAL)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -81,6 +82,9 @@ DMA_HandleTypeDef hdma_usart1_rx;
 /* USER CODE BEGIN PV */
 /* Transfer state */
 volatile MAIN_TransferStateTypeDef main_transfer_state = TRANSFER_WAIT;
+
+/* Watchdog reset timer */
+static uint8_t watchdog_timer_id;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,6 +103,11 @@ static void MX_RF_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void Watchdog_Timer(void)
+{
+  /* Timer only exists to force wake-up */
+}
+
 void UTIL_SEQ_PostIdle(void)
 {
   WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
@@ -158,8 +167,12 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  // Reload watchdog timer
+  /* Reset watchdog timer */
   WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
+
+  /* Initialize watchdog reset timer */
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &watchdog_timer_id, hw_ts_Repeated, Watchdog_Timer);
+  HW_TS_Start(watchdog_timer_id, WATCHDOG_RESET_RATE);
 
   FS_Mode_Init();
   FS_Button_Init();
