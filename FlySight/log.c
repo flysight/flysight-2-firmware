@@ -448,7 +448,7 @@ void FS_Log_Init(uint32_t sessionId)
 	f_mkdir(filename);
 
 	// Open GNSS log file
-	sprintf(filename, "/temp/%04lu/gnss.csv", sessionId);
+	sprintf(filename, "/temp/%04lu/track.csv", sessionId);
 	if (f_open(&gnssFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
