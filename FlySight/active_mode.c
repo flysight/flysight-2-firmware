@@ -69,7 +69,7 @@ void FS_ActiveMode_Init(void)
 	FS_Config_Init();
 	if (FS_Config_Read("/config.txt") != FS_CONFIG_OK)
 	{
-		Error_Handler();
+		FS_Config_Write("/config.txt");
 	}
 
 	if (FS_Config_Get()->enable_logging)

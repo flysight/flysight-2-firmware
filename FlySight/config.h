@@ -114,6 +114,7 @@ typedef enum {
 
 void FS_Config_Init(void);
 FS_Config_Result_t FS_Config_Read(const char *filename);
+FS_Config_Result_t FS_Config_Write(const char *filename);
 const FS_Config_Data_t *FS_Config_Get(void);
 
 #endif /* CONFIG_H_ */
