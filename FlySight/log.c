@@ -61,6 +61,7 @@ static          FS_VBAT_Data_t vbatBuf[VBAT_COUNT];	// data buffer
 static          uint32_t       vbatRdI;				// read index
 static volatile uint32_t       vbatWrI;				// write index
 
+static FIL infoFile;
 static FIL gnssFile;
 static FIL sensorFile;
 static FIL rawFile;
@@ -441,6 +442,27 @@ void FS_Log_Init(uint32_t sessionId)
 	vbatRdI = 0;
 	vbatWrI = 0;
 	validDateTime = false;
+
+	// Open FlySight info file
+	sprintf(filename, "/flysight.txt");
+	if (f_open(&infoFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	{
+		Error_Handler();
+	}
+
+	// Write device info
+	f_printf(&infoFile, "FlySight - http://flysight.ca/\n");
+
+	f_printf(&infoFile, "Device ID: ");
+	FS_Log_WriteHex(&infoFile, FS_Config_Get()->device_id, 3);
+	f_printf(&infoFile, "\n");
+
+	f_printf(&infoFile, "Last session ID: ");
+	FS_Log_WriteHex(&infoFile, FS_Config_Get()->session_id, 3);
+	f_printf(&infoFile, "\n");
+
+	// Close FlySight info file
+	f_close(&infoFile);
 
 	// Create temporary folder
 	f_mkdir("/temp");
