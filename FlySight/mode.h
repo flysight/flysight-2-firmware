@@ -21,6 +21,7 @@ typedef enum
 {
 	FS_MODE_STATE_SLEEP,
 	FS_MODE_STATE_ACTIVE,
+	FS_MODE_STATE_CONFIG,
 	FS_MODE_STATE_USB,
 
 	// Number of modes
