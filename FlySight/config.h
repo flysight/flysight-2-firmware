@@ -102,9 +102,6 @@ typedef struct
 	uint8_t  ble_tx_power;
 	uint8_t  enable_raw;
 	uint8_t  cold_start;
-
-	uint32_t device_id[3];
-	uint32_t session_id[3];
 } FS_Config_Data_t;
 
 typedef enum {

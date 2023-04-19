@@ -13,6 +13,7 @@
 #include "config.h"
 #include "ff.h"
 #include "log.h"
+#include "state.h"
 #include "stm32_seq.h"
 
 #define LOG_TIMEOUT     5		// Write timeout
@@ -61,7 +62,6 @@ static          FS_VBAT_Data_t vbatBuf[VBAT_COUNT];	// data buffer
 static          uint32_t       vbatRdI;				// read index
 static volatile uint32_t       vbatWrI;				// write index
 
-static FIL infoFile;
 static FIL gnssFile;
 static FIL sensorFile;
 static FIL rawFile;
@@ -411,12 +411,12 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 
 	// Write device ID
 	f_printf(file, "$VAR,DEVICE_ID,");
-	FS_Log_WriteHex(file, FS_Config_Get()->device_id, 3);
+	FS_Log_WriteHex(file, FS_State_Get()->device_id, 3);
 	f_printf(file, "\n");
 
 	// Write session ID
 	f_printf(file, "$VAR,SESSION_ID,");
-	FS_Log_WriteHex(file, FS_Config_Get()->session_id, 3);
+	FS_Log_WriteHex(file, FS_State_Get()->session_id, 3);
 	f_printf(file, "\n");
 }
 
@@ -442,27 +442,6 @@ void FS_Log_Init(uint32_t sessionId)
 	vbatRdI = 0;
 	vbatWrI = 0;
 	validDateTime = false;
-
-	// Open FlySight info file
-	sprintf(filename, "/flysight.txt");
-	if (f_open(&infoFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
-	{
-		Error_Handler();
-	}
-
-	// Write device info
-	f_printf(&infoFile, "FlySight - http://flysight.ca/\n");
-
-	f_printf(&infoFile, "Device ID: ");
-	FS_Log_WriteHex(&infoFile, FS_Config_Get()->device_id, 3);
-	f_printf(&infoFile, "\n");
-
-	f_printf(&infoFile, "Last session ID: ");
-	FS_Log_WriteHex(&infoFile, FS_Config_Get()->session_id, 3);
-	f_printf(&infoFile, "\n");
-
-	// Close FlySight info file
-	f_close(&infoFile);
 
 	// Create temporary folder
 	f_mkdir("/temp");

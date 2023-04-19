@@ -13,6 +13,7 @@
 #include "button.h"
 #include "config_mode.h"
 #include "mode.h"
+#include "state.h"
 #include "stm32_seq.h"
 #include "usb_mode.h"
 
@@ -157,9 +158,19 @@ static FS_Mode_State_t FS_Mode_State_Active(FS_Mode_Event_t event)
 
 static FS_Mode_State_t FS_Mode_State_Config(FS_Mode_Event_t event)
 {
-	FS_Mode_State_t next_mode = FS_MODE_STATE_ACTIVE;
+	FS_Mode_State_t next_mode = FS_MODE_STATE_CONFIG;
 
-	// TO DO: Do something so we aren't stuck in this mode.
+	if (event == FS_MODE_EVENT_BUTTON_PRESSED)
+	{
+		FS_State_SetConfigFilename(FS_ConfigMode_GetConfigFilename());
+		FS_ConfigMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+	else if (event == FS_MODE_EVENT_FORCE_UPDATE)
+	{
+		FS_ConfigMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
 
 	return next_mode;
 }

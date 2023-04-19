@@ -19,6 +19,7 @@
 #include "log.h"
 #include "mag.h"
 #include "sensor.h"
+#include "state.h"
 #include "vbat.h"
 
 static FATFS fs;
@@ -65,11 +66,20 @@ void FS_ActiveMode_Init(void)
 		Error_Handler();
 	}
 
+	/* Read persistent state */
+	FS_State_Init();
+
 	/* Initialize configuration */
 	FS_Config_Init();
 	if (FS_Config_Read("/config.txt") != FS_CONFIG_OK)
 	{
 		FS_Config_Write("/config.txt");
+	}
+
+	/* Read selectable config */
+	if (f_chdir("/config") == FR_OK)
+	{
+		FS_Config_Read(FS_State_Get()->config_filename);
 	}
 
 	if (FS_Config_Get()->enable_logging)
