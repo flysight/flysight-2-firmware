@@ -46,7 +46,7 @@ static enum {
 	ACCEL_FS_16 = 1,
 	ACCEL_FS_4  = 2,
 	ACCEL_FS_8  = 3
-} accelFS = ACCEL_FS_2;
+} accelFS = ACCEL_FS_8;
 
 static enum {
 	GYRO_ODR_PD = 0,
@@ -67,7 +67,7 @@ static enum {
 	GYRO_FS_500  = 1,
 	GYRO_FS_1000 = 2,
 	GYRO_FS_2000 = 3
-} gyroFS = GYRO_FS_250;
+} gyroFS = GYRO_FS_2000;
 
 static int32_t accelFactor;
 static int32_t gyroFactor;
