@@ -834,6 +834,7 @@ void FS_AudioControl_Init(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t i;
+	char filename[13];
 
 	// Initialize state
 	cur_speech = 0;
@@ -869,6 +870,18 @@ void FS_AudioControl_Init(void)
 		{
 			flags |= FLAG_SAY_ALTITUDE;
 		}
+	}
+
+	if (config->init_mode == 1)
+	{
+		strncpy(speech_buf, "0123456789.-", sizeof(speech_buf));
+	}
+	else if (config->init_mode == 2)
+	{
+		filename[0] = '\0';
+		strncat(filename, config->init_filename, sizeof(filename) - 1);
+		strncat(filename, ".wav", sizeof(filename) - 1);
+		FS_Audio_Play(filename, config->sp_volume * 5);
 	}
 }
 

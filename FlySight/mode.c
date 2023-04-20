@@ -168,6 +168,7 @@ static FS_Mode_State_t FS_Mode_State_Config(FS_Mode_Event_t event)
 	}
 	else if (event == FS_MODE_EVENT_FORCE_UPDATE)
 	{
+		FS_State_SetConfigFilename("");
 		FS_ConfigMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
 	}
