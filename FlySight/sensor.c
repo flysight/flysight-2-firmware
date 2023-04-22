@@ -12,6 +12,7 @@
 #include "stm32_seq.h"
 
 #define HANDLER_COUNT 4
+#define TIMEOUT       100
 
 typedef enum
 {
@@ -177,24 +178,54 @@ void FS_Sensor_ReadAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t si
 
 HAL_StatusTypeDef FS_Sensor_Write(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size)
 {
+	HAL_StatusTypeDef result;
+	uint32_t ms;
+
 	if (mode == MODE_ACTIVE)
 	{
 		return HAL_ERROR;
 	}
 	else
 	{
-		return HAL_I2C_Mem_Write(&hi2c3, addr, reg, 1, pData, size, HAL_MAX_DELAY);
+		ms = HAL_GetTick();
+		do
+		{
+			if (HAL_GetTick() - ms > TIMEOUT)
+			{
+				Error_Handler();
+			}
+
+			result = HAL_I2C_Mem_Write(&hi2c3, addr, reg, 1, pData, size, TIMEOUT);
+		}
+		while (result != HAL_OK);
+
+		return result;
 	}
 }
 
 HAL_StatusTypeDef FS_Sensor_Read(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size)
 {
+	HAL_StatusTypeDef result;
+	uint32_t ms;
+
 	if (mode == MODE_ACTIVE)
 	{
 		return HAL_ERROR;
 	}
 	else
 	{
-		return HAL_I2C_Mem_Read(&hi2c3, addr, reg, 1, pData, size, HAL_MAX_DELAY);
+		ms = HAL_GetTick();
+		do
+		{
+			if (HAL_GetTick() - ms > TIMEOUT)
+			{
+				Error_Handler();
+			}
+
+			result = HAL_I2C_Mem_Read(&hi2c3, addr, reg, 1, pData, size, TIMEOUT);
+		}
+		while (result != HAL_OK);
+
+		return result;
 	}
 }

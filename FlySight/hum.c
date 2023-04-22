@@ -175,25 +175,25 @@ static void FS_Hum_Read_Callback(HAL_StatusTypeDef result)
 	int32_t n, d;
 
 	// Read raw measurements
-	if (result != HAL_OK)
-		Error_Handler();
+	if (result == HAL_OK)
+	{
+		H_T_out = (int16_t) ((dataBuf[1] << 8) | dataBuf[0]);
+		T_out = (int16_t) ((dataBuf[3] << 8) | dataBuf[2]);
 
-	H_T_out = (int16_t) ((dataBuf[1] << 8) | dataBuf[0]);
-	T_out = (int16_t) ((dataBuf[3] << 8) | dataBuf[2]);
+		// Compute humidity
+		n = (H1_rH_x2 - H0_rH_x2) * (H_T_out - H0_T0_out) * 10;
+		d = H1_T0_out - H0_T0_out;
 
-	// Compute humidity
-	n = (H1_rH_x2 - H0_rH_x2) * (H_T_out - H0_T0_out) * 10;
-	d = H1_T0_out - H0_T0_out;
+		humData.humidity = (n / d + H0_rH_x2 * 10) / 2;
 
-	humData.humidity = (n / d + H0_rH_x2 * 10) / 2;
+		// Compute temperature
+		n = (T1_degC_x8_u16 - T0_degC_x8_u16) * (T_out - T0_out) * 10;
+		d = T1_out - T0_out;
 
-	// Compute temperature
-	n = (T1_degC_x8_u16 - T0_degC_x8_u16) * (T_out - T0_out) * 10;
-	d = T1_out - T0_out;
+		humData.temperature = (n / d + T0_degC_x8_u16 * 10) / 8;
 
-	humData.temperature = (n / d + T0_degC_x8_u16 * 10) / 8;
-
-	FS_Hum_DataReady_Callback();
+		FS_Hum_DataReady_Callback();
+	}
 }
 
 void FS_Hum_Read(void)

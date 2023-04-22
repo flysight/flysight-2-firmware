@@ -94,17 +94,17 @@ static void FS_Baro_Read_Callback(HAL_StatusTypeDef result)
 {
 	uint32_t temp;
 
-	if (result != HAL_OK)
-		Error_Handler();
+	if (result == HAL_OK)
+	{
+		temp = (uint32_t) ((dataBuf[2] << 16) | (dataBuf[1] << 8) | dataBuf[0]);
+		if (temp & 0x00800000)
+			temp |= 0xff000000;
 
-	temp = (uint32_t) ((dataBuf[2] << 16) | (dataBuf[1] << 8) | dataBuf[0]);
-	if (temp & 0x00800000)
-		temp |= 0xff000000;
+		baroData.pressure = (((int32_t) temp) * (625 / 2)) / (256 / 2);
+		baroData.temperature = (int16_t) ((dataBuf[4] << 8) | dataBuf[3]);
 
-	baroData.pressure = (((int32_t) temp) * (625 / 2)) / (256 / 2);
-	baroData.temperature = (int16_t) ((dataBuf[4] << 8) | dataBuf[3]);
-
-	FS_Baro_DataReady_Callback();
+		FS_Baro_DataReady_Callback();
+	}
 }
 
 void FS_Baro_Read(void)
