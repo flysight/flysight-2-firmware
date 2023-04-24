@@ -9,6 +9,7 @@
 #include "app_common.h"
 #include "config.h"
 #include "gnss.h"
+#include "state.h"
 #include "stm32_seq.h"
 
 #define GNSS_RATE           230400	// Baud rate
@@ -21,6 +22,8 @@
 
 #define UBX_NUM_CHANNELS	72		// For MAX-M8
 #define UBX_PAYLOAD_LEN		(8+12*UBX_NUM_CHANNELS) // Payload for single UBX message
+
+#define UBX_NUM_CFG_BYTES   36
 
 #define UBX_SYNC_1			0xb5	// UBX sync bytes
 #define UBX_SYNC_2			0x62
@@ -50,6 +53,7 @@
 #define UBX_CFG_NAV5        0x24
 #define UBX_CFG_TP5         0x31
 #define UBX_CFG_PM2         0x3b
+#define UBX_CFG_VALSET      0x8a
 
 #define UBX_MON             0x0a
 #define UBX_MON_HW          0x09
@@ -66,11 +70,18 @@
 #define UBX_NMEA_GPRMC      0x04
 #define UBX_NMEA_GPVTG      0x05
 
+#define UBX_SEC             0x27
+#define UBX_SEC_ECSIGN      0x04
+
 #define UBX_MSG_POSLLH      0x01
 #define UBX_MSG_PVT         0x02
 #define UBX_MSG_VELNED      0x04
 #define UBX_MSG_TIMEUTC     0x08
 #define UBX_MSG_ALL         (UBX_MSG_POSLLH | UBX_MSG_PVT | UBX_MSG_VELNED | UBX_MSG_TIMEUTC)
+
+#define UBX_CFG_SEC_ECCFGSESSIONID0 0x06, 0x00, 0xf6, 0x50
+#define UBX_CFG_SEC_ECCFGSESSIONID1 0x07, 0x00, 0xf6, 0x50
+#define UBX_CFG_SEC_ECCFGSESSIONID2 0x08, 0x00, 0xf6, 0x50
 
 typedef struct
 {
@@ -148,6 +159,15 @@ typedef struct
 	uint32_t flags;             // Configuration flags
 }
 ubxCfgTp5_t;
+
+typedef struct
+{
+	uint8_t version;
+	uint8_t layers;
+	uint8_t reserved0[2];
+	uint8_t cfgData[UBX_NUM_CFG_BYTES];
+}
+ubxCfgValset_t;
 
 typedef struct
 {
@@ -633,6 +653,7 @@ static void FS_GNSS_HandleMessage(void)
 static void FS_GNSS_InitMessages(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
+	const FS_State_Data_t *state = FS_State_Get();
 
 	const ubxCfgMsg_t cfgMsg[] =
 	{
@@ -646,7 +667,8 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
 		{UBX_NAV,  UBX_NAV_TIMEUTC, 1},
-		{UBX_TIM,  UBX_TIM_TP ,     1000 / config->rate}
+		{UBX_TIM,  UBX_TIM_TP ,     1000 / config->rate},
+		{UBX_SEC,  UBX_SEC_ECSIGN,  1000 / config->rate}
 	};
 
 	const ubxCfgMsg_t cfgMsgRaw[] =
@@ -685,6 +707,18 @@ static void FS_GNSS_InitMessages(void)
 		.flags             = 0x73     // Configuration flags
 	};
 
+	ubxCfgValset_t cfgValset =
+	{
+		.version = 0x00,
+		.layers = 0x01,
+		.cfgData =
+		{
+			UBX_CFG_SEC_ECCFGSESSIONID0, 0x41, 0x34, 0xbf, 0x87, 0x89, 0xe0, 0x3e, 0xc0,
+			UBX_CFG_SEC_ECCFGSESSIONID1, 0xa1, 0x73, 0xca, 0x90, 0x09, 0x80, 0x4b, 0x31,
+			UBX_CFG_SEC_ECCFGSESSIONID2, 0x0a, 0x75, 0xd0, 0x58, 0x20, 0xfa, 0x16, 0x27
+		}
+	};
+
 	#define SEND_MESSAGE(c,m,d)							\
 		do {											\
 			FS_GNSS_SendMessage(c,m,sizeof(d),&d);			\
@@ -708,6 +742,19 @@ static void FS_GNSS_InitMessages(void)
 	SEND_MESSAGE(UBX_CFG, UBX_CFG_RATE, cfgRate);
 	SEND_MESSAGE(UBX_CFG, UBX_CFG_NAV5, cfgNav5);
 	SEND_MESSAGE(UBX_CFG, UBX_CFG_TP5,  cfgTp5);
+
+	// Set session ID
+	for (i = 0; i < 4; ++i)
+	{
+		cfgValset.cfgData[8 + i]  = (state->device_id[0]  >> (8 * i)) & 0xff;
+		cfgValset.cfgData[4 + i]  = (state->device_id[1]  >> (8 * i)) & 0xff;
+		cfgValset.cfgData[20 + i] = (state->device_id[2]  >> (8 * i)) & 0xff;
+		cfgValset.cfgData[16 + i] = (state->session_id[0] >> (8 * i)) & 0xff;
+		cfgValset.cfgData[32 + i] = (state->session_id[1] >> (8 * i)) & 0xff;
+		cfgValset.cfgData[28 + i] = (state->session_id[2] >> (8 * i)) & 0xff;
+	}
+
+	SEND_MESSAGE(UBX_CFG, UBX_CFG_VALSET, cfgValset);
 
 	#undef SEND_MESSAGE
 }
