@@ -667,8 +667,8 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
 		{UBX_NAV,  UBX_NAV_TIMEUTC, 1},
-		{UBX_TIM,  UBX_TIM_TP ,     1000 / config->rate},
-		{UBX_SEC,  UBX_SEC_ECSIGN,  1000 / config->rate}
+		{UBX_TIM,  UBX_TIM_TP ,     MIN(1, 1000 / config->rate)},
+		{UBX_SEC,  UBX_SEC_ECSIGN,  MIN(1, 10000 / config->rate)}
 	};
 
 	const ubxCfgMsg_t cfgMsgRaw[] =
@@ -713,9 +713,9 @@ static void FS_GNSS_InitMessages(void)
 		.layers = 0x01,
 		.cfgData =
 		{
-			UBX_CFG_SEC_ECCFGSESSIONID0, 0x41, 0x34, 0xbf, 0x87, 0x89, 0xe0, 0x3e, 0xc0,
-			UBX_CFG_SEC_ECCFGSESSIONID1, 0xa1, 0x73, 0xca, 0x90, 0x09, 0x80, 0x4b, 0x31,
-			UBX_CFG_SEC_ECCFGSESSIONID2, 0x0a, 0x75, 0xd0, 0x58, 0x20, 0xfa, 0x16, 0x27
+			UBX_CFG_SEC_ECCFGSESSIONID0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			UBX_CFG_SEC_ECCFGSESSIONID1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			UBX_CFG_SEC_ECCFGSESSIONID2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 		}
 	};
 
