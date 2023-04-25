@@ -7,5 +7,8 @@ Debug/
 Release/
 Binary/
 
+# Created in prebuild scrip
+/FlySight/version.h
+
 # Locally stored "Eclipse launch configurations"
 *.launch

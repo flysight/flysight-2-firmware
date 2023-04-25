@@ -15,6 +15,7 @@
 #include "log.h"
 #include "state.h"
 #include "stm32_seq.h"
+#include "version.h"
 
 #define LOG_TIMEOUT     5		// Write timeout
 
@@ -408,6 +409,9 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 {
 	// Write file format
 	f_printf(file, "$FLYS,1\n");
+
+	// Write firmware version
+    f_printf(file, "$VAR,FIRMWARE_VER,%s\n", GIT_TAG);
 
 	// Write device ID
 	f_printf(file, "$VAR,DEVICE_ID,");

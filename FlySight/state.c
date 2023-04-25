@@ -6,8 +6,9 @@
  */
 
 #include "main.h"
-#include "state.h"
 #include "ff.h"
+#include "state.h"
+#include "version.h"
 
 #define TIMEOUT_VALUE 100
 
@@ -73,17 +74,19 @@ static void FS_State_Write(void)
 
 	f_printf(&stateFile, "; Device information\n\n");
 
-	f_printf(&stateFile, "Device_ID:   ");
+    f_printf(&stateFile, "Firmware_Ver: %s\n", GIT_TAG);
+
+    f_printf(&stateFile, "Device_ID:    ");
 	FS_State_WriteHex(&stateFile, state.device_id, 3);
 	f_printf(&stateFile, "\n");
 
-	f_printf(&stateFile, "Session_ID:  ");
+	f_printf(&stateFile, "Session_ID:   ");
 	FS_State_WriteHex(&stateFile, state.session_id, 3);
 	f_printf(&stateFile, "\n\n");
 
 	f_printf(&stateFile, "; Persistent state\n\n");
 
-	f_printf(&stateFile, "Config_File: %s\n", state.config_filename);
+	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
 
 	// Close FlySight info file
 	f_close(&stateFile);
