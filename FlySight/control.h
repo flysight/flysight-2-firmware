@@ -10,6 +10,5 @@
 
 void FS_Control_Init(void);
 void FS_Control_DeInit(void);
-uint32_t FS_Control_SessionID(void);
 
 #endif /* CONTROL_H_ */

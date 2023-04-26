@@ -424,7 +424,7 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 	f_printf(file, "\n");
 }
 
-void FS_Log_Init(uint32_t sessionId)
+void FS_Log_Init(uint32_t temp_folder)
 {
 	char filename[50];
 
@@ -449,11 +449,11 @@ void FS_Log_Init(uint32_t sessionId)
 
 	// Create temporary folder
 	f_mkdir("/temp");
-	sprintf(filename, "/temp/%04lu", sessionId);
+	sprintf(filename, "/temp/%04lu", temp_folder);
 	f_mkdir(filename);
 
 	// Open GNSS log file
-	sprintf(filename, "/temp/%04lu/track.csv", sessionId);
+	sprintf(filename, "/temp/%04lu/track.csv", temp_folder);
 	if (f_open(&gnssFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
@@ -467,7 +467,7 @@ void FS_Log_Init(uint32_t sessionId)
 	if (FS_Config_Get()->enable_raw)
 	{
 		// Open raw GNSS file
-		sprintf(filename, "/temp/%04lu/raw.ubx", sessionId);
+		sprintf(filename, "/temp/%04lu/raw.ubx", temp_folder);
 		if (f_open(&rawFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
 			Error_Handler();
@@ -475,7 +475,7 @@ void FS_Log_Init(uint32_t sessionId)
 	}
 
 	// Open sensor log file
-	sprintf(filename, "/temp/%04lu/sensor.csv", sessionId);
+	sprintf(filename, "/temp/%04lu/sensor.csv", temp_folder);
 	if (f_open(&sensorFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
@@ -504,7 +504,7 @@ void FS_Log_Init(uint32_t sessionId)
 	HW_TS_Start(timer_id, LOG_UPDATE_RATE);
 }
 
-void FS_Log_DeInit(uint32_t sessionId)
+void FS_Log_DeInit(uint32_t temp_folder)
 {
 	char oldPath[50], newPath[50];
 
@@ -525,7 +525,7 @@ void FS_Log_DeInit(uint32_t sessionId)
 		sprintf(newPath, "/%s", date);
 		f_mkdir(newPath);
 
-		sprintf(oldPath, "/temp/%04lu", sessionId);
+		sprintf(oldPath, "/temp/%04lu", temp_folder);
 		sprintf(newPath, "/%s/%s", date, time);
 		f_rename(oldPath, newPath);
 	}

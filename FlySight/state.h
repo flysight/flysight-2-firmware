@@ -13,6 +13,7 @@ typedef struct
 	uint32_t device_id[3];
 	uint32_t session_id[3];
 	char     config_filename[13];
+	uint32_t temp_folder;
 } FS_State_Data_t;
 
 void FS_State_Init(void);

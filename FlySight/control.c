@@ -23,8 +23,6 @@
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
 
-static uint32_t sessionId = 0;
-
 static uint8_t led_timer_id;
 
 static volatile bool hasFix = false;
@@ -64,9 +62,6 @@ void FS_Control_DeInit(void)
 
 	// Turn off LEDs
 	FS_LED_Off();
-
-	// Increment session counter
-	++sessionId;
 }
 
 void FS_Baro_DataReady_Callback(void)
@@ -169,9 +164,4 @@ void FS_VBAT_ValueReady_Callback(void)
 
 	// Save to log file
 	FS_Log_WriteVBATData(FS_VBAT_GetData());
-}
-
-uint32_t FS_Control_SessionID(void)
-{
-	return sessionId;
 }

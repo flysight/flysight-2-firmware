@@ -85,7 +85,7 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Enable logging
-		FS_Log_Init(FS_Control_SessionID());
+		FS_Log_Init(FS_State_Get()->temp_folder);
 	}
 
 	if (FS_Config_Get()->enable_audio)
@@ -172,8 +172,6 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
-	const uint32_t sessionID = FS_Control_SessionID();
-
 	/* Disable controller */
 	FS_Control_DeInit();
 
@@ -246,7 +244,7 @@ void FS_ActiveMode_DeInit(void)
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Disable logging
-		FS_Log_DeInit(sessionID);
+		FS_Log_DeInit(FS_State_Get()->temp_folder);
 	}
 
 	/* Disable microSD card */

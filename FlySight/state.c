@@ -56,6 +56,11 @@ static void FS_State_Read(void)
 			result[12] = '\0';
 			strncpy(state.config_filename, result, sizeof(state.config_filename));
 		}
+
+		if (!strcmp(name, "Temp_Folder"))
+		{
+			state.temp_folder = atol(result);
+		}
 	}
 
 	f_close(&stateFile);
@@ -87,6 +92,7 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "; Persistent state\n\n");
 
 	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
+	f_printf(&stateFile, "Temp_Folder:  %04lu\n", state.temp_folder);
 
 	// Close FlySight info file
 	f_close(&stateFile);
@@ -98,11 +104,15 @@ void FS_State_Init(void)
 	uint32_t counter;
 	uint32_t tickstart;
 
-	/* Initialize config filename */
+	/* Initialize persistent state */
 	state.config_filename[0] = 0;
+	state.temp_folder = -1;
 
 	/* Read current state */
 	FS_State_Read();
+
+	/* Increment temporary folder number */
+	++state.temp_folder;
 
 	/* Get device ID */
 	state.device_id[0] = HAL_GetUIDw0();
