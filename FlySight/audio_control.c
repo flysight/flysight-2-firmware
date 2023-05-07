@@ -52,7 +52,7 @@ static uint8_t prev_flags;
 
 static int32_t prevHMSL;
 
-static uint8_t suppress_tone;
+static uint8_t g_suppress_tone;
 
 static char speech_buf[16];
 static char *speech_ptr;
@@ -482,14 +482,14 @@ static void updateAlarms(
 		}
 	}
 
-	if (suppress_tone && !suppress_tone)
+	if (suppress_tone && !g_suppress_tone)
 	{
 		*speech_ptr = '\0';
 		setRate(0);
 		FS_Audio_Stop();
 	}
 
-	suppress_tone = suppress_tone;
+	g_suppress_tone = suppress_tone;
 
 	if (prev_flags & FLAG_HAS_FIX)
 	{
@@ -588,7 +588,7 @@ static void updateTones(
 		getValues(current, config, config->mode_2, &val_2, &min_2, &max_2);
 	}
 
-	if (!suppress_tone)
+	if (!g_suppress_tone)
 	{
 		if (ABS(current->velD) >= config->threshold &&
 			current->gSpeed >= config->hThreshold)
@@ -841,7 +841,7 @@ void FS_AudioControl_Init(void)
 	sp_counter = 0;
 	flags = 0;
 	prev_flags = 0;
-	suppress_tone = 0;
+	g_suppress_tone = 0;
 	speech_buf[0] = '\0';
 	speech_ptr = speech_buf;
 	tonePitch = 0;
