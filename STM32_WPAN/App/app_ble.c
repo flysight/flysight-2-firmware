@@ -132,7 +132,7 @@ static void Ble_Tl_Init(void)
  *************************************************************/
 void hci_notify_asynch_evt(void* p_Data)
 {
-  UTIL_SEQ_SetTask(1 << CFG_TASK_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_0);
+  UTIL_SEQ_SetTask(1 << CFG_TASK_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_1);
 
   return;
 }

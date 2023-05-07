@@ -86,7 +86,7 @@ typedef enum
 static void FS_Log_Timer(void)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 static FS_Log_SensorType_t FS_Log_GetNextSensor(void)

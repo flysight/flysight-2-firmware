@@ -62,7 +62,7 @@ void FS_Mode_PushQueue(FS_Mode_Event_t event)
 	queue_write = (queue_write + 1) % QUEUE_LENGTH;
 
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_MODE_UPDATE_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_MODE_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 FS_Mode_Event_t FS_Mode_PopQueue(void)

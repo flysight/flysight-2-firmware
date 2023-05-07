@@ -42,7 +42,7 @@ extern SPI_HandleTypeDef hspi2;
 static void updateTimer(void)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CONFIG_UPDATE_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CONFIG_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 static void readSingleConfigName(

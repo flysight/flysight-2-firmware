@@ -881,7 +881,7 @@ void FS_GNSS_Stop(void)
 static void FS_GNSS_Timer(void)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 static void FS_GNSS_Update(void)
