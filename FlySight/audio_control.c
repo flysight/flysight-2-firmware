@@ -676,7 +676,7 @@ static void consumerTimer(void)
 	static uint16_t tone_timer = 0;
 	const FS_Config_Data_t *config = FS_Config_Get();
 
-	if (!toneHold && toneRate > 0 && 0x10000 - tone_timer <= toneRate)
+	if (FS_Audio_IsIdle() && !toneHold && toneRate > 0 && 0x10000 - tone_timer <= toneRate)
 	{
 		FS_Audio_Beep(tonePitch, tonePitch + toneChirp, 125, config->volume * 5);
 	}
