@@ -339,7 +339,11 @@ void FS_Audio_Beep(
 		uint32_t duration,
 		uint8_t volume)
 {
-	if (audioState != AUDIO_IDLE) return;
+	if (audioState != AUDIO_IDLE)
+	{
+		FS_Audio_Stop();
+	}
+
 	audioState = AUDIO_PLAY_TONE;
 
 	// Set volume
@@ -394,7 +398,11 @@ void FS_Audio_Play(
 		const char *filename,
 		uint8_t volume)
 {
-	if (audioState != AUDIO_IDLE) return;
+	if (audioState != AUDIO_IDLE)
+	{
+		FS_Audio_Stop();
+	}
+
 	audioState = AUDIO_PLAY_FILE;
 
 	// Set volume
@@ -437,7 +445,11 @@ void FS_Audio_PlayList(
 		const char *list,
 		uint8_t volume)
 {
-	if (audioState != AUDIO_IDLE) return;
+	if (audioState != AUDIO_IDLE)
+	{
+		FS_Audio_Stop();
+	}
+
 	audioState = AUDIO_PLAY_LIST;
 
 	// Keep a copy of the list
