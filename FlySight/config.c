@@ -88,7 +88,7 @@ static const char defaultConfig[] =
 		"\n"
 		"Sp_Rate:   0     ; Speech rate (s)\n"
 		"                 ;   0 = No speech\n"
-		"Sp_Volume: 8     ; 0 (min) to 8 (max)\n"
+		"Sp_Volume: 6     ; 0 (min) to 8 (max)\n"
 		"\n"
 		"Sp_Mode:   2     ; Speech mode\n"
 		"                 ;   0 = Horizontal speed\n"
