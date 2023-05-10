@@ -15,6 +15,7 @@
 #define BARO_REG_CTRL_REG1    0x10
 #define BARO_REG_CTRL_REG2    0x11
 #define BARO_REG_CTRL_REG3    0x12
+#define BARO_REG_INT_SOURCE   0x24
 #define BARO_REG_PRESS_OUT_XL 0x28
 #define BARO_REG_TEMP_OUT_L   0x2b
 
@@ -36,6 +37,13 @@ void FS_Baro_Init(void)
 {
 	uint8_t buf[1];
 	HAL_StatusTypeDef result;
+
+	// Wait for boot
+	do
+	{
+		result = FS_Sensor_Read(BARO_ADDR, BARO_REG_INT_SOURCE, buf, 1);
+	}
+	while ((result != HAL_OK) || (buf[0] & 0x80));
 
 	// Software reset
 	do
