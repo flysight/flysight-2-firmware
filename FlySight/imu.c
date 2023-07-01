@@ -41,14 +41,14 @@ static enum {
 	ACCEL_ODR_3333 = 0x9,
 	ACCEL_ODR_6666 = 0xa,
 	ACCEL_ODR_1_6  = 0xb
-} accelODR = ACCEL_ODR_104;
+} accelODR = ACCEL_ODR_12_5;
 
 static enum {
 	ACCEL_FS_2  = 0,
 	ACCEL_FS_16 = 1,
 	ACCEL_FS_4  = 2,
 	ACCEL_FS_8  = 3
-} accelFS = ACCEL_FS_8;
+} accelFS = ACCEL_FS_16;
 
 static enum {
 	GYRO_ODR_PD = 0,
@@ -62,7 +62,7 @@ static enum {
 	GYRO_ODR_1666 = 0x8,
 	GYRO_ODR_3333 = 0x9,
 	GYRO_ODR_6666 = 0xa
-} gyroODR = GYRO_ODR_104;
+} gyroODR = GYRO_ODR_12_5;
 
 static enum {
 	GYRO_FS_250  = 0,
