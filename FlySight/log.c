@@ -70,7 +70,7 @@ static FIL rawFile;
 static uint8_t timer_id;
 
 static bool validDateTime;
-static char date[15], time[15];
+static FS_GNSS_Data_t saved_data;
 
 typedef enum
 {
@@ -204,9 +204,7 @@ void FS_Log_UpdateGNSS(void)
 	if ((data->gpsFix >= 3) && (!validDateTime))
 	{
 		// Remember date and time
-		sprintf(date, "%02d-%02d-%02d", data->year % 100, data->month, data->day);
-		sprintf(time, "%02d-%02d-%02d", data->hour, data->min, data->sec);
-
+		memcpy(&saved_data, data, sizeof(FS_GNSS_Data_t));
 		validDateTime = true;
 	}
 
@@ -506,7 +504,9 @@ void FS_Log_Init(uint32_t temp_folder)
 
 void FS_Log_DeInit(uint32_t temp_folder)
 {
+	char date[15], time[15];
 	char oldPath[50], newPath[50];
+    FILINFO fno;
 
 	// Delete timer
 	HW_TS_Delete(timer_id);
@@ -521,10 +521,43 @@ void FS_Log_DeInit(uint32_t temp_folder)
 
 	if (validDateTime)
 	{
-		// Create temporary folder
-		sprintf(newPath, "/%s", date);
-		f_mkdir(newPath);
+		// Calculate timestamp
+	    fno.fdate = (WORD)(((saved_data.year - 1980) * 512U) | saved_data.month * 32U | saved_data.day);
+	    fno.ftime = (WORD)(saved_data.hour * 2048U | saved_data.min * 32U | saved_data.sec / 2U);
 
+	    // Update timestamps
+		sprintf(oldPath, "/temp/%04lu", temp_folder);
+	    f_utime(oldPath, &fno);
+
+	    sprintf(oldPath, "/temp/%04lu/track.csv", temp_folder);
+	    f_utime(oldPath, &fno);
+
+		if (FS_Config_Get()->enable_raw)
+		{
+			sprintf(oldPath, "/temp/%04lu/raw.ubx", temp_folder);
+			f_utime(oldPath, &fno);
+		}
+
+	    sprintf(oldPath, "/temp/%04lu/sensor.csv", temp_folder);
+	    f_utime(oldPath, &fno);
+
+		// Format date and time
+		sprintf(date, "%02d-%02d-%02d",
+				saved_data.year % 100, saved_data.month, saved_data.day);
+		sprintf(time, "%02d-%02d-%02d",
+				saved_data.hour, saved_data.min, saved_data.sec);
+
+		sprintf(newPath, "/%s", date);
+		if (f_stat(newPath, 0) != FR_OK)
+		{
+			// Create new folder
+			f_mkdir(newPath);
+
+			// Update timestamp
+			f_utime(newPath, &fno);
+		}
+
+		// Move temporary folder
 		sprintf(oldPath, "/temp/%04lu", temp_folder);
 		sprintf(newPath, "/%s/%s", date, time);
 		f_rename(oldPath, newPath);
