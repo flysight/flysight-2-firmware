@@ -15,6 +15,7 @@
 #include "log.h"
 #include "state.h"
 #include "stm32_seq.h"
+#include "time.h"
 #include "version.h"
 
 #define LOG_TIMEOUT     5		// Write timeout
@@ -502,8 +503,26 @@ void FS_Log_Init(uint32_t temp_folder)
 	HW_TS_Start(timer_id, LOG_UPDATE_RATE);
 }
 
+static void FS_Log_AdjustDateTime(uint16_t *year, uint8_t *month, uint8_t *day,
+		uint8_t *hour, uint8_t *min, uint8_t *sec)
+{
+	uint32_t timestamp;
+
+	// Convert UTC date/time to a single value, offset it, and convert back
+	timestamp = mk_gmtime(*year, *month, *day, *hour, *min, *sec);
+	timestamp += FS_Config_Get()->tz_offset;
+	gmtime_r(timestamp, year, month, day, hour, min, sec);
+}
+
 void FS_Log_DeInit(uint32_t temp_folder)
 {
+	uint16_t year;
+	uint8_t  month;
+	uint8_t  day;
+	uint8_t  hour;
+	uint8_t  min;
+	uint8_t  sec;
+
 	char date[15], time[15];
 	char oldPath[50], newPath[50];
     FILINFO fno;
@@ -521,16 +540,27 @@ void FS_Log_DeInit(uint32_t temp_folder)
 
 	if (validDateTime)
 	{
-		// Calculate timestamp
-	    fno.fdate = (WORD)(((saved_data.year - 1980) * 512U) | saved_data.month * 32U | saved_data.day);
-	    fno.ftime = (WORD)(saved_data.hour * 2048U | saved_data.min * 32U | saved_data.sec / 2U);
+		// Get date/time
+		year = saved_data.year;
+		month = saved_data.month;
+		day = saved_data.day;
+		hour = saved_data.hour;
+		min = saved_data.min;
+		sec = saved_data.sec;
 
-	    // Update timestamps
+		// Adjust using timezone
+		FS_Log_AdjustDateTime(&year, &month, &day, &hour, &min, &sec);
+
+		// Set timestamp in FILINFO structure
+		fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | day);
+		fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
+
+		// Update timestamps
 		sprintf(oldPath, "/temp/%04lu", temp_folder);
-	    f_utime(oldPath, &fno);
+		f_utime(oldPath, &fno);
 
-	    sprintf(oldPath, "/temp/%04lu/track.csv", temp_folder);
-	    f_utime(oldPath, &fno);
+		sprintf(oldPath, "/temp/%04lu/track.csv", temp_folder);
+		f_utime(oldPath, &fno);
 
 		if (FS_Config_Get()->enable_raw)
 		{
@@ -538,14 +568,12 @@ void FS_Log_DeInit(uint32_t temp_folder)
 			f_utime(oldPath, &fno);
 		}
 
-	    sprintf(oldPath, "/temp/%04lu/sensor.csv", temp_folder);
-	    f_utime(oldPath, &fno);
+		sprintf(oldPath, "/temp/%04lu/sensor.csv", temp_folder);
+		f_utime(oldPath, &fno);
 
 		// Format date and time
-		sprintf(date, "%02d-%02d-%02d",
-				saved_data.year % 100, saved_data.month, saved_data.day);
-		sprintf(time, "%02d-%02d-%02d",
-				saved_data.hour, saved_data.min, saved_data.sec);
+		sprintf(date, "%02d-%02d-%02d", year % 100, month, day);
+		sprintf(time, "%02d-%02d-%02d", hour, min, sec);
 
 		sprintf(newPath, "/%s", date);
 		if (f_stat(newPath, 0) != FR_OK)
