@@ -17,7 +17,17 @@ static FIL stateFile;
 
 extern RNG_HandleTypeDef hrng;
 
-static void FS_State_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
+static void FS_State_WriteHex_8(FIL *file, const uint8_t *data, uint32_t count)
+{
+	uint32_t i;
+
+	for (i = 0; i < count; ++i)
+	{
+		f_printf(file, "%02x", data[i]);
+	}
+}
+
+static void FS_State_WriteHex_32(FIL *file, const uint32_t *data, uint32_t count)
 {
 	uint32_t i;
 
@@ -68,6 +78,8 @@ static void FS_State_Read(void)
 
 static void FS_State_Write(void)
 {
+	const uint8_t * const pubkey = (uint8_t *) 0x08018200;
+
 	// Open FlySight info file
 	if (f_open(&stateFile, "/flysight.txt", FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
@@ -82,17 +94,27 @@ static void FS_State_Write(void)
     f_printf(&stateFile, "Firmware_Ver: %s\n", GIT_TAG);
 
     f_printf(&stateFile, "Device_ID:    ");
-	FS_State_WriteHex(&stateFile, state.device_id, 3);
+	FS_State_WriteHex_32(&stateFile, state.device_id, 3);
 	f_printf(&stateFile, "\n");
 
 	f_printf(&stateFile, "Session_ID:   ");
-	FS_State_WriteHex(&stateFile, state.session_id, 3);
+	FS_State_WriteHex_32(&stateFile, state.session_id, 3);
 	f_printf(&stateFile, "\n\n");
 
 	f_printf(&stateFile, "; Persistent state\n\n");
 
 	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
-	f_printf(&stateFile, "Temp_Folder:  %04lu\n", state.temp_folder);
+	f_printf(&stateFile, "Temp_Folder:  %04lu\n\n", state.temp_folder);
+
+	f_printf(&stateFile, "; Bootloader public key\n\n");
+
+	f_printf(&stateFile, "Pubkey_X:     ");
+	FS_State_WriteHex_8(&stateFile, pubkey, 32);
+	f_printf(&stateFile, "\n");
+
+	f_printf(&stateFile, "Pubkey_Y:     ");
+	FS_State_WriteHex_8(&stateFile, pubkey + 32, 32);
+	f_printf(&stateFile, "\n");
 
 	// Close FlySight info file
 	f_close(&stateFile);
