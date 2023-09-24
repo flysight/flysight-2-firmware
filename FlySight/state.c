@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "ff.h"
+#include "shci.h"
 #include "state.h"
 #include "version.h"
 
@@ -80,6 +81,14 @@ static void FS_State_Write(void)
 {
 	const uint8_t * const pubkey = (uint8_t *) 0x08018200;
 
+	WirelessFwInfo_t WirelessInfo;
+
+	// Read the firmware version of both the wireless stack and the FUS
+	if (SHCI_GetWirelessFwInfo(&WirelessInfo) != SHCI_Success)
+	{
+		Error_Handler();
+	}
+
 	// Open FlySight info file
 	if (f_open(&stateFile, "/flysight.txt", FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
@@ -89,9 +98,15 @@ static void FS_State_Write(void)
 	// Write device info
 	f_printf(&stateFile, "; FlySight - http://flysight.ca\n\n");
 
-	f_printf(&stateFile, "; Device information\n\n");
+	f_printf(&stateFile, "; Firmware version\n\n");
 
-    f_printf(&stateFile, "Firmware_Ver: %s\n", GIT_TAG);
+	f_printf(&stateFile, "FUS_Ver:      %u.%u.%u\n",
+			WirelessInfo.FusVersionMajor, WirelessInfo.FusVersionMinor, WirelessInfo.FusVersionSub);
+	f_printf(&stateFile, "Stack_Ver:    %u.%u.%u\n",
+			WirelessInfo.VersionMajor, WirelessInfo.VersionMinor, WirelessInfo.VersionSub);
+	f_printf(&stateFile, "Firmware_Ver: %s\n\n", GIT_TAG);
+
+	f_printf(&stateFile, "; Device information\n\n");
 
     f_printf(&stateFile, "Device_ID:    ");
 	FS_State_WriteHex_32(&stateFile, state.device_id, 3);
