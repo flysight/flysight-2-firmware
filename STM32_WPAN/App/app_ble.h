@@ -61,7 +61,7 @@ extern "C" {
 /* USER CODE END EM */
 
 /* Exported functions ---------------------------------------------*/
-  void APP_BLE_Init( void );
+void APP_BLE_Init(void);
 
 /* USER CODE BEGIN EF */
 

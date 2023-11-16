@@ -49,18 +49,18 @@ typedef struct
   CRS_Data_t                                    DataTransfered;
   uint16_t                                      ConnectionHandle;
   uint8_t                                       ServiceInstance;
-}CRSAPP_Notification_evt_t;
+}CRS_STM_Notification_evt_t;
 
 
 /* Exported constants --------------------------------------------------------*/
-#define CRS_MAX_DATA_LEN                                           (ATT_MTU - 3) /**< Maximum length of data (in bytes) that can be transmitted to the peer. */
+#define CRS_MAX_DATA_LEN                                           (BLE_DEFAULT_ATT_MTU - 3) /**< Maximum length of data (in bytes) that can be transmitted to the peer. */
 
 /* External variables --------------------------------------------------------*/
 /* Exported macros -----------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 void CRS_STM_Init(void);
-void CRSAPP_Notification(CRSAPP_Notification_evt_t *pNotification);
-tBleStatus CRSAPP_Update_Char(uint16_t UUID,  uint8_t *pPayload);
+void CRS_STM_Notification(CRS_STM_Notification_evt_t *p_Notification);
+tBleStatus CRS_STM_Update_Char(uint16_t UUID,  uint8_t *p_Payload);
 
 
 #ifdef __cplusplus

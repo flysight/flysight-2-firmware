@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2023 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -24,6 +24,7 @@
 #include "ble_std.h"
 #include "ble_defs.h"
 #include "osal.h"
+#include "compiler.h"
 
 
 /* Default BLE variant */
@@ -35,6 +36,9 @@
 #endif
 #ifndef LL_ONLY
 #define LL_ONLY 0
+#endif
+#ifndef LL_ONLY_BASIC
+#define LL_ONLY_BASIC 0
 #endif
 #ifndef BEACON_ONLY
 #define BEACON_ONLY 0

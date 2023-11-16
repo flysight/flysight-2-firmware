@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2023 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -18,173 +18,6 @@
 #ifndef BLE_DEFS_H__
 #define BLE_DEFS_H__
 
-
-/* ------------------------------------------------------------------------- */
-
-/* ACI GAP vendor specific event codes
- */
-
-/* ACI_GAP_LIMITED_DISCOVERABLE_EVENT code: */
-#define ACI_GAP_LIMITED_DISCOVERABLE_VSEVT_CODE         0x0400U
-
-/* ACI_GAP_PAIRING_COMPLETE_EVENT code: */
-#define ACI_GAP_PAIRING_COMPLETE_VSEVT_CODE             0x0401U
-
-/* ACI_GAP_PASS_KEY_REQ_EVENT code: */
-#define ACI_GAP_PASS_KEY_REQ_VSEVT_CODE                 0x0402U
-
-/* ACI_GAP_AUTHORIZATION_REQ_EVENT code: */
-#define ACI_GAP_AUTHORIZATION_REQ_VSEVT_CODE            0x0403U
-
-/* ACI_GAP_SLAVE_SECURITY_INITIATED_EVENT code: */
-#define ACI_GAP_SLAVE_SECURITY_INITIATED_VSEVT_CODE     0x0404U
-
-/* ACI_GAP_BOND_LOST_EVENT code: */
-#define ACI_GAP_BOND_LOST_VSEVT_CODE                    0x0405U
-
-/* ACI_GAP_PROC_COMPLETE_EVENT code: */
-#define ACI_GAP_PROC_COMPLETE_VSEVT_CODE                0x0407U
-
-/* ACI_GAP_ADDR_NOT_RESOLVED_EVENT code: */
-#define ACI_GAP_ADDR_NOT_RESOLVED_VSEVT_CODE            0x0408U
-
-/* ACI_GAP_NUMERIC_COMPARISON_VALUE_EVENT code: */
-#define ACI_GAP_NUMERIC_COMPARISON_VALUE_VSEVT_CODE     0x0409U
-
-/* ACI_GAP_KEYPRESS_NOTIFICATION_EVENT code: */
-#define ACI_GAP_KEYPRESS_NOTIFICATION_VSEVT_CODE        0x040AU
-
-/* ACI GATT/ATT vendor specific event codes
- */
-
-/* ACI_GATT_ATTRIBUTE_MODIFIED_EVENT code: */
-#define ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE          0x0C01U
-
-/* ACI_GATT_PROC_TIMEOUT_EVENT code: */
-#define ACI_GATT_PROC_TIMEOUT_VSEVT_CODE                0x0C02U
-
-/* ACI_ATT_EXCHANGE_MTU_RESP_EVENT code: */
-#define ACI_ATT_EXCHANGE_MTU_RESP_VSEVT_CODE            0x0C03U
-
-/* ACI_ATT_FIND_INFO_RESP_EVENT code: */
-#define ACI_ATT_FIND_INFO_RESP_VSEVT_CODE               0x0C04U
-
-/* ACI_ATT_FIND_BY_TYPE_VALUE_RESP_EVENT code: */
-#define ACI_ATT_FIND_BY_TYPE_VALUE_RESP_VSEVT_CODE      0x0C05U
-
-/* ACI_ATT_READ_BY_TYPE_RESP_EVENT code: */
-#define ACI_ATT_READ_BY_TYPE_RESP_VSEVT_CODE            0x0C06U
-
-/* ACI_ATT_READ_RESP_EVENT code: */
-#define ACI_ATT_READ_RESP_VSEVT_CODE                    0x0C07U
-
-/* ACI_ATT_READ_BLOB_RESP_EVENT code: */
-#define ACI_ATT_READ_BLOB_RESP_VSEVT_CODE               0x0C08U
-
-/* ACI_ATT_READ_MULTIPLE_RESP_EVENT code: */
-#define ACI_ATT_READ_MULTIPLE_RESP_VSEVT_CODE           0x0C09U
-
-/* ACI_ATT_READ_BY_GROUP_TYPE_RESP_EVENT code: */
-#define ACI_ATT_READ_BY_GROUP_TYPE_RESP_VSEVT_CODE      0x0C0AU
-
-/* ACI_ATT_PREPARE_WRITE_RESP_EVENT code: */
-#define ACI_ATT_PREPARE_WRITE_RESP_VSEVT_CODE           0x0C0CU
-
-/* ACI_ATT_EXEC_WRITE_RESP_EVENT code: */
-#define ACI_ATT_EXEC_WRITE_RESP_VSEVT_CODE              0x0C0DU
-
-/* ACI_GATT_INDICATION_EVENT code: */
-#define ACI_GATT_INDICATION_VSEVT_CODE                  0x0C0EU
-
-/* ACI_GATT_NOTIFICATION_EVENT code: */
-#define ACI_GATT_NOTIFICATION_VSEVT_CODE                0x0C0FU
-
-/* ACI_GATT_PROC_COMPLETE_EVENT code: */
-#define ACI_GATT_PROC_COMPLETE_VSEVT_CODE               0x0C10U
-
-/* ACI_GATT_ERROR_RESP_EVENT code: */
-#define ACI_GATT_ERROR_RESP_VSEVT_CODE                  0x0C11U
-
-/* ACI_GATT_DISC_READ_CHAR_BY_UUID_RESP_EVENT code: */
-#define ACI_GATT_DISC_READ_CHAR_BY_UUID_RESP_VSEVT_CODE 0x0C12U
-
-/* ACI_GATT_WRITE_PERMIT_REQ_EVENT code: */
-#define ACI_GATT_WRITE_PERMIT_REQ_VSEVT_CODE            0x0C13U
-
-/* ACI_GATT_READ_PERMIT_REQ_EVENT code: */
-#define ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE             0x0C14U
-
-/* ACI_GATT_READ_MULTI_PERMIT_REQ_EVENT code: */
-#define ACI_GATT_READ_MULTI_PERMIT_REQ_VSEVT_CODE       0x0C15U
-
-/* ACI_GATT_TX_POOL_AVAILABLE_EVENT code: */
-#define ACI_GATT_TX_POOL_AVAILABLE_VSEVT_CODE           0x0C16U
-
-/* ACI_GATT_SERVER_CONFIRMATION_EVENT code: */
-#define ACI_GATT_SERVER_CONFIRMATION_VSEVT_CODE         0x0C17U
-
-/* ACI_GATT_PREPARE_WRITE_PERMIT_REQ_EVENT code: */
-#define ACI_GATT_PREPARE_WRITE_PERMIT_REQ_VSEVT_CODE    0x0C18U
-
-/* ACI_GATT_READ_EXT_EVENT code: */
-#define ACI_GATT_READ_EXT_VSEVT_CODE                    0x0C1DU
-
-/* ACI_GATT_INDICATION_EXT_EVENT code: */
-#define ACI_GATT_INDICATION_EXT_VSEVT_CODE              0x0C1EU
-
-/* ACI_GATT_NOTIFICATION_EXT_EVENT code: */
-#define ACI_GATT_NOTIFICATION_EXT_VSEVT_CODE            0x0C1FU
-
-/* ACI L2CAP vendor specific event codes
- */
-
-/* ACI_L2CAP_CONNECTION_UPDATE_RESP_EVENT code: */
-#define ACI_L2CAP_CONNECTION_UPDATE_RESP_VSEVT_CODE     0x0800U
-
-/* ACI_L2CAP_PROC_TIMEOUT_EVENT code: */
-#define ACI_L2CAP_PROC_TIMEOUT_VSEVT_CODE               0x0801U
-
-/* ACI_L2CAP_CONNECTION_UPDATE_REQ_EVENT code: */
-#define ACI_L2CAP_CONNECTION_UPDATE_REQ_VSEVT_CODE      0x0802U
-
-/* ACI_L2CAP_COMMAND_REJECT_EVENT code: */
-#define ACI_L2CAP_COMMAND_REJECT_VSEVT_CODE             0x080AU
-
-/* ACI_L2CAP_COC_CONNECT_EVENT code: */
-#define ACI_L2CAP_COC_CONNECT_VSEVT_CODE                0x0810U
-
-/* ACI_L2CAP_COC_CONNECT_CONFIRM_EVENT code: */
-#define ACI_L2CAP_COC_CONNECT_CONFIRM_VSEVT_CODE        0x0811U
-
-/* ACI_L2CAP_COC_RECONF_EVENT code: */
-#define ACI_L2CAP_COC_RECONF_VSEVT_CODE                 0x0812U
-
-/* ACI_L2CAP_COC_RECONF_CONFIRM_EVENT code: */
-#define ACI_L2CAP_COC_RECONF_CONFIRM_VSEVT_CODE         0x0813U
-
-/* ACI_L2CAP_COC_DISCONNECT_EVENT code: */
-#define ACI_L2CAP_COC_DISCONNECT_VSEVT_CODE             0x0814U
-
-/* ACI_L2CAP_COC_FLOW_CONTROL_EVENT code: */
-#define ACI_L2CAP_COC_FLOW_CONTROL_VSEVT_CODE           0x0815U
-
-/* ACI_L2CAP_COC_RX_DATA_EVENT code: */
-#define ACI_L2CAP_COC_RX_DATA_VSEVT_CODE                0x0816U
-
-/* ACI_L2CAP_COC_TX_POOL_AVAILABLE_EVENT code: */
-#define ACI_L2CAP_COC_TX_POOL_AVAILABLE_VSEVT_CODE      0x0817U
-
-/* ACI HAL vendor specific event codes
- */
-
-/* ACI_HAL_END_OF_RADIO_ACTIVITY_EVENT code: */
-#define ACI_HAL_END_OF_RADIO_ACTIVITY_VSEVT_CODE        0x0004U
-
-/* ACI_HAL_SCAN_REQ_REPORT_EVENT code: */
-#define ACI_HAL_SCAN_REQ_REPORT_VSEVT_CODE              0x0005U
-
-/* ACI_HAL_FW_ERROR_EVENT code: */
-#define ACI_HAL_FW_ERROR_VSEVT_CODE                     0x0006U
 
 /* ------------------------------------------------------------------------- */
 
@@ -212,18 +45,10 @@
  */
 #define BLE_STATUS_DEV_NOT_FOUND                        0x5CU
 
-/* The security database is full and no more records can be added.
- */
-#define BLE_STATUS_SEC_DB_FULL                          0x5DU
-
 /* The remote device is not bonded, and no operations related to bonded devices
  * may be performed (e.g. writing Gatt Client data).
  */
 #define BLE_STATUS_DEV_NOT_BONDED                       0x5EU
-
-/* The encryption key size used for encrypting the link is insufficient\n
- */
-#define BLE_STATUS_INSUFFICIENT_ENC_KEYSIZE             0x5FU
 
 /* The attribute handle is invalid.
  */
@@ -240,10 +65,6 @@
  * because it refers to specific GATT specifications/rules.
  */
 #define BLE_STATUS_INVALID_OPERATION                    0x62U
-
-/* The characteristic has already been added to the database.
- */
-#define BLE_STATUS_CHARAC_ALREADY_EXISTS                0x63U
 
 /* The requested operation failed for a temporary lack of resources
  * (e.g. packet pool or timers), but it may be retried later when resources may
@@ -339,108 +160,21 @@
 #define MAX_ADV_DATA_LEN                              31U
 #define BD_ADDR_SIZE                                   6U
 
-/* AD types for adv. data and scan response data
- */
-#define AD_TYPE_FLAGS                                0x01U
-#define AD_TYPE_16_BIT_SERV_UUID                     0x02U
-#define AD_TYPE_16_BIT_SERV_UUID_CMPLT_LIST          0x03U
-#define AD_TYPE_32_BIT_SERV_UUID                     0x04U
-#define AD_TYPE_32_BIT_SERV_UUID_CMPLT_LIST          0x05U
-#define AD_TYPE_128_BIT_SERV_UUID                    0x06U
-#define AD_TYPE_128_BIT_SERV_UUID_CMPLT_LIST         0x07U
-#define AD_TYPE_SHORTENED_LOCAL_NAME                 0x08U
-#define AD_TYPE_COMPLETE_LOCAL_NAME                  0x09U
-#define AD_TYPE_TX_POWER_LEVEL                       0x0AU
-#define AD_TYPE_CLASS_OF_DEVICE                      0x0DU
-#define AD_TYPE_SEC_MGR_TK_VALUE                     0x10U
-#define AD_TYPE_SEC_MGR_OOB_FLAGS                    0x11U
-#define AD_TYPE_SLAVE_CONN_INTERVAL                  0x12U
-#define AD_TYPE_SERV_SOLICIT_16_BIT_UUID_LIST        0x14U
-#define AD_TYPE_SERV_SOLICIT_128_BIT_UUID_LIST       0x15U
-#define AD_TYPE_SERVICE_DATA                         0x16U
-#define AD_TYPE_APPEARANCE                           0x19U
-#define AD_TYPE_ADVERTISING_INTERVAL                 0x1AU
-#define AD_TYPE_LE_ROLE                              0x1CU
-#define AD_TYPE_SERV_SOLICIT_32_BIT_UUID_LIST        0x1FU
-#define AD_TYPE_URI                                  0x24U
-#define AD_TYPE_MANUFACTURER_SPECIFIC_DATA           0xFFU
-
-/* Flag bits for Flags AD Type
- */
-#define FLAG_BIT_LE_LIMITED_DISCOVERABLE_MODE        0x01
-#define FLAG_BIT_LE_GENERAL_DISCOVERABLE_MODE        0x02
-#define FLAG_BIT_BR_EDR_NOT_SUPPORTED                0x04
-#define FLAG_BIT_LE_BR_EDR_CONTROLLER                0x08
-#define FLAG_BIT_LE_BR_EDR_HOST                      0x10
-
-/* Appearance values
- */
-#define GAP_APPEARANCE_UNKNOWN                                 0x0000
-#define GAP_APPEARANCE_GENERIC_PHONE                           0x0040
-#define GAP_APPEARANCE_GENERIC_COMPUTER                        0x0080
-#define GAP_APPEARANCE_GENERIC_WATCH                           0x00C0
-#define GAP_APPEARANCE_WATCH_SPORT_WATCH                       0x00C1
-#define GAP_APPEARANCE_GENERIC_CLOCK                           0x0100
-#define GAP_APPEARANCE_GENERIC_DISPLAY                         0x0140
-#define GAP_APPEARANCE_GENERIC_REMOTE_CONTROL                  0x0180
-#define GAP_APPEARANCE_GENERIC_EYE_GLASSES                     0x01C0
-#define GAP_APPEARANCE_GENERIC_TAG                             0x0200
-#define GAP_APPEARANCE_GENERIC_KEYRING                         0x0240
-#define GAP_APPEARANCE_GENERIC_MEDIA_PLAYER                    0x0280
-#define GAP_APPEARANCE_GENERIC_BARCODE_SCANNER                 0x02C0
-#define GAP_APPEARANCE_GENERIC_THERMOMETER                     0x0300
-#define GAP_APPEARANCE_THERMOMETER_EAR                         0x0301
-#define GAP_APPEARANCE_GENERIC_HEART_RATE_SENSOR               0x0340
-#define GAP_APPEARANCE_HEART_RATE_SENSOR_HEART_RATE_BELT       0x0341
-#define GAP_APPEARANCE_GENERIC_BLOOD_PRESSURE                  0x0380
-#define GAP_APPEARANCE_BLOOD_PRESSURE_ARM                      0x0381
-#define GAP_APPEARANCE_BLOOD_PRESSURE_WRIST                    0x0382
-#define GAP_APPEARANCE_HUMAN_INTERFACE_DEVICE                  0x03C0
-#define GAP_APPEARANCE_KEYBOARD                                0x03C1
-#define GAP_APPEARANCE_MOUSE                                   0x03C2
-#define GAP_APPEARANCE_JOYSTICK                                0x03C3
-#define GAP_APPEARANCE_GAMEPAD                                 0x03C4
-#define GAP_APPEARANCE_DIGITIZER_TABLET                        0x03C5
-#define GAP_APPEARANCE_CARD_READER                             0x03C6
-#define GAP_APPEARANCE_DIGITAL_PEN                             0x03C7
-#define GAP_APPEARANCE_BARCODE_SCANNER                         0x03C8
-#define GAP_APPEARANCE_GENERIC_GLUCOSE_METER                   0x0400
-#define GAP_APPEARANCE_GENERIC_RUNNING_WALKING_SENSOR          0x0440
-#define GAP_APPEARANCE_RUNNING_WALKING_IN_SHOE                 0x0441
-#define GAP_APPEARANCE_RUNNING_WALKING_ON_SHOE                 0x0442
-#define GAP_APPEARANCE_RUNNING_WALKING_ON_HIP                  0x0443
-#define GAP_APPEARANCE_GENERIC_CYCLING                         0x0480
-#define GAP_APPEARANCE_CYCLING_CYCLING_COMPUTER                0x0481
-#define GAP_APPEARANCE_CYCLING_SPEED_SENSOR                    0x0482
-#define GAP_APPEARANCE_CYCLING_CADENCE_SENSOR                  0x0483
-#define GAP_APPEARANCE_CYCLING_POWER_SENSOR                    0x0484
-#define GAP_APPEARANCE_CYCLING_SPEED_AND_CADENCE_SENSOR        0x0485
-#define GAP_APPEARANCE_GENERIC_PULSE_OXYMETER                  0x0C40
-#define GAP_APPEARANCE_FINGERTIP                               0x0C41
-#define GAP_APPEARANCE_WRIST_WORN                              0x0C42
-#define GAP_APPEARANCE_GENERIC_WEIGHT_SCALE                    0x0C80
-#define GAP_APPEARANCE_GENERIC_OUTDOOR_SPORT_ACTIVITY          0x1440
-#define GAP_APPEARANCE_LOCATION_DISPLAY_DEVICE                 0x1441
-#define GAP_APPEARANCE_LOCATION_AND_NAVIGATION_DISPLAY_DEVICE  0x1442
-#define GAP_APPEARANCE_LOCATION_POD                            0x1443
-#define GAP_APPEARANCE_LOCATION_AND_NAVIGATION_POD             0x1444
-#define GAP_APPEARANCE_GENERIC_ENVIRONMENTAL_SENSOR            0x1640
-
 /* Privacy flag values
  */
-#define PRIVACY_ENABLED                               0x02
 #define PRIVACY_DISABLED                              0x00
+#define PRIVACY_ENABLED                               0x02
 
 /* Intervals in terms of 625 micro sec
  */
-#define DIR_CONN_ADV_INT_MIN                        0x190U  /* 250 ms */
-#define DIR_CONN_ADV_INT_MAX                        0x320U  /* 500 ms */
-#define UNDIR_CONN_ADV_INT_MIN                      0x800U  /* 1.28 s */
-#define UNDIR_CONN_ADV_INT_MAX                     0x1000U  /* 2.56 s */
-#define LIM_DISC_ADV_INT_MIN                        0x190U  /* 250 ms */
-#define LIM_DISC_ADV_INT_MAX                        0x320U  /* 500 ms */
-#define GEN_DISC_ADV_INT_MIN                        0x800U  /* 1.28 s */
-#define GEN_DISC_ADV_INT_MAX                       0x1000U  /* 2.56 s */
+#define DIR_CONN_ADV_INT_MIN                          0x190U  /* 250 ms */
+#define DIR_CONN_ADV_INT_MAX                          0x320U  /* 500 ms */
+#define UNDIR_CONN_ADV_INT_MIN                        0x800U  /* 1.28 s */
+#define UNDIR_CONN_ADV_INT_MAX                       0x1000U  /* 2.56 s */
+#define LIM_DISC_ADV_INT_MIN                          0x190U  /* 250 ms */
+#define LIM_DISC_ADV_INT_MAX                          0x320U  /* 500 ms */
+#define GEN_DISC_ADV_INT_MIN                          0x800U  /* 1.28 s */
+#define GEN_DISC_ADV_INT_MAX                         0x1000U  /* 2.56 s */
 
 /* GAP Roles
  */
@@ -469,9 +203,17 @@
 #define GAP_RESOLVABLE_PRIVATE_ADDR                  0x02U
 #define GAP_NON_RESOLVABLE_PRIVATE_ADDR              0x03U
 
+/* Bitmap definitions for Mode of ACI_GAP_ADD_DEVICES_TO_LIST
+ */
+#define GAP_ADD_DEV_MODE_RESOLVING_LIST_ONLY         0x00U
+#define GAP_ADD_DEV_MODE_CLEAR                       0x01U
+#define GAP_ADD_DEV_MODE_FILTER_ACC_LIST_ONLY        0x02U
+#define GAP_ADD_DEV_MODE_BOTH_LISTS                  0x04U 
+
 /* ------------------------------------------------------------------------- */
 
 /* IO capabilities
+ * (ACI_GAP_SET_IO_CAPABILITY)
  */
 #define IO_CAP_DISPLAY_ONLY                        0x00U
 #define IO_CAP_DISPLAY_YES_NO                      0x01U
@@ -479,63 +221,76 @@
 #define IO_CAP_NO_INPUT_NO_OUTPUT                  0x03U
 #define IO_CAP_KEYBOARD_DISPLAY                    0x04U
 
-/* Authentication requirements
+/* Bonding mode
+ * (ACI_GAP_SET_AUTHENTICATION_REQUIREMENT)
  */
 #define NO_BONDING                                 0x00U
 #define BONDING                                    0x01U
 
-/* MITM protection requirements
+/* MITM protection
+ * (ACI_GAP_SET_AUTHENTICATION_REQUIREMENT)
  */
 #define MITM_PROTECTION_NOT_REQUIRED               0x00U
 #define MITM_PROTECTION_REQUIRED                   0x01U
 
-/* Out-Of-Band data
+/* LE Secure Connections support
+ * (ACI_GAP_SET_AUTHENTICATION_REQUIREMENT)
  */
-#define OOB_AUTH_DATA_ABSENT                       0x00U
-#define OOB_AUTH_DATA_PRESENT                      0x01U
-
-/* Authorization requirements
- */
-#define AUTHORIZATION_NOT_REQUIRED                 0x00U
-#define AUTHORIZATION_REQUIRED                     0x01U
-
-/* Connection authorization
- */
-#define CONNECTION_AUTHORIZED                      0x01U
-#define CONNECTION_REJECTED                        0x02U
+#define SC_PAIRING_UNSUPPORTED                     0x00U
+#define SC_PAIRING_OPTIONAL                        0x01U
+#define SC_PAIRING_ONLY                            0x02U
 
 /* Keypress notification support
+ * (ACI_GAP_SET_AUTHENTICATION_REQUIREMENT)
  */
 #define KEYPRESS_NOT_SUPPORTED                     0x00U
 #define KEYPRESS_SUPPORTED                         0x01U
 
 /* Use fixed pin
+ * (ACI_GAP_SET_AUTHENTICATION_REQUIREMENT)
  */
 #define USE_FIXED_PIN_FOR_PAIRING_ALLOWED          0x00U
 #define USE_FIXED_PIN_FOR_PAIRING_FORBIDDEN        0x01U
 
-/* SMP pairing status (ACI_GAP_PAIRING_COMPLETE_EVENT)
+/* Authorization requirements
+ * (ACI_GAP_SET_AUTHORIZATION_REQUIREMENT)
+ */
+#define AUTHORIZATION_NOT_REQUIRED                 0x00U
+#define AUTHORIZATION_REQUIRED                     0x01U
+
+/* Connection authorization response
+ * (ACI_GAP_AUTHORIZATION_RESP)
+ */
+#define CONNECTION_AUTHORIZED                      0x01U
+#define CONNECTION_REJECTED                        0x02U
+
+/* SMP pairing status
+ * (ACI_GAP_PAIRING_COMPLETE_EVENT)
  */
 #define SMP_PAIRING_STATUS_SUCCESS                 0x00U
 #define SMP_PAIRING_STATUS_SMP_TIMEOUT             0x01U
 #define SMP_PAIRING_STATUS_PAIRING_FAILED          0x02U
 #define SMP_PAIRING_STATUS_ENCRYPT_FAILED          0x03U
 
-/* SMP pairing failed reason code (ACI_GAP_PAIRING_COMPLETE_EVENT)
+/* SMP pairing failed reason code
+ * (ACI_GAP_PAIRING_COMPLETE_EVENT)
  */
-#define OOB_NOT_AVAILABLE                          0x02
-#define AUTH_REQ_CANNOT_BE_MET                     0x03
-#define CONFIRM_VALUE_FAILED                       0x04
-#define PAIRING_NOT_SUPPORTED                      0x05
-#define INSUFF_ENCRYPTION_KEY_SIZE                 0x06
-#define CMD_NOT_SUPPORTED                          0x07
-#define UNSPECIFIED_REASON                         0x08
-#define VERY_EARLY_NEXT_ATTEMPT                    0x09
-#define SM_INVALID_PARAMS                          0x0A
-#define SMP_SC_DHKEY_CHECK_FAILED                  0x0B
-#define SMP_SC_NUMCOMPARISON_FAILED                0x0C
+#define REASON_PASSKEY_ENTRY_FAILED                0x01U
+#define REASON_OOB_NOT_AVAILABLE                   0x02U
+#define REASON_AUTHENTICATION_REQ                  0x03U
+#define REASON_CONFIRM_VALUE_FAILED                0x04U
+#define REASON_PAIRING_NOT_SUPPORTED               0x05U
+#define REASON_ENCRYPTION_KEY_SIZE                 0x06U
+#define REASON_COMMAND_NOT_SUPPORTED               0x07U
+#define REASON_UNSPECIFIED_REASON                  0x08U
+#define REASON_REPEATED_ATTEMPTS                   0x09U
+#define REASON_INVALID_PARAMETERS                  0x0AU
+#define REASON_DHKEY_CHECK_FAILED                  0x0BU
+#define REASON_NUM_COMPARISON_FAILED               0x0CU
+#define REASON_KEY_REJECTED                        0x0FU
 
-/* Passkey input type detected (ACI_GAP_PASSKEY_INPUT)
+/* Passkey input type detected
+ * (ACI_GAP_PASSKEY_INPUT)
  */
 #define PASSKEY_ENTRY_STARTED                      0x00U
 #define PASSKEY_DIGIT_ENTERED                      0x01U
@@ -549,12 +304,14 @@
 #define NUMERIC_COMPARISON_CONFIRM_NO              0x00U
 #define NUMERIC_COMPARISON_CONFIRM_YES             0x01U
 
-/* OOB Device Type (ACI_GAP_SET_OOB_DATA)
+/* OOB Device Type
+ * (ACI_GAP_SET_OOB_DATA)
  */
 #define OOB_DEVICE_TYPE_LOCAL                      0x00U
 #define OOB_DEVICE_TYPE_REMOTE                     0x01U
 
-/* OOB Data Type (ACI_GAP_GET_OOB_DATA / ACI_GAP_SET_OOB_DATA)
+/* OOB Data Type
+ * (ACI_GAP_GET_OOB_DATA, ACI_GAP_SET_OOB_DATA)
  */
 #define OOB_DATA_TYPE_LP_TK                        0x00U
 #define OOB_DATA_TYPE_SC_RANDOM                    0x01U
@@ -562,54 +319,28 @@
 
 /* ------------------------------------------------------------------------- */
 
-/* GATT UUIDs
- */
-#define PRIMARY_SERVICE_UUID                     0x2800U
-#define SECONDARY_SERVICE_UUID                   0x2801U
-#define INCLUDE_SERVICE_UUID                     0x2802U
-#define CHARACTERISTIC_UUID                      0x2803U
-#define CHAR_EXTENDED_PROP_DESC_UUID             0x2900U
-#define CHAR_USER_DESC_UUID                      0x2901U
-#define CHAR_CLIENT_CONFIG_DESC_UUID             0x2902U
-#define CHAR_SERVER_CONFIG_DESC_UUID             0x2903U
-#define CHAR_FORMAT_DESC_UUID                    0x2904U
-#define CHAR_AGGR_FMT_DESC_UUID                  0x2905U
-#define GATT_SERVICE_UUID                        0x1801U
-#define SERVICE_CHANGED_UUID                     0x2A05U
-
-/* GAP UUIDs
- */
-#define GAP_SERVICE_UUID                         0x1800U
-#define DEVICE_NAME_UUID                         0x2A00U
-#define APPEARANCE_UUID                          0x2A01U
-#define PERIPHERAL_PRIVACY_FLAG_UUID             0x2A02U
-#define RECONNECTION_ADDR_UUID                   0x2A03U
-#define PERIPHERAL_PREFERRED_CONN_PARAMS_UUID    0x2A04U
-#define CENTRAL_ADDRESS_RESOLUTION_UUID          0x2AA6U
-#define RESOLVABLE_PRIVATE_ADDRESS_ONLY_UUID     0x2AC9U
-
 /* Access permissions for an attribute
  */
-#define ATTR_NO_ACCESS                           0x00U
-#define ATTR_ACCESS_READ_ONLY                    0x01U
-#define ATTR_ACCESS_WRITE_REQ_ONLY               0x02U
-#define ATTR_ACCESS_READ_WRITE                   0x03U
-#define ATTR_ACCESS_WRITE_WITHOUT_RESPONSE       0x04U
-#define ATTR_ACCESS_SIGNED_WRITE_ALLOWED         0x08U
-#define ATTR_ACCESS_WRITE_ANY                    0x0EU
-#define ATTR_ACCESS_ANY                          0x0FU
+#define ATTR_NO_ACCESS                             0x00U
+#define ATTR_ACCESS_READ_ONLY                      0x01U
+#define ATTR_ACCESS_WRITE_REQ_ONLY                 0x02U
+#define ATTR_ACCESS_READ_WRITE                     0x03U
+#define ATTR_ACCESS_WRITE_WITHOUT_RESPONSE         0x04U
+#define ATTR_ACCESS_SIGNED_WRITE_ALLOWED           0x08U
+#define ATTR_ACCESS_WRITE_ANY                      0x0EU
+#define ATTR_ACCESS_ANY                            0x0FU
 
 /* Characteristic properties
  */
-#define CHAR_PROP_NONE                           0x00U
-#define CHAR_PROP_BROADCAST                      0x01U
-#define CHAR_PROP_READ                           0x02U
-#define CHAR_PROP_WRITE_WITHOUT_RESP             0x04U
-#define CHAR_PROP_WRITE                          0x08U
-#define CHAR_PROP_NOTIFY                         0x10u
-#define CHAR_PROP_INDICATE                       0x20U
-#define CHAR_PROP_SIGNED_WRITE                   0x40U
-#define CHAR_PROP_EXT                            0x80U
+#define CHAR_PROP_NONE                             0x00U
+#define CHAR_PROP_BROADCAST                        0x01U
+#define CHAR_PROP_READ                             0x02U
+#define CHAR_PROP_WRITE_WITHOUT_RESP               0x04U
+#define CHAR_PROP_WRITE                            0x08U
+#define CHAR_PROP_NOTIFY                           0x10u
+#define CHAR_PROP_INDICATE                         0x20U
+#define CHAR_PROP_SIGNED_WRITE                     0x40U
+#define CHAR_PROP_EXT                              0x80U
 
 /* Security permissions for an attribute
  */
@@ -623,79 +354,114 @@
 
 /* Type of UUID (16 bit or 128 bit)
  */
-#define UUID_TYPE_16                             0x01U
-#define UUID_TYPE_128                            0x02U
+#define UUID_TYPE_16                               0x01U
+#define UUID_TYPE_128                              0x02U
 
 /* Type of service (primary or secondary)
  */
-#define PRIMARY_SERVICE                          0x01U
-#define SECONDARY_SERVICE                        0x02U
+#define PRIMARY_SERVICE                            0x01U
+#define SECONDARY_SERVICE                          0x02U
 
 /* Gatt Event Mask
  * Type of event generated by GATT server
  * See aci_gatt_add_char.
  */
-#define GATT_DONT_NOTIFY_EVENTS                       0x00 
-#define GATT_NOTIFY_ATTRIBUTE_WRITE                   0x01
-#define GATT_NOTIFY_WRITE_REQ_AND_WAIT_FOR_APPL_RESP  0x02
-#define GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP   0x04
+#define GATT_DONT_NOTIFY_EVENTS                       0x00U
+#define GATT_NOTIFY_ATTRIBUTE_WRITE                   0x01U
+#define GATT_NOTIFY_WRITE_REQ_AND_WAIT_FOR_APPL_RESP  0x02U
+#define GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP   0x04U
+#define GATT_NOTIFY_NOTIFICATION_COMPLETION           0x08U
 
 /* Type of characteristic length (see ACI_GATT_ADD_CHAR)
  */
-#define CHAR_VALUE_LEN_CONSTANT                  0x00
-#define CHAR_VALUE_LEN_VARIABLE                  0x01
+#define CHAR_VALUE_LEN_CONSTANT                    0x00
+#define CHAR_VALUE_LEN_VARIABLE                    0x01
 
 /* Encryption key size
  */
-#define MIN_ENCRY_KEY_SIZE                       7U
-#define MAX_ENCRY_KEY_SIZE                      16U
+#define MIN_ENCRY_KEY_SIZE                          7U
+#define MAX_ENCRY_KEY_SIZE                         16U
 
 /* Format
  */
-#define FORMAT_UINT8                             0x04U
-#define FORMAT_UINT16                            0x06U
-#define FORMAT_SINT16                            0x0EU
-#define FORMAT_SINT24                            0x0FU
+#define FORMAT_UINT8                               0x04U
+#define FORMAT_UINT16                              0x06U
+#define FORMAT_SINT16                              0x0EU
+#define FORMAT_SINT24                              0x0FU
 
 /* Unit
  */
-#define UNIT_UNITLESS                          0x2700
-#define UNIT_TEMP_CELSIUS                      0x272F
-#define UNIT_PRESSURE_BAR                      0x2780
+#define UNIT_UNITLESS                              0x2700
+#define UNIT_TEMP_CELSIUS                          0x272F
+#define UNIT_PRESSURE_BAR                          0x2780
+
+/* Update_Type definitions for ACI_GATT_UPDATE_CHAR_VALUE_EXT
+ */
+#define GATT_CHAR_UPDATE_LOCAL_ONLY                0x00U
+#define GATT_CHAR_UPDATE_SEND_NOTIFICATION         0x01U
+#define GATT_CHAR_UPDATE_SEND_INDICATION           0x02U
 
 /* ------------------------------------------------------------------------- */
 
-/* Advertising policy for filtering (white list related)
- * See HCI_LE_SET_ADVERTISING_PARAMETERS
+/* Advertising Type
  */
-#define NO_WHITE_LIST_USE                      0X00U
-#define WHITE_LIST_FOR_ONLY_SCAN               0X01U
-#define WHITE_LIST_FOR_ONLY_CONN               0X02U
-#define WHITE_LIST_FOR_ALL                     0X03U
+#define ADV_IND                                    0
+#define ADV_DIRECT_IND                             1
+#define ADV_SCAN_IND                               2
+#define ADV_NONCONN_IND                            3
+#define ADV_DIRECT_IND_LDC                         4
+#define SCAN_RSP                                   4
 
 /* Advertising channels
  */
-#define ADV_CH_37                              0x01
-#define ADV_CH_38                              0x02
-#define ADV_CH_39                              0x04
+#define ADV_CH_37                                  0x01
+#define ADV_CH_38                                  0x02
+#define ADV_CH_39                                  0x04
+
+/* ------------------------------------------------------------------------- */
+
+/* Definitions for Radio_Activity_Mask
+ * (ACI_HAL_SET_RADIO_ACTIVITY_MASK)
+ */
+#define RADIO_ACT_MASK_IDLE                        0x0001U
+#define RADIO_ACT_MASK_ADVERTISING                 0x0002U
+#define RADIO_ACT_MASK_PERIPH_CONNECT              0x0004U
+#define RADIO_ACT_MASK_SCANNING                    0x0008U
+#define RADIO_ACT_MASK_CENTR_CONNECT               0x0020U
+#define RADIO_ACT_MASK_TX_TEST                     0x0040U
+#define RADIO_ACT_MASK_RX_TEST                     0x0080U
+#define RADIO_ACT_MASK_PERIOD_ADVERTISING          0x0200U
+#define RADIO_ACT_MASK_PERIOD_SYNC                 0x0400U
+#define RADIO_ACT_MASK_ISO_BROADCAST               0x0800U
+#define RADIO_ACT_MASK_ISO_SYNC                    0x1000U
+#define RADIO_ACT_MASK_ISO_PERIPH_CONNECT          0x2000U
+#define RADIO_ACT_MASK_ISO_CENTR_CONNECT           0x4000U
 
 /* ------------------------------------------------------------------------- */
 
 /* Offset for configuration values (see ACI_HAL_WRITE_CONFIG_DATA)
  */
-#define CONFIG_DATA_PUBADDR_OFFSET             0x00U
-#define CONFIG_DATA_ER_OFFSET                  0x08U
-#define CONFIG_DATA_IR_OFFSET                  0x18U
-#define CONFIG_DATA_RANDOM_ADDRESS_OFFSET      0x2EU
-#define CONFIG_DATA_SMP_MODE_OFFSET            0xB0U
+#define CONFIG_DATA_PUBADDR_OFFSET                 0x00U
+#define CONFIG_DATA_ER_OFFSET                      0x08U
+#define CONFIG_DATA_IR_OFFSET                      0x18U
+#define CONFIG_DATA_RANDOM_ADDRESS_OFFSET          0x2EU
+#define CONFIG_DATA_GAP_ADD_REC_NBR_OFFSET         0x34U
+#define CONFIG_DATA_SC_KEY_TYPE_OFFSET             0x35U
+#define CONFIG_DATA_SMP_MODE_OFFSET                0xB0U
+#define CONFIG_DATA_LL_SCAN_CHAN_MAP_OFFSET        0xC0U
+#define CONFIG_DATA_LL_BG_SCAN_MODE_OFFSET         0xC1U
 
 /* Length for configuration values (see ACI_HAL_WRITE_CONFIG_DATA)
  */
-#define CONFIG_DATA_PUBADDR_LEN                6
-#define CONFIG_DATA_ER_LEN                    16
-#define CONFIG_DATA_IR_LEN                    16
-#define CONFIG_DATA_RANDOM_ADDRESS_LEN         6
-#define CONFIG_DATA_SMP_MODE_LEN               1
+#define CONFIG_DATA_PUBADDR_LEN                     6
+#define CONFIG_DATA_ER_LEN                         16
+#define CONFIG_DATA_IR_LEN                         16
+#define CONFIG_DATA_RANDOM_ADDRESS_LEN              6
+#define CONFIG_DATA_GAP_ADD_REC_NBR_LEN             1
+#define CONFIG_DATA_SC_KEY_TYPE_LEN                 1
+#define CONFIG_DATA_SMP_MODE_LEN                    1
+#define CONFIG_DATA_LL_SCAN_CHAN_MAP_LEN            1
+#define CONFIG_DATA_LL_BG_SCAN_MODE_LEN             1
 
 /* ------------------------------------------------------------------------- */
 
