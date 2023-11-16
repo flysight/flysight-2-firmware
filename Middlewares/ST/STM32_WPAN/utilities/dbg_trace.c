@@ -138,7 +138,7 @@ const char *DbgTraceGetFileName(const char *fullpath)
  * @param  *pBuffer  Pointer on buffer to be output
  * @param  u32Length buffer Size
  * @paramt strFormat string as expected by "printf" function. Used to desrcibe buffer content information.
- * @param  ...       Paremeters to be "formatted" in strFormat string (if any)
+ * @param  ...       Parameters to be "formatted" in strFormat string (if any)
  * @retval None
  */
 
@@ -301,7 +301,7 @@ size_t DbgTraceWrite(int handle, const unsigned char * buf, size_t bufSize)
   return ( chars_written );
 }
 
-#if   defined ( __CC_ARM )     /* Keil */
+#if defined ( __CC_ARM ) || defined (__ARMCC_VERSION) /* Keil */
 
 /**
   Called from assert() and prints a message on stderr and calls abort().

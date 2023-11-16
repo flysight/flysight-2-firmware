@@ -6,7 +6,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2023 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -205,10 +205,10 @@ tBleStatus hci_host_number_of_completed_packets( uint8_t Number_Of_Handles,
 }
 
 tBleStatus hci_read_local_version_information( uint8_t* HCI_Version,
-                                               uint16_t* HCI_Revision,
-                                               uint8_t* LMP_PAL_Version,
-                                               uint16_t* Manufacturer_Name,
-                                               uint16_t* LMP_PAL_Subversion )
+                                               uint16_t* HCI_Subversion,
+                                               uint8_t* LMP_Version,
+                                               uint16_t* Company_Identifier,
+                                               uint16_t* LMP_Subversion )
 {
   struct hci_request rq;
   hci_read_local_version_information_rp0 resp;
@@ -223,10 +223,10 @@ tBleStatus hci_read_local_version_information( uint8_t* HCI_Version,
   if ( resp.Status )
     return resp.Status;
   *HCI_Version = resp.HCI_Version;
-  *HCI_Revision = resp.HCI_Revision;
-  *LMP_PAL_Version = resp.LMP_PAL_Version;
-  *Manufacturer_Name = resp.Manufacturer_Name;
-  *LMP_PAL_Subversion = resp.LMP_PAL_Subversion;
+  *HCI_Subversion = resp.HCI_Subversion;
+  *LMP_Version = resp.LMP_Version;
+  *Company_Identifier = resp.Company_Identifier;
+  *LMP_Subversion = resp.LMP_Subversion;
   return BLE_STATUS_SUCCESS;
 }
 
@@ -645,10 +645,10 @@ tBleStatus hci_le_create_connection_cancel( void )
   return status;
 }
 
-tBleStatus hci_le_read_white_list_size( uint8_t* White_List_Size )
+tBleStatus hci_le_read_filter_accept_list_size( uint8_t* Filter_Accept_List_Size )
 {
   struct hci_request rq;
-  hci_le_read_white_list_size_rp0 resp;
+  hci_le_read_filter_accept_list_size_rp0 resp;
   Osal_MemSet( &resp, 0, sizeof(resp) );
   Osal_MemSet( &rq, 0, sizeof(rq) );
   rq.ogf = 0x08;
@@ -659,11 +659,11 @@ tBleStatus hci_le_read_white_list_size( uint8_t* White_List_Size )
     return BLE_STATUS_TIMEOUT;
   if ( resp.Status )
     return resp.Status;
-  *White_List_Size = resp.White_List_Size;
+  *Filter_Accept_List_Size = resp.Filter_Accept_List_Size;
   return BLE_STATUS_SUCCESS;
 }
 
-tBleStatus hci_le_clear_white_list( void )
+tBleStatus hci_le_clear_filter_accept_list( void )
 {
   struct hci_request rq;
   tBleStatus status = 0;
@@ -677,12 +677,12 @@ tBleStatus hci_le_clear_white_list( void )
   return status;
 }
 
-tBleStatus hci_le_add_device_to_white_list( uint8_t Address_Type,
-                                            const uint8_t* Address )
+tBleStatus hci_le_add_device_to_filter_accept_list( uint8_t Address_Type,
+                                                    const uint8_t* Address )
 {
   struct hci_request rq;
   uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
-  hci_le_add_device_to_white_list_cp0 *cp0 = (hci_le_add_device_to_white_list_cp0*)(cmd_buffer);
+  hci_le_add_device_to_filter_accept_list_cp0 *cp0 = (hci_le_add_device_to_filter_accept_list_cp0*)(cmd_buffer);
   tBleStatus status = 0;
   int index_input = 0;
   cp0->Address_Type = Address_Type;
@@ -701,12 +701,12 @@ tBleStatus hci_le_add_device_to_white_list( uint8_t Address_Type,
   return status;
 }
 
-tBleStatus hci_le_remove_device_from_white_list( uint8_t Address_Type,
-                                                 const uint8_t* Address )
+tBleStatus hci_le_remove_device_from_filter_accept_list( uint8_t Address_Type,
+                                                         const uint8_t* Address )
 {
   struct hci_request rq;
   uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
-  hci_le_remove_device_from_white_list_cp0 *cp0 = (hci_le_remove_device_from_white_list_cp0*)(cmd_buffer);
+  hci_le_remove_device_from_filter_accept_list_cp0 *cp0 = (hci_le_remove_device_from_filter_accept_list_cp0*)(cmd_buffer);
   tBleStatus status = 0;
   int index_input = 0;
   cp0->Address_Type = Address_Type;
@@ -1773,9 +1773,7 @@ tBleStatus hci_le_clear_advertising_sets( void )
 tBleStatus hci_le_set_extended_scan_parameters( uint8_t Own_Address_Type,
                                                 uint8_t Scanning_Filter_Policy,
                                                 uint8_t Scanning_PHYs,
-                                                uint8_t Scan_Type,
-                                                uint16_t Scan_Interval,
-                                                uint16_t Scan_Window )
+                                                const Scan_Param_Phy_t* Scan_Param_Phy )
 {
   struct hci_request rq;
   uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
@@ -1788,12 +1786,8 @@ tBleStatus hci_le_set_extended_scan_parameters( uint8_t Own_Address_Type,
   index_input += 1;
   cp0->Scanning_PHYs = Scanning_PHYs;
   index_input += 1;
-  cp0->Scan_Type = Scan_Type;
-  index_input += 1;
-  cp0->Scan_Interval = Scan_Interval;
-  index_input += 2;
-  cp0->Scan_Window = Scan_Window;
-  index_input += 2;
+  Osal_MemCpy( (void*)&cp0->Scan_Param_Phy, (const void*)Scan_Param_Phy, 10 );
+  index_input += 10;
   Osal_MemSet( &rq, 0, sizeof(rq) );
   rq.ogf = 0x08;
   rq.ocf = 0x041;
@@ -1841,14 +1835,7 @@ tBleStatus hci_le_extended_create_connection( uint8_t Initiator_Filter_Policy,
                                               uint8_t Peer_Address_Type,
                                               const uint8_t* Peer_Address,
                                               uint8_t Initiating_PHYs,
-                                              uint16_t Scan_Interval,
-                                              uint16_t Scan_Window,
-                                              uint16_t Conn_Interval_Min,
-                                              uint16_t Conn_Interval_Max,
-                                              uint16_t Conn_Latency,
-                                              uint16_t Supervision_Timeout,
-                                              uint16_t Min_CE_Length,
-                                              uint16_t Max_CE_Length )
+                                              const Init_Param_Phy_t* Init_Param_Phy )
 {
   struct hci_request rq;
   uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
@@ -1865,22 +1852,8 @@ tBleStatus hci_le_extended_create_connection( uint8_t Initiator_Filter_Policy,
   index_input += 6;
   cp0->Initiating_PHYs = Initiating_PHYs;
   index_input += 1;
-  cp0->Scan_Interval = Scan_Interval;
-  index_input += 2;
-  cp0->Scan_Window = Scan_Window;
-  index_input += 2;
-  cp0->Conn_Interval_Min = Conn_Interval_Min;
-  index_input += 2;
-  cp0->Conn_Interval_Max = Conn_Interval_Max;
-  index_input += 2;
-  cp0->Conn_Latency = Conn_Latency;
-  index_input += 2;
-  cp0->Supervision_Timeout = Supervision_Timeout;
-  index_input += 2;
-  cp0->Min_CE_Length = Min_CE_Length;
-  index_input += 2;
-  cp0->Max_CE_Length = Max_CE_Length;
-  index_input += 2;
+  Osal_MemCpy( (void*)&cp0->Init_Param_Phy, (const void*)Init_Param_Phy, 48 );
+  index_input += 48;
   Osal_MemSet( &rq, 0, sizeof(rq) );
   rq.ogf = 0x08;
   rq.ocf = 0x043;
@@ -1976,6 +1949,31 @@ tBleStatus hci_le_set_privacy_mode( uint8_t Peer_Identity_Address_Type,
   Osal_MemSet( &rq, 0, sizeof(rq) );
   rq.ogf = 0x08;
   rq.ocf = 0x04e;
+  rq.cparam = cmd_buffer;
+  rq.clen = index_input;
+  rq.rparam = &status;
+  rq.rlen = 1;
+  if ( hci_send_req(&rq, FALSE) < 0 )
+    return BLE_STATUS_TIMEOUT;
+  return status;
+}
+
+tBleStatus hci_le_generate_dhkey_v2( const uint8_t* Remote_P256_Public_Key,
+                                     uint8_t Key_Type )
+{
+  struct hci_request rq;
+  uint8_t cmd_buffer[BLE_CMD_MAX_PARAM_LEN];
+  hci_le_generate_dhkey_v2_cp0 *cp0 = (hci_le_generate_dhkey_v2_cp0*)(cmd_buffer);
+  tBleStatus status = 0;
+  int index_input = 0;
+  Osal_MemCpy( (void*)&cp0->Remote_P256_Public_Key, (const void*)Remote_P256_Public_Key, 64 );
+  index_input += 64;
+  cp0->Key_Type = Key_Type;
+  index_input += 1;
+  Osal_MemSet( &rq, 0, sizeof(rq) );
+  rq.ogf = 0x08;
+  rq.ocf = 0x05e;
+  rq.event = 0x0F;
   rq.cparam = cmd_buffer;
   rq.clen = index_input;
   rq.rparam = &status;

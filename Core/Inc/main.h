@@ -65,6 +65,12 @@ typedef enum
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void MX_ADC1_Init(void);
+void MX_I2C1_Init(void);
+void MX_SAI1_Init(void);
+void MX_SPI2_Init(void);
+void MX_USART1_UART_Init(void);
+void MX_RNG_Init(void);
 
 /* USER CODE BEGIN EFP */
 void PeriphClock_Config(void);
@@ -157,12 +163,7 @@ void PeriphClock_Config(void);
 #define GNSS_PPS_EXTI_IRQn EXTI3_IRQn
 #define LED_G_Pin GPIO_PIN_15
 #define LED_G_GPIO_Port GPIOD
-void   MX_ADC1_Init(void);
-void   MX_I2C1_Init(void);
-void   MX_SAI1_Init(void);
-void   MX_SPI2_Init(void);
-void   MX_USART1_UART_Init(void);
-void   MX_RNG_Init(void);
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

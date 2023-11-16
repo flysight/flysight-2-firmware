@@ -5,7 +5,7 @@
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2023 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -18,6 +18,14 @@
 #ifndef COMPILER_H__
 #define COMPILER_H__
 
+
+#ifndef __PACKED_STRUCT
+#define __PACKED_STRUCT PACKED(struct)
+#endif
+
+#ifndef __PACKED_UNION
+#define __PACKED_UNION PACKED(union)
+#endif
 
 /**
   * @brief  This is the section dedicated to IAR toolchain

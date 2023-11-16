@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2018-2021 STMicroelectronics.
+  * Copyright (c) 2018-2023 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -43,6 +43,9 @@ typedef enum
   HW_ACC_EVENT_NOTIFY_ENABLED_EVT,
   HW_ACC_EVENT_NOTIFY_DISABLED_EVT,
   HW_ACC_EVENT_READ_EVT,
+  HW_TOF_NOTIFY_ENABLED_EVT,
+  HW_TOF_NOTIFY_DISABLED_EVT,
+  HW_TOF_WRITE_EVT,
   /* SW Service Chars related events */
   SW_MOTIONFX_NOTIFY_ENABLED_EVT,
   SW_MOTIONFX_NOTIFY_DISABLED_EVT,
@@ -62,6 +65,7 @@ typedef enum
   SW_PEDOMETER_READ_EVT,
   SW_INTENSITY_DET_NOTIFY_ENABLED_EVT,
   SW_INTENSITY_DET_NOTIFY_DISABLED_EVT,
+  MOTENV_STM_BOOT_REQUEST_EVT,
   /* Config Service Chars related events */
   CONFIG_NOTIFY_ENABLED_EVT,
   CONFIG_NOTIFY_DISABLED_EVT,
@@ -97,7 +101,9 @@ typedef struct
 
 
 /* Exported constants --------------------------------------------------------*/
-/* External variables --------------------------------------------------------*/
+/* Exported Variables ------------------------------------------------------- */
+extern uint8_t ToF_BoardPresent;
+
 /* Exported macros -----------------------------------------------------------*/
 /**
  * @brief  Motion (Acc-Gyro-Magneto) Char shortened UUID
@@ -107,6 +113,10 @@ typedef struct
  * @brief  Environmental (Temp-Humidity-Pressure) Char shortened UUID
  */
 #define ENV_CHAR_UUID                   (0x1D00)
+/**
+ * @brief  ToF Char shortened UUID
+ */
+#define TOF_CHAR_UUID                (0x0000)
 /**
  * @brief  Acceleration event Char shortened UUID
  */

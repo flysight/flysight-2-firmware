@@ -27,7 +27,7 @@ extern "C" {
 
   /* Includes ------------------------------------------------------------------*/
 #include "mbox_def.h" /* Requested to expose the MB_WirelessFwInfoTable_t structure */
-
+  
   /* Exported types ------------------------------------------------------------*/
 
   /* SYSTEM EVENT */
@@ -163,9 +163,11 @@ extern "C" {
   {
     SHCI_Success = 0x00,
     SHCI_UNKNOWN_CMD = 0x01,
+    SHCI_MEMORY_CAPACITY_EXCEEDED_ERR_CODE=  0x07,
     SHCI_ERR_UNSUPPORTED_FEATURE = 0x11,
     SHCI_ERR_INVALID_HCI_CMD_PARAMS = 0x12,
-    SHCI_ERR_INVALID_PARAMS = 0x42,
+    SHCI_ERR_INVALID_PARAMS = 0x42,    /* only used for release < v1.13.0 */
+    SHCI_ERR_INVALID_PARAMS_V2 = 0x92, /* available for release >= v1.13.0 */
     SHCI_FUS_CMD_NOT_SUPPORTED = 0xFF,
   } SHCI_CmdStatus_t;
 
@@ -225,6 +227,7 @@ extern "C" {
     SHCI_OCF_C2_CONCURRENT_GET_NEXT_BLE_EVT_TIME,
     SHCI_OCF_C2_CONCURRENT_ENABLE_NEXT_802154_EVT_NOTIFICATION,
     SHCI_OCF_C2_802_15_4_DEINIT,
+    SHCI_OCF_C2_SET_SYSTEM_CLOCK,
   } SHCI_OCF_t;
 
 #define SHCI_OPCODE_C2_FUS_GET_STATE         (( SHCI_OGF << 10) + SHCI_OCF_C2_FUS_GET_STATE)
@@ -487,13 +490,13 @@ extern "C" {
    *    - 0 ppm to 20 ppm: 7
    */
   uint8_t MasterSca;
-
+  
   /**
    * LsSource
-   * Source for the 32 kHz slow speed clock.
-   *    - External crystal LSE: 0 - No calibration
-   *    - Others:1 - As the accuracy of this oscillator can vary depending upon external conditions (temperature),
-   *      it is calibrated every second to ensure correct behavior of timing sensitive BLE operations
+   * Some information for Low speed clock mapped in bits field
+   * - bit 0:   1: Calibration for the RF system wakeup clock source   0: No calibration for the RF system wakeup clock source
+   * - bit 1:   1: STM32W5M Module device                              0: Other devices as STM32WBxx SOC, STM32WB1M module
+   * - bit 2:   1: HSE/1024 Clock config                               0: LSE Clock config   
    */
   uint8_t LsSource;
 
@@ -531,8 +534,10 @@ extern "C" {
    * - bit 2:   1: device name Read-Only            0: device name R/W
    * - bit 3:   1: extended advertizing supported   0: extended advertizing not supported
    * - bit 4:   1: CS Algo #2 supported             0: CS Algo #2 not supported
-   * - bit 7:   1: LE Power Class 1                 0: LE Power Classe 2-3
-   * - other bits: reserved ( shall be set to 0)
+   * - bit 5:   1: Reduced GATT database in NVM     0: Full GATT database in NVM 
+   * - bit 6:   1: GATT caching is used             0: GATT caching is not used
+   * - bit 7:   1: LE Power Class 1                 0: LE Power Class 2-3
+   * - other bits: complete with Options_extension flag
    */
   uint8_t Options;
 
@@ -566,7 +571,46 @@ extern "C" {
    * - other bits: reserved ( shall be set to 0)
    */
   uint8_t rx_model_config;
+
+  /* Maximum number of advertising sets.
+   * Range: 1 .. 8 with limitation:
+   * This parameter is linked to max_adv_data_len such as both compliant with allocated Total memory computed with BLE_EXT_ADV_BUFFER_SIZE based 
+   * on Max Extended advertising configuration supported.
+   * This parameter is considered by the CPU2 when Options has SHCI_C2_BLE_INIT_OPTIONS_EXT_ADV flag set
+   */
+  uint8_t max_adv_set_nbr;
+
+  /* Maximum advertising data length (in bytes)
+   * Range: 31 .. 1650 with limitation:
+   * This parameter is linked to max_adv_set_nbr such as both compliant with allocated Total memory computed with BLE_EXT_ADV_BUFFER_SIZE based 
+   * on Max Extended advertising configuration supported.
+   * This parameter is considered by the CPU2 when Options has SHCI_C2_BLE_INIT_OPTIONS_EXT_ADV flag set
+   */
+  uint16_t max_adv_data_len;
+
+  /* RF TX Path Compensation Value (16-bit signed integer). Units: 0.1 dB.
+   * Range: -1280 .. 1280
+   */
+  int16_t tx_path_compens;
+
+  /* RF RX Path Compensation Value (16-bit signed integer). Units: 0.1 dB.
+   * Range: -1280 .. 1280
+   */
+  int16_t rx_path_compens;
+
+  /* BLE core specification version (8-bit unsigned integer).
+   * values as: 11(5.2), 12(5.3), 13(5.4)
+   */
+  uint8_t ble_core_version; 
  
+   /**
+   * Options flags extension
+   * - bit 0:   1: appearance Writable              0: appearance Read-Only
+   * - bit 1:   1: Enhanced ATT supported           0: Enhanced ATT not supported
+   * - other bits: reserved ( shall be set to 0)
+   */
+  uint8_t Options_extension;
+
       } SHCI_C2_Ble_Init_Cmd_Param_t;
 
   typedef PACKED_STRUCT{
@@ -593,17 +637,50 @@ extern "C" {
   
 #define SHCI_C2_BLE_INIT_OPTIONS_CS_ALGO2                             (1<<4)
 #define SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2                          (0<<4)
+
+#define SHCI_C2_BLE_INIT_OPTIONS_REDUC_GATTDB_NVM                     (1<<5)
+#define SHCI_C2_BLE_INIT_OPTIONS_FULL_GATTDB_NVM                      (0<<5) 
+
+#define SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_USED                    (1<<6)
+#define SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_NOTUSED                 (0<<6)
   
 #define SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_1                        (1<<7)
 #define SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3                      (0<<7)
 
+  /**
+   * Options extension
+   * Each definition below may be added together to build the Options value
+   * WARNING : Only one definition per bit shall be added to build the Options value
+   */
+#define SHCI_C2_BLE_INIT_OPTIONS_APPEARANCE_WRITABLE                  (1<<0)
+#define SHCI_C2_BLE_INIT_OPTIONS_APPEARANCE_READONLY                  (0<<0)
+
+#define SHCI_C2_BLE_INIT_OPTIONS_ENHANCED_ATT_SUPPORTED               (1<<1)
+#define SHCI_C2_BLE_INIT_OPTIONS_ENHANCED_ATT_NOTSUPPORTED            (0<<1)
+  
     /**
    * RX models configuration
    */
 #define SHCI_C2_BLE_INIT_RX_MODEL_AGC_RSSI_LEGACY                     (0<<0)
 #define SHCI_C2_BLE_INIT_RX_MODEL_AGC_RSSI_BLOCKER                    (1<<0)
- 
 
+  /**
+   * BLE core version
+   */
+#define SHCI_C2_BLE_INIT_BLE_CORE_5_2               11
+#define SHCI_C2_BLE_INIT_BLE_CORE_5_3               12
+#define SHCI_C2_BLE_INIT_BLE_CORE_5_4               13
+  
+   /**
+   * LsSource information
+   */
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_NOCALIB                     (0<<0)
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_CALIB                       (1<<0)
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_OTHER_DEV                   (0<<1)  
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_MOD5MM_DEV                  (1<<1)
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_CLK_LSE                     (0<<2)  
+#define SHCI_C2_BLE_INIT_CFG_BLE_LS_CLK_HSE_1024                (1<<2)
+  
 #define SHCI_OPCODE_C2_THREAD_INIT              (( SHCI_OGF << 10) + SHCI_OCF_C2_THREAD_INIT)
 /** No command parameters */
 /** No response parameters*/
@@ -629,6 +706,11 @@ extern "C" {
    */      
       uint8_t sys_dbg_cfg1;
       uint8_t reserved[2];
+      uint16_t STBY_DebugGpioaPinList;
+      uint16_t STBY_DebugGpiobPinList;
+      uint16_t STBY_DebugGpiocPinList;
+      uint16_t STBY_DtbGpioaPinList;
+      uint16_t STBY_DtbGpiobPinList;
     } SHCI_C2_DEBUG_GeneralConfig_t;
 
     typedef PACKED_STRUCT{
@@ -748,6 +830,7 @@ extern "C" {
     /** No response parameters*/
 
 #define SHCI_OPCODE_C2_CONFIG   (( SHCI_OGF << 10) + SHCI_OCF_C2_CONFIG)
+
   /** Command parameters */
     typedef PACKED_STRUCT{
       uint8_t PayloadCmdSize;
@@ -757,9 +840,19 @@ extern "C" {
       uint32_t BleNvmRamAddress;
       uint32_t ThreadNvmRamAddress;
       uint16_t RevisionID;
+      uint16_t DeviceID;
     } SHCI_C2_CONFIG_Cmd_Param_t;
 
 #define SHCI_OPCODE_C2_802_15_4_DEINIT    (( SHCI_OGF << 10) + SHCI_OCF_C2_802_15_4_DEINIT)
+    
+#define SHCI_OPCODE_C2_SET_SYSTEM_CLOCK   (( SHCI_OGF << 10) + SHCI_OCF_C2_SET_SYSTEM_CLOCK)
+  /** Command parameters */
+    typedef enum
+    {
+      SET_SYSTEM_CLOCK_HSE_TO_PLL,
+      SET_SYSTEM_CLOCK_PLL_ON_TO_HSE,
+      SET_SYSTEM_CLOCK_PLL_OFF_TO_HSE,
+    }SHCI_C2_SET_SYSTEM_CLOCK_Cmd_Param_t;
 
 /**
  * PayloadCmdSize
@@ -773,7 +866,13 @@ extern "C" {
 #define SHCI_C2_CONFIG_CUT2_0                        (0x2000)
 #define SHCI_C2_CONFIG_CUT2_1                        (0x2001)
 #define SHCI_C2_CONFIG_CUT2_2                        (0x2003)
-    
+
+/**
+ * Device ID
+ */
+#define SHCI_C2_CONFIG_STM32WB55xx                    (0x495)
+#define SHCI_C2_CONFIG_STM32WB15xx                    (0x494)
+
 /**
  * Config1
  * Each definition below may be added together to build the Config1 value
@@ -790,7 +889,7 @@ extern "C" {
  */
 #define SHCI_C2_CONFIG_EVTMASK1_BIT0_ERROR_NOTIF_ENABLE               (1<<0)
 #define SHCI_C2_CONFIG_EVTMASK1_BIT1_BLE_NVM_RAM_UPDATE_ENABLE        (1<<1)
-#define SHCI_C2_CONFIG_EVTMASK1_BIT2_THREAD_NVM_RAM_UPDATE_ENABLE         (1<<2)
+#define SHCI_C2_CONFIG_EVTMASK1_BIT2_THREAD_NVM_RAM_UPDATE_ENABLE     (1<<2)
 #define SHCI_C2_CONFIG_EVTMASK1_BIT3_NVM_START_WRITE_ENABLE           (1<<3)
 #define SHCI_C2_CONFIG_EVTMASK1_BIT4_NVM_END_WRITE_ENABLE             (1<<4)
 #define SHCI_C2_CONFIG_EVTMASK1_BIT5_NVM_START_ERASE_ENABLE           (1<<5)
@@ -817,7 +916,7 @@ extern "C" {
 #define FUS_DEVICE_INFO_TABLE_VALIDITY_KEYWORD    (0xA94656B9)
 
 /*
-  *   At startup, the informations relative to the wireless binary are stored in RAM trough a structure defined by
+  *   At startup, the information relative to the wireless binary are stored in RAM through a structure defined by
   *   MB_WirelessFwInfoTable_t.This structure contains 4 fields (Version,MemorySize, Stack_info and a reserved part)
   *   each of those coded on 32 bits as shown on the table below:
   *
@@ -1063,7 +1162,7 @@ typedef struct {
   * @brief Starts the LLD tests CLI
   *
   * @param  param_size : Nb of bytes
-  * @param  p_param : pointeur with data to give from M4 to M0
+  * @param  p_param : pointer with data to give from M4 to M0
   * @retval Status
   */
   SHCI_CmdStatus_t SHCI_C2_LLDTESTS_Init( uint8_t param_size, uint8_t * p_param );
@@ -1073,7 +1172,7 @@ typedef struct {
   * @brief Starts the LLD tests BLE
   *
   * @param  param_size : Nb of bytes
-  * @param  p_param : pointeur with data to give from M4 to M0
+  * @param  p_param : pointer with data to give from M4 to M0
   * @retval Status
   */
   SHCI_CmdStatus_t SHCI_C2_BLE_LLD_Init( uint8_t param_size, uint8_t * p_param );
@@ -1173,7 +1272,7 @@ typedef struct {
 
   /**
    * SHCI_GetWirelessFwInfo
-   * @brief This function read back the informations relative to the wireless binary loaded.
+   * @brief This function read back the information relative to the wireless binary loaded.
    *         Refer yourself to MB_WirelessFwInfoTable_t structure to get the significance
    *         of the different parameters returned.
    * @param  pWirelessInfo : Pointer to WirelessFwInfo_t.
@@ -1258,7 +1357,7 @@ typedef struct {
   *                               When set to 0, data are kept in internal SRAM on CPU2
   *                               Otherwise, data are copied in the cache pointed by ThreadNvmRamAddress
   *                               The size of the buffer shall be THREAD_NVM_SRAM_SIZE (number of 32bits)
-  *                               The buffer shall be allocated in SRAM2
+  *                               The buffer shall be allocated in SRAM1
   *
   *                    Please check macro definition to be used for this function
   *                    They are defined in this file next to the definition of SHCI_OPCODE_C2_CONFIG
@@ -1275,10 +1374,25 @@ typedef struct {
    * @retval Status
    */
   SHCI_CmdStatus_t SHCI_C2_802_15_4_DeInit( void );
+  
+  /**
+  * SHCI_C2_SetSystemClock
+  * @brief Request CPU2 to change system clock
+  *
+  * @param clockSel: It can be one of the following list
+  *                -  SET_SYSTEM_CLOCK_HSE_TO_PLL : CPU2 set system clock to PLL, PLL must be configured and started before.
+  *                -  SET_SYSTEM_CLOCK_PLL_ON_TO_HSE : CPU2 set System clock to HSE, PLL is still ON after command exection. 
+  *                -  SET_SYSTEM_CLOCK_PLL_OFF_TO_HSE : CPU2 set System clock to HSE, PLL is turned OFF after command exection. 
+  *
+  * @retval Status
+  */
+  SHCI_CmdStatus_t SHCI_C2_SetSystemClock( SHCI_C2_SET_SYSTEM_CLOCK_Cmd_Param_t clockSel );
 
-  #ifdef __cplusplus
+
+#ifdef __cplusplus
 }
 #endif
 
 #endif /*__SHCI_H */
 
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -146,7 +146,7 @@
   *        This value is used by the UART, RTC HAL module to compute the system frequency
   */
 #if !defined  (LSE_VALUE)
-#define LSE_VALUE    32768U               /*!< Value of the External oscillator in Hz*/
+#define LSE_VALUE    32774U               /*!< Value of the External oscillator in Hz*/
 #endif /* LSE_VALUE */
 
 /**
@@ -159,7 +159,7 @@
 
 #if !defined  (LSE_STARTUP_TIMEOUT)
 #define LSE_STARTUP_TIMEOUT    5000U      /*!< Time out for LSE start up, in ms */
-#endif /* HSE_STARTUP_TIMEOUT */
+#endif /* LSE_STARTUP_TIMEOUT */
 
 /**
   * @brief External clock source for SAI1 peripheral
