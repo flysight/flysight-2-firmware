@@ -124,7 +124,8 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT */
-
+      pNotification->DataTransfered.pPayload[pNotification->DataTransfered.Length] = '\0';
+      Custom_STM_App_Update_Char(CUSTOM_STM_CRS_RX, pNotification->DataTransfered.pPayload);
       /* USER CODE END CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT */
       break;
 

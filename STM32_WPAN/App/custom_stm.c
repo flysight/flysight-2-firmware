@@ -196,7 +196,10 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
           {
             return_value = SVCCTL_EvtAckFlowEnable;
             /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_2_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
-
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT;
+            Notification.DataTransfered.Length = attribute_modified->Attr_Data_Length;
+            Notification.DataTransfered.pPayload = attribute_modified->Attr_Data;
+            Custom_STM_App_Notification(&Notification);
             /* USER CODE END CUSTOM_STM_Service_1_Char_2_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
           } /* if (attribute_modified->Attr_Handle == (CustomContext.CustomCrs_TxHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
           /* USER CODE BEGIN EVT_BLUE_GATT_ATTRIBUTE_MODIFIED_END */
