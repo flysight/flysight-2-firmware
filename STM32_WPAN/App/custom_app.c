@@ -75,6 +75,7 @@ uint8_t NotifyCharData[247];
 /* USER CODE BEGIN PV */
 uint8_t buffer[BUFFER_LEN];
 uint16_t read_index, write_index;
+uint8_t notify_flag;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,8 +84,10 @@ static void Custom_Crs_tx_Update_Char(void);
 static void Custom_Crs_tx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
+static void Custom_CRS_OnConnect(void);
 static void Custom_CRS_OnTxRead(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
+static void Custom_CRS_Update(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -108,13 +111,16 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
+      notify_flag = 1;
 
+      // Call update task
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
     case CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
-
+      notify_flag = 0;
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
       break;
 
@@ -149,7 +155,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
     /* USER CODE END P2PS_CUSTOM_Notification_Custom_Evt_Opcode */
     case CUSTOM_CONN_HANDLE_EVT :
       /* USER CODE BEGIN CUSTOM_CONN_HANDLE_EVT */
-
+      Custom_CRS_OnConnect();
       /* USER CODE END CUSTOM_CONN_HANDLE_EVT */
       break;
 
@@ -176,8 +182,8 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  read_index = 0;
-  write_index = 0;
+  // Register update task
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, UTIL_SEQ_RFU, Custom_CRS_Update);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -233,6 +239,16 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
+static void Custom_CRS_OnConnect(void)
+{
+  // Reset buffer indices
+  read_index = 0;
+  write_index = 0;
+
+  // Reset state
+  notify_flag = 0;
+}
+
 static void Custom_CRS_OnTxRead(void)
 {
   if (read_index + 20 <= write_index)
@@ -248,6 +264,9 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   {
     memcpy(buffer + (write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, 20);
     write_index += 20;
+
+    // Call update task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, CFG_SCH_PRIO_1);
   }
   else
   {
@@ -255,4 +274,13 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   }
 }
 
+static void Custom_CRS_Update(void)
+{
+  uint16_t saved_index = write_index;
+
+  while (notify_flag && (read_index != saved_index))
+  {
+	  Custom_CRS_OnTxRead();
+  }
+}
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
