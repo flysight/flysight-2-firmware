@@ -36,7 +36,7 @@
 typedef struct
 {
   /* CRS */
-  uint8_t               Crs_rx_Notification_Status;
+  uint8_t               Crs_tx_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -50,7 +50,7 @@ typedef struct
 
 /* Private defines ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BUFFER_LEN 200
 /* USER CODE END PD */
 
 /* Private macros -------------------------------------------------------------*/
@@ -73,16 +73,18 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-
+uint8_t buffer[BUFFER_LEN];
+uint16_t read_index, write_index;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 /* CRS */
-static void Custom_Crs_rx_Update_Char(void);
-static void Custom_Crs_rx_Send_Notification(void);
+static void Custom_Crs_tx_Update_Char(void);
+static void Custom_Crs_tx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
-
+static void Custom_CRS_OnTxRead(void);
+static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -98,35 +100,28 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* USER CODE END CUSTOM_STM_App_Notification_Custom_Evt_Opcode */
 
     /* CRS */
-    case CUSTOM_STM_CRS_RX_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_READ_EVT */
-
-      /* USER CODE END CUSTOM_STM_CRS_RX_READ_EVT */
-      break;
-
-    case CUSTOM_STM_CRS_RX_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_NOTIFY_ENABLED_EVT */
-
-      /* USER CODE END CUSTOM_STM_CRS_RX_NOTIFY_ENABLED_EVT */
-      break;
-
-    case CUSTOM_STM_CRS_RX_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_NOTIFY_DISABLED_EVT */
-
-      /* USER CODE END CUSTOM_STM_CRS_RX_NOTIFY_DISABLED_EVT */
-      break;
-
     case CUSTOM_STM_CRS_TX_READ_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_READ_EVT */
-
+      Custom_CRS_OnTxRead();
       /* USER CODE END CUSTOM_STM_CRS_TX_READ_EVT */
       break;
 
-    case CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT */
-      pNotification->DataTransfered.pPayload[pNotification->DataTransfered.Length] = '\0';
-      Custom_STM_App_Update_Char(CUSTOM_STM_CRS_RX, pNotification->DataTransfered.pPayload);
-      /* USER CODE END CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT */
+    case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_CRS_RX_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_EVT */
+      Custom_CRS_OnRxWrite(pNotification);
+      /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_EVT */
       break;
 
     default:
@@ -181,7 +176,8 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-
+  read_index = 0;
+  write_index = 0;
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -197,45 +193,66 @@ void Custom_APP_Init(void)
  *************************************************************/
 
 /* CRS */
-void Custom_Crs_rx_Update_Char(void) /* Property Read */
+void Custom_Crs_tx_Update_Char(void) /* Property Read */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Crs_rx_UC_1*/
+  /* USER CODE BEGIN Crs_tx_UC_1*/
 
-  /* USER CODE END Crs_rx_UC_1*/
+  /* USER CODE END Crs_tx_UC_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_RX, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, (uint8_t *)UpdateCharData);
   }
 
-  /* USER CODE BEGIN Crs_rx_UC_Last*/
+  /* USER CODE BEGIN Crs_tx_UC_Last*/
 
-  /* USER CODE END Crs_rx_UC_Last*/
+  /* USER CODE END Crs_tx_UC_Last*/
   return;
 }
 
-void Custom_Crs_rx_Send_Notification(void) /* Property Notification */
+void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Crs_rx_NS_1*/
+  /* USER CODE BEGIN Crs_tx_NS_1*/
 
-  /* USER CODE END Crs_rx_NS_1*/
+  /* USER CODE END Crs_tx_NS_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_RX, (uint8_t *)NotifyCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Crs_rx_NS_Last*/
+  /* USER CODE BEGIN Crs_tx_NS_Last*/
 
-  /* USER CODE END Crs_rx_NS_Last*/
+  /* USER CODE END Crs_tx_NS_Last*/
 
   return;
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
+static void Custom_CRS_OnTxRead(void)
+{
+  if (read_index + 20 <= write_index)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, buffer + (read_index % BUFFER_LEN));
+    read_index += 20;
+  }
+}
+
+static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
+{
+  if (write_index + 20 <= read_index + BUFFER_LEN)
+  {
+    memcpy(buffer + (write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, 20);
+    write_index += 20;
+  }
+  else
+  {
+    // Buffer overflow
+  }
+}
 
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

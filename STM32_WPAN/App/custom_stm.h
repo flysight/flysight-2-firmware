@@ -35,19 +35,18 @@ extern "C" {
 typedef enum
 {
   /* CRS */
-  CUSTOM_STM_CRS_RX,
   CUSTOM_STM_CRS_TX,
+  CUSTOM_STM_CRS_RX,
 } Custom_STM_Char_Opcode_t;
 
 typedef enum
 {
-  /* CRS_RX */
-  CUSTOM_STM_CRS_RX_READ_EVT,
-  CUSTOM_STM_CRS_RX_NOTIFY_ENABLED_EVT,
-  CUSTOM_STM_CRS_RX_NOTIFY_DISABLED_EVT,
   /* CRS_TX */
   CUSTOM_STM_CRS_TX_READ_EVT,
-  CUSTOM_STM_CRS_TX_WRITE_NO_RESP_EVT,
+  CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT,
+  CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT,
+  /* CRS_RX */
+  CUSTOM_STM_CRS_RX_WRITE_EVT,
 
   CUSTOM_STM_BOOT_REQUEST_EVT
 } Custom_STM_Opcode_evt_t;
@@ -71,8 +70,8 @@ typedef struct
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
-extern uint8_t SizeCrs_Rx;
 extern uint8_t SizeCrs_Tx;
+extern uint8_t SizeCrs_Rx;
 
 /* USER CODE BEGIN EC */
 
