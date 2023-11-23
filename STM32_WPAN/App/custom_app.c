@@ -50,7 +50,7 @@ typedef struct
 
 /* Private defines ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFFER_LEN 200
+#define BUFFER_LEN 2450
 /* USER CODE END PD */
 
 /* Private macros -------------------------------------------------------------*/
@@ -76,6 +76,9 @@ uint8_t NotifyCharData[247];
 uint8_t buffer[BUFFER_LEN];
 uint16_t read_index, write_index;
 uint8_t notify_flag;
+
+extern uint8_t SizeCrs_Tx;
+extern uint8_t SizeCrs_Rx;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -251,19 +254,19 @@ static void Custom_CRS_OnConnect(void)
 
 static void Custom_CRS_OnTxRead(void)
 {
-  if (read_index + 20 <= write_index)
+  if (read_index + SizeCrs_Tx <= write_index)
   {
     Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, buffer + (read_index % BUFFER_LEN));
-    read_index += 20;
+    read_index += SizeCrs_Tx;
   }
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
 {
-  if (write_index + 20 <= read_index + BUFFER_LEN)
+  if (write_index + SizeCrs_Rx <= read_index + BUFFER_LEN)
   {
-    memcpy(buffer + (write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, 20);
-    write_index += 20;
+    memcpy(buffer + (write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, SizeCrs_Rx);
+    write_index += SizeCrs_Rx;
 
     // Call update task
     UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, CFG_SCH_PRIO_1);
