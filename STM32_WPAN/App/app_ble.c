@@ -254,7 +254,7 @@ static void Connection_Interval_Update_Req(void);
 #endif /* L2CAP_REQUEST_NEW_CONN_PARAM != 0 */
 
 /* USER CODE BEGIN PFP */
-
+static void LinkConfiguration(void);
 /* USER CODE END PFP */
 
 /* External variables --------------------------------------------------------*/
@@ -361,7 +361,7 @@ void APP_BLE_Init(void)
   UTIL_SEQ_RegTask(1<<CFG_TASK_ADV_CANCEL_ID, UTIL_SEQ_RFU, Adv_Cancel);
 
   /* USER CODE BEGIN APP_BLE_Init_4 */
-
+  UTIL_SEQ_RegTask(1<<CFG_TASK_LINK_CONFIG_ID, UTIL_SEQ_RFU, LinkConfiguration);
   /* USER CODE END APP_BLE_Init_4 */
 
   /**
@@ -534,7 +534,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
           Custom_APP_Notification(&HandleNotification);
           /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
-
+          UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_0);
           /* USER CODE END HCI_EVT_LE_CONN_COMPLETE */
           break; /* HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE */
         }
@@ -1175,7 +1175,18 @@ static void Connection_Interval_Update_Req(void)
 #endif /* L2CAP_REQUEST_NEW_CONN_PARAM != 0 */
 
 /* USER CODE BEGIN FD_SPECIFIC_FUNCTIONS */
+static void LinkConfiguration(void)
+{
+  tBleStatus status;
 
+  /* See AN5289: How to maximize data throughput */
+  APP_DBG_MSG("set data length \n");
+  status = hci_le_set_data_length(BleApplicationContext.BleApplicationContext_legacy.connectionHandle,251,2120);
+  if (status != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("set data length command error \n");
+  }
+}
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
 /*************************************************************
  *

@@ -50,7 +50,7 @@ typedef struct
 
 /* Private defines ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFFER_LEN 2450
+#define BUFFER_LEN 2440
 /* USER CODE END PD */
 
 /* Private macros -------------------------------------------------------------*/

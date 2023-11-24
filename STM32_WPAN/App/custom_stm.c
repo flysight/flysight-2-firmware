@@ -64,8 +64,8 @@ typedef struct{
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-uint8_t SizeCrs_Tx = 245;
-uint8_t SizeCrs_Rx = 245;
+uint8_t SizeCrs_Tx = 244;
+uint8_t SizeCrs_Rx = 244;
 
 /**
  * START of Section BLE_DRIVER_CONTEXT

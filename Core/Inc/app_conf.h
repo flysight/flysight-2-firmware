@@ -220,7 +220,7 @@
  * Maximum supported ATT_MTU size
  * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_LL_ONLY flag set
  */
-#define CFG_BLE_MAX_ATT_MTU             (248)
+#define CFG_BLE_MAX_ATT_MTU             (250)
 
 /**
  * Size of the storage area for Attribute values
@@ -674,7 +674,7 @@ typedef enum
 #endif
   CFG_TASK_HCI_ASYNCH_EVT_ID,
   /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
-
+  CFG_TASK_LINK_CONFIG_ID,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
