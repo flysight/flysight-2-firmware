@@ -68,7 +68,8 @@ typedef struct
 void Custom_APP_Init(void);
 void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification);
 /* USER CODE BEGIN EF */
-
+int Custom_CRS_GetChar(void);
+int Custom_CRS_PutChar(int ch);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

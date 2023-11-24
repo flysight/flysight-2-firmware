@@ -30,6 +30,7 @@
 /* USER CODE BEGIN Includes */
 #include "baro.h"
 #include "button.h"
+#include "crs.h"
 #include "gnss.h"
 #include "hum.h"
 #include "imu.h"
@@ -182,6 +183,7 @@ int main(void)
   FS_Mode_Init();
   FS_Button_Init();
   FS_VBUS_Init();
+  FS_CRS_Init();
 
   while (1)
   {

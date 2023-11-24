@@ -50,7 +50,7 @@ typedef struct
 
 /* Private defines ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFFER_LEN 2440
+#define BUFFER_LEN (244*2)
 /* USER CODE END PD */
 
 /* Private macros -------------------------------------------------------------*/
@@ -73,8 +73,12 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-uint8_t buffer[BUFFER_LEN];
-uint16_t read_index, write_index;
+uint8_t tx_buffer[BUFFER_LEN];
+uint16_t tx_read_index, tx_write_index;
+
+uint8_t rx_buffer[BUFFER_LEN];
+uint16_t rx_read_index, rx_write_index;
+
 uint8_t notify_flag;
 
 extern uint8_t SizeCrs_Tx;
@@ -117,7 +121,7 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       notify_flag = 1;
 
       // Call update task
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, CFG_SCH_PRIO_1);
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
@@ -186,7 +190,7 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
   // Register update task
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, UTIL_SEQ_RFU, Custom_CRS_Update);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, UTIL_SEQ_RFU, Custom_CRS_Update);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -245,8 +249,11 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
 static void Custom_CRS_OnConnect(void)
 {
   // Reset buffer indices
-  read_index = 0;
-  write_index = 0;
+  tx_read_index = 0;
+  tx_write_index = 0;
+
+  rx_read_index = 0;
+  rx_write_index = 0;
 
   // Reset state
   notify_flag = 0;
@@ -254,22 +261,19 @@ static void Custom_CRS_OnConnect(void)
 
 static void Custom_CRS_OnTxRead(void)
 {
-  if (read_index + SizeCrs_Tx <= write_index)
+  if (tx_read_index + SizeCrs_Tx <= tx_write_index)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, buffer + (read_index % BUFFER_LEN));
-    read_index += SizeCrs_Tx;
+    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, tx_buffer + (tx_read_index % BUFFER_LEN));
+    tx_read_index += SizeCrs_Tx;
   }
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
 {
-  if (write_index + SizeCrs_Rx <= read_index + BUFFER_LEN)
+  if (rx_write_index + SizeCrs_Rx <= rx_read_index + BUFFER_LEN)
   {
-    memcpy(buffer + (write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, SizeCrs_Rx);
-    write_index += SizeCrs_Rx;
-
-    // Call update task
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_UPDATE_ID, CFG_SCH_PRIO_1);
+    memcpy(rx_buffer + (rx_write_index % BUFFER_LEN), pNotification->DataTransfered.pPayload, SizeCrs_Rx);
+    rx_write_index += SizeCrs_Rx;
   }
   else
   {
@@ -279,11 +283,43 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 
 static void Custom_CRS_Update(void)
 {
-  uint16_t saved_index = write_index;
+  uint16_t saved_index = tx_write_index;
 
-  while (notify_flag && (read_index != saved_index))
+  while (notify_flag && (tx_read_index != saved_index))
   {
 	  Custom_CRS_OnTxRead();
   }
+}
+
+int Custom_CRS_GetChar(void)
+{
+  int ret = -1;
+
+  if (rx_read_index + 1 <= rx_write_index)
+  {
+    ret = rx_buffer[rx_read_index % BUFFER_LEN];
+    ++rx_read_index;
+  }
+
+  return ret;
+}
+
+int Custom_CRS_PutChar(int ch)
+{
+  int ret = -1;
+
+  if (tx_write_index + 1 <= tx_read_index + BUFFER_LEN)
+  {
+    ret = tx_buffer[tx_write_index % BUFFER_LEN] = (uint8_t) ch;
+    ++tx_write_index;
+  }
+
+  if (tx_read_index + SizeCrs_Tx <= tx_write_index)
+  {
+    // Call update task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+  }
+
+  return ret;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
