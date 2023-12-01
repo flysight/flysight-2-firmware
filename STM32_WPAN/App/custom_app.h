@@ -46,7 +46,11 @@ typedef struct
   uint16_t                                 ConnectionHandle;
 } Custom_App_ConnHandle_Not_evt_t;
 /* USER CODE BEGIN ET */
-
+typedef struct
+{
+  uint8_t data[247];
+  uint8_t length;
+} Custom_CRS_Packet_t;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -68,8 +72,9 @@ typedef struct
 void Custom_APP_Init(void);
 void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification);
 /* USER CODE BEGIN EF */
-int Custom_CRS_GetChar(void);
-int Custom_CRS_PutChar(int ch);
+Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void);
+void Custom_CRS_SendNextTxPacket(void);
+Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

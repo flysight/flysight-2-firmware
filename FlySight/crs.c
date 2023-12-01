@@ -53,10 +53,15 @@ static void FS_CRS_Timer(void)
 
 static void FS_CRS_Update(void)
 {
-	int ch;
+	Custom_CRS_Packet_t *rx_packet, *tx_packet;
 
-	while ((ch = Custom_CRS_GetChar()) != -1)
+	while ((rx_packet = Custom_CRS_GetNextRxPacket()))
 	{
-		Custom_CRS_PutChar(ch);
+		if ((tx_packet = Custom_CRS_GetNextTxPacket()))
+		{
+			tx_packet->length = rx_packet->length;
+			memcpy(tx_packet->data, rx_packet->data, tx_packet->length);
+			Custom_CRS_SendNextTxPacket();
+		}
 	}
 }
