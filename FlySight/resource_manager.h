@@ -21,86 +21,21 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#include "main.h"
-#include "app_common.h"
-#include "charge.h"
-#include "led.h"
-#include "resource_manager.h"
-#include "usb_device.h"
-#include "usbd_core.h"
-#include "usbd_storage_if.h"
+#ifndef RESOURCE_MANAGER_H_
+#define RESOURCE_MANAGER_H_
 
-extern USBD_HandleTypeDef hUsbDeviceFS;
-extern UART_HandleTypeDef huart1;
-
-static void FS_USBMode_BeginActivity(void)
+typedef enum
 {
-	FS_LED_Off();
-}
+	FS_RESOURCE_VCC,
+	FS_RESOURCE_MICROSD,
+	FS_RESOURCE_FATFS,
 
+	// Number of resources
+	FS_RESOURCE_COUNT
+} FS_Resource_t;
 
-static void FS_USBMode_EndActivity(void)
-{
-	FS_LED_On();
-}
+void FS_ResourceManager_Init(void);
+void FS_ResourceManager_RequestResource(FS_Resource_t resource);
+void FS_ResourceManager_ReleaseResource(FS_Resource_t resource);
 
-void FS_USBMode_Init(void)
-{
-	/* Enable charge status */
-	FS_Charge_Init();
-
-	/* Turn on LEDs */
-	FS_LED_On();
-
-	/* Initialize microSD */
-	FS_ResourceManager_RequestResource(FS_RESOURCE_MICROSD);
-
-	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
-
-	/* Configure peripheral clocks */
-	PeriphClock_Config();
-
-	/* Enable USB interface */
-	MX_USB_Device_Init();
-
-	/* Set disk activity callbacks */
-	USBD_SetActivityCallbacks(FS_USBMode_BeginActivity, FS_USBMode_EndActivity);
-}
-
-void FS_USBMode_DeInit(void)
-{
-	/* Clear disk activity callbacks */
-	USBD_SetActivityCallbacks(0, 0);
-
-	/* Turn off LEDs */
-	FS_LED_Off();
-
-	/* Disable charge status */
-	FS_Charge_DeInit();
-
-	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
-
-	/* Disable USB interface */
-	if (USBD_DeInit(&hUsbDeviceFS) != USBD_OK)
-	{
-		Error_Handler();
-	}
-
-	/* Disable USB power */
-	HAL_PWREx_DisableVddUSB();
-
-	/* Get Sem0 */
-	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
-
-	/* Disable HSI48 */
-	LL_RCC_HSI48_Disable();
-
-	/* Release Sem0 */
-	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
-
-	/* Release HSI48 semaphore */
-	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
-
-	/* De-initialize microSD */
-	FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
-}
+#endif /* RESOURCE_MANAGER_H_ */

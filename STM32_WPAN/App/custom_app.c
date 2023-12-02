@@ -268,6 +268,9 @@ static void Custom_CRS_OnTxRead(void)
     packet = &tx_buffer[(tx_read_index++) % BUFFER_LEN];
     SizeCrs_Tx = packet->length;
     Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
+
+    // Call update task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
   }
 }
 
@@ -280,6 +283,9 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 	packet = &rx_buffer[(rx_write_index++) % BUFFER_LEN];
 	packet->length = pNotification->DataTransfered.Length;
     memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
+
+    // Call update task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
   }
   else
   {
