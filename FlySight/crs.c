@@ -29,13 +29,13 @@
 #include "resource_manager.h"
 #include "stm32_seq.h"
 
-#define CRS_UPDATE_MSEC    100
-#define CRS_UPDATE_RATE    (CRS_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
+#define QUEUE_LENGTH 4
 
 typedef enum
 {
 	FS_CRS_COMMAND_DIR = 0x00,
-	FS_CRS_RESP_FILE_INFO = 0x01
+	FS_CRS_RESP_FILE_INFO = 0x01,
+	FS_CRS_COMMAND_CANCEL = 0xff
 } FS_CRS_Command_t;
 
 typedef enum
@@ -47,10 +47,10 @@ typedef enum
 	FS_CRS_STATE_COUNT
 } FS_CRS_State_t;
 
-typedef FS_CRS_State_t FS_CRS_StateFunc_t(void);
+typedef FS_CRS_State_t FS_CRS_StateFunc_t(FS_CRS_Event_t event);
 
-static FS_CRS_State_t FS_CRS_State_Idle(void);
-static FS_CRS_State_t FS_CRS_State_Dir(void);
+static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event);
+static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event);
 
 static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 {
@@ -62,12 +62,28 @@ static FS_CRS_State_t state = FS_CRS_STATE_IDLE;
 
 static DIR dir;
 
-static void FS_CRS_Update(void);
+static FS_CRS_Event_t event_queue[QUEUE_LENGTH];
+static uint8_t queue_read = 0;
+static uint8_t queue_write = 0;
 
-void FS_CRS_Init(void)
+void FS_CRS_PushQueue(FS_CRS_Event_t event)
 {
-	// Initialize CRS task
-	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, UTIL_SEQ_RFU, FS_CRS_Update);
+	// TODO: Log if this queue overflows
+
+	event_queue[queue_write] = event;
+	queue_write = (queue_write + 1) % QUEUE_LENGTH;
+
+	// Call update task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+}
+
+FS_CRS_Event_t FS_CRS_PopQueue(void)
+{
+	// TODO: Log if this queue underflows
+
+	const FS_CRS_Event_t event = event_queue[queue_read];
+	queue_read = (queue_read + 1) % QUEUE_LENGTH;
+	return event;
 }
 
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
@@ -83,58 +99,82 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 	}
 }
 
-static FS_CRS_State_t FS_CRS_State_Idle(void)
+static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_IDLE;
 	Custom_CRS_Packet_t *packet;
 
-	if ((packet = Custom_CRS_GetNextRxPacket()))
+	if (event == FS_CRS_EVENT_RX_WRITE)
 	{
-		if (packet->length > 0)
+		if ((packet = Custom_CRS_GetNextRxPacket()))
 		{
-			// Handle commands
-			switch (packet->data[0])
+			if (packet->length > 0)
 			{
-			case FS_CRS_COMMAND_DIR:
-				// Initialize disk
-				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-				// Open directory
-				if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
+				// Handle commands
+				switch (packet->data[0])
 				{
-					next_state = FS_CRS_STATE_DIR;
+				case FS_CRS_COMMAND_DIR:
+					// Initialize disk
+					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+					// Open directory
+					if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
+					{
+					    // Call update task
+					    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
+
+						next_state = FS_CRS_STATE_DIR;
+					}
+					break;
 				}
-				break;
 			}
 		}
-
-	    // Call update task
-	    UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
 	}
 
 	return next_state;
 }
 
-static FS_CRS_State_t FS_CRS_State_Dir(void)
+static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_DIR;
 	FILINFO fno;
+	Custom_CRS_Packet_t *packet;
 
-	// Read a directory item
-	if (f_readdir(&dir, &fno) == FR_OK)
+	if (event == FS_CRS_EVENT_RX_WRITE)
 	{
-		FS_CRS_SendPacket(FS_CRS_RESP_FILE_INFO, (uint8_t *) &fno, sizeof(fno));
+		if ((packet = Custom_CRS_GetNextRxPacket()))
+		{
+			if (packet->length > 0)
+			{
+				// Handle commands
+				switch (packet->data[0])
+				{
+				case FS_CRS_COMMAND_CANCEL:
+					f_closedir(&dir);
+					next_state = FS_CRS_STATE_IDLE;
+					break;
+				}
+			}
+		}
+	}
+	else if (event == FS_CRS_EVENT_TX_READ)
+	{
+		// Read a directory item
+		if (f_readdir(&dir, &fno) == FR_OK)
+		{
+			FS_CRS_SendPacket(FS_CRS_RESP_FILE_INFO, (uint8_t *) &fno, sizeof(fno));
 
-		if (fno.fname[0] == 0)
+			if (fno.fname[0] == 0)
+			{
+				f_closedir(&dir);
+				next_state = FS_CRS_STATE_IDLE;
+			}
+		}
+		else
 		{
 			f_closedir(&dir);
 			next_state = FS_CRS_STATE_IDLE;
 		}
-	}
-	else
-	{
-		f_closedir(&dir);
-		next_state = FS_CRS_STATE_IDLE;
 	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
@@ -148,5 +188,14 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 
 static void FS_CRS_Update(void)
 {
-	state = state_table[state]();
+	while (queue_read != queue_write)
+	{
+		state = state_table[state](FS_CRS_PopQueue());
+	}
+}
+
+void FS_CRS_Init(void)
+{
+	// Initialize CRS task
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, UTIL_SEQ_RFU, FS_CRS_Update);
 }
