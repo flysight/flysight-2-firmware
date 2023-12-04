@@ -257,7 +257,7 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   // Copy packet data
   rx_packet.length = pNotification->DataTransfered.Length;
   memcpy(rx_packet.data, pNotification->DataTransfered.pPayload,
-		  pNotification->DataTransfered.Length);
+      pNotification->DataTransfered.Length);
 
   // Handle the packet
   FS_CRS_PushQueue(FS_CRS_EVENT_RX_WRITE);
