@@ -51,7 +51,7 @@ typedef struct
 
 /* Private defines ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFFER_LEN 2
+
 /* USER CODE END PD */
 
 /* Private macros -------------------------------------------------------------*/
@@ -74,11 +74,8 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-Custom_CRS_Packet_t tx_buffer[BUFFER_LEN];
-uint16_t tx_read_index, tx_write_index;
-
-Custom_CRS_Packet_t rx_buffer[BUFFER_LEN];
-uint16_t rx_read_index, rx_write_index;
+Custom_CRS_Packet_t tx_packet;
+Custom_CRS_Packet_t rx_packet;
 
 uint8_t notify_flag;
 
@@ -95,7 +92,6 @@ static void Custom_Crs_tx_Send_Notification(void);
 static void Custom_CRS_OnConnect(void);
 static void Custom_CRS_OnTxRead(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_CRS_Update(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -120,9 +116,6 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       notify_flag = 1;
-
-      // Call update task
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
@@ -190,8 +183,8 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  // Register update task
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, UTIL_SEQ_RFU, Custom_CRS_Update);
+  // Register retry transmit task
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_RETRY_TX_ID, UTIL_SEQ_RFU, Custom_CRS_SendNextTxPacket);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -249,91 +242,54 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(void)
 {
-  // Reset buffer indices
-  tx_read_index = 0;
-  tx_write_index = 0;
-
-  rx_read_index = 0;
-  rx_write_index = 0;
-
   // Reset state
   notify_flag = 0;
 }
 
 static void Custom_CRS_OnTxRead(void)
 {
-  Custom_CRS_Packet_t *packet;
-
-  if (tx_read_index < tx_write_index)
-  {
-    packet = &tx_buffer[(tx_read_index++) % BUFFER_LEN];
-    SizeCrs_Tx = packet->length;
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
-
-    // Call update task
-    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
-  }
+  // Check if there is another packet to send
+  FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
 {
-  Custom_CRS_Packet_t *packet;
+  // Copy packet data
+  rx_packet.length = pNotification->DataTransfered.Length;
+  memcpy(rx_packet.data, pNotification->DataTransfered.pPayload,
+		  pNotification->DataTransfered.Length);
 
-  if (rx_write_index < rx_read_index + BUFFER_LEN)
-  {
-	packet = &rx_buffer[(rx_write_index++) % BUFFER_LEN];
-	packet->length = pNotification->DataTransfered.Length;
-    memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
-
-    // Call update task
-    FS_CRS_PushQueue(FS_CRS_EVENT_RX_WRITE);
-  }
-  else
-  {
-    // Buffer overflow
-  }
-}
-
-static void Custom_CRS_Update(void)
-{
-  uint16_t saved_index = tx_write_index;
-
-  while (notify_flag && (tx_read_index != saved_index))
-  {
-	  Custom_CRS_OnTxRead();
-  }
+  // Handle the packet
+  FS_CRS_PushQueue(FS_CRS_EVENT_RX_WRITE);
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
 {
-  Custom_CRS_Packet_t *ret = 0;
-
-  if (tx_write_index < tx_read_index + BUFFER_LEN)
-  {
-	ret = &tx_buffer[tx_write_index % BUFFER_LEN];
-  }
-
-  return ret;
+  return &tx_packet;
 }
 
 void Custom_CRS_SendNextTxPacket(void)
 {
-  if (tx_read_index < (++tx_write_index))
+  tBleStatus res;
+
+  // Try to transmit packet data
+  SizeCrs_Tx = tx_packet.length;
+  res = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, tx_packet.data);
+
+  if (res != BLE_STATUS_SUCCESS)
   {
-    // Call update task
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+    // Retry transmit operation
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_RETRY_TX_ID, CFG_SCH_PRIO_1);
+  }
+  else if (notify_flag)
+  {
+    // Check if there is another packet to send
+    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
   }
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
 {
-  Custom_CRS_Packet_t *ret = 0;
-
-  if (rx_read_index < rx_write_index)
-  {
-	ret = &rx_buffer[(rx_read_index++) % BUFFER_LEN];
-  }
-
-  return ret;
+  return &rx_packet;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

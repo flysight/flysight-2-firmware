@@ -30,11 +30,14 @@
 #include "stm32_seq.h"
 
 #define QUEUE_LENGTH 4
+#define FILE_READ_LENGTH 243
 
 typedef enum
 {
 	FS_CRS_COMMAND_DIR = 0x00,
 	FS_CRS_RESP_FILE_INFO = 0x01,
+	FS_CRS_COMMAND_READ = 0x02,
+	FS_CRS_RESP_FILE_DATA = 0x03,
 	FS_CRS_COMMAND_CANCEL = 0xff
 } FS_CRS_Command_t;
 
@@ -42,6 +45,7 @@ typedef enum
 {
 	FS_CRS_STATE_IDLE,
 	FS_CRS_STATE_DIR,
+	FS_CRS_STATE_READ,
 
 	// Number of states
 	FS_CRS_STATE_COUNT
@@ -51,16 +55,20 @@ typedef FS_CRS_State_t FS_CRS_StateFunc_t(FS_CRS_Event_t event);
 
 static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event);
 static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event);
+static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event);
 
 static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 {
 	FS_CRS_State_Idle,
-	FS_CRS_State_Dir
+	FS_CRS_State_Dir,
+	FS_CRS_State_Read
 };
 
 static FS_CRS_State_t state = FS_CRS_STATE_IDLE;
 
 static DIR dir;
+static FIL file;
+static uint8_t buffer[FILE_READ_LENGTH];
 
 static FS_CRS_Event_t event_queue[QUEUE_LENGTH];
 static uint8_t queue_read = 0;
@@ -74,7 +82,7 @@ void FS_CRS_PushQueue(FS_CRS_Event_t event)
 	queue_write = (queue_write + 1) % QUEUE_LENGTH;
 
 	// Call update task
-    UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 FS_CRS_Event_t FS_CRS_PopQueue(void)
@@ -125,6 +133,29 @@ static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event)
 
 						next_state = FS_CRS_STATE_DIR;
 					}
+					else
+					{
+						// De-initialize disk
+						FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+					}
+					break;
+				case FS_CRS_COMMAND_READ:
+					// Initialize disk
+					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+					// Open file
+					if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_READ) == FR_OK)
+					{
+					    // Call update task
+					    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
+
+						next_state = FS_CRS_STATE_READ;
+					}
+					else
+					{
+						// De-initialize disk
+						FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+					}
 					break;
 				}
 			}
@@ -173,6 +204,60 @@ static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 		else
 		{
 			f_closedir(&dir);
+			next_state = FS_CRS_STATE_IDLE;
+		}
+	}
+
+	if (next_state == FS_CRS_STATE_IDLE)
+	{
+		// De-initialize disk
+		FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+	}
+
+	return next_state;
+}
+
+static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
+{
+	FS_CRS_State_t next_state = FS_CRS_STATE_READ;
+	UINT br;
+	Custom_CRS_Packet_t *packet;
+
+	if (event == FS_CRS_EVENT_RX_WRITE)
+	{
+		if ((packet = Custom_CRS_GetNextRxPacket()))
+		{
+			if (packet->length > 0)
+			{
+				// Handle commands
+				switch (packet->data[0])
+				{
+				case FS_CRS_COMMAND_CANCEL:
+					f_close(&file);
+					next_state = FS_CRS_STATE_IDLE;
+					break;
+				}
+			}
+		}
+	}
+	else if (event == FS_CRS_EVENT_TX_READ)
+	{
+		if (f_eof(&file))
+		{
+			// Send empty buffer to signal end of file
+			FS_CRS_SendPacket(FS_CRS_RESP_FILE_DATA, buffer, 0);
+
+			f_close(&file);
+			next_state = FS_CRS_STATE_IDLE;
+		}
+		else if (f_read(&file, buffer, FILE_READ_LENGTH, &br) == FR_OK)
+		{
+			// Send data
+			FS_CRS_SendPacket(FS_CRS_RESP_FILE_DATA, buffer, br);
+		}
+		else
+		{
+			f_close(&file);
 			next_state = FS_CRS_STATE_IDLE;
 		}
 	}
