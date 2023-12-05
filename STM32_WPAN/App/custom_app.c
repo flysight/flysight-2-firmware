@@ -162,7 +162,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 
     case CUSTOM_DISCON_HANDLE_EVT :
       /* USER CODE BEGIN CUSTOM_DISCON_HANDLE_EVT */
-
+      FS_CRS_PushQueue(FS_CRS_EVENT_DISCONNECT);
       /* USER CODE END CUSTOM_DISCON_HANDLE_EVT */
       break;
 

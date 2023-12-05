@@ -254,7 +254,6 @@ static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 				switch (packet->data[0])
 				{
 				case FS_CRS_COMMAND_CANCEL:
-					f_closedir(&dir);
 					next_state = FS_CRS_STATE_IDLE;
 					break;
 				}
@@ -276,19 +275,24 @@ static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 
 			if (fno.fname[0] == 0)
 			{
-				f_closedir(&dir);
 				next_state = FS_CRS_STATE_IDLE;
 			}
 		}
 		else
 		{
-			f_closedir(&dir);
 			next_state = FS_CRS_STATE_IDLE;
 		}
+	}
+	else if (event == FS_CRS_EVENT_DISCONNECT)
+	{
+		next_state = FS_CRS_STATE_IDLE;
 	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
+		// Close directory
+		f_closedir(&dir);
+
 		// De-initialize disk
 		FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 	}
@@ -312,7 +316,6 @@ static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
 				switch (packet->data[0])
 				{
 				case FS_CRS_COMMAND_CANCEL:
-					f_close(&file);
 					next_state = FS_CRS_STATE_IDLE;
 					break;
 				}
@@ -326,7 +329,6 @@ static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
 			// Send empty buffer to signal end of file
 			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, 0);
 
-			f_close(&file);
 			next_state = FS_CRS_STATE_IDLE;
 		}
 		else if (f_read(&file, buffer, FILE_READ_LENGTH, &br) == FR_OK)
@@ -336,13 +338,19 @@ static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
 		}
 		else
 		{
-			f_close(&file);
 			next_state = FS_CRS_STATE_IDLE;
 		}
+	}
+	else if (event == FS_CRS_EVENT_DISCONNECT)
+	{
+		next_state = FS_CRS_STATE_IDLE;
 	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
+		// Close file
+		f_close(&file);
+
 		// De-initialize disk
 		FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 	}
@@ -372,17 +380,26 @@ static FS_CRS_State_t FS_CRS_State_Write(FS_CRS_Event_t event)
 					}
 					else
 					{
-						f_close(&file);
 						next_state = FS_CRS_STATE_IDLE;
 					}
+					break;
+				case FS_CRS_COMMAND_CANCEL:
+					next_state = FS_CRS_STATE_IDLE;
 					break;
 				}
 			}
 		}
 	}
+	else if (event == FS_CRS_EVENT_DISCONNECT)
+	{
+		next_state = FS_CRS_STATE_IDLE;
+	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
+		// Close file
+		f_close(&file);
+
 		// De-initialize disk
 		FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 	}

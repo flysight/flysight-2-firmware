@@ -27,7 +27,8 @@
 typedef enum
 {
 	FS_CRS_EVENT_RX_WRITE,
-	FS_CRS_EVENT_TX_READ
+	FS_CRS_EVENT_TX_READ,
+	FS_CRS_EVENT_DISCONNECT
 } FS_CRS_Event_t;
 
 void FS_CRS_Init(void);
