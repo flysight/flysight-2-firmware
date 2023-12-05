@@ -142,11 +142,12 @@ def main():
     parser.add_argument('--list', action='store_true', help='List all available BLE devices.')
     parser.add_argument('--address', type=str, metavar='ADDRESS', help='Specify the BLE device address.')
     parser.add_argument('--dir', type=str, metavar='DIRECTORY', help='List contents of the specified directory.')
-    parser.add_argument('--read', nargs='+', metavar=('OFFSET', 'REMOTE_FILE', 'LOCAL_FILE'), help='Read a file from the device. Provide the offset, remote file path, and an optional local file path.')
+    parser.add_argument('--read', nargs='+', help='Read a file from the device. Provide the offset, remote file path, and an optional local file path.')
     parser.add_argument('--write', nargs=3, metavar=('OFFSET', 'LOCAL_FILE', 'REMOTE_FILE'), help='Write a file to the device. Provide the offset, local file path, and remote file path.')
     parser.add_argument('--create', type=str, metavar='FILE_NAME', help='Create a new file on the device with the specified name.')
     parser.add_argument('--delete', type=str, metavar='FILE_NAME', help='Delete the specified file from the device.')
     parser.add_argument('--mkdir', type=str, metavar='DIRECTORY_NAME', help='Create a new directory on the device with the specified name.')
+    args = parser.parse_args()
 
     if args.list:
         asyncio.run(list_devices())
