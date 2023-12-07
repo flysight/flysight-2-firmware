@@ -23,14 +23,13 @@
 #include "app_common.h"
 #include "dbg_trace.h"
 #include "ble.h"
-#include "crs.h"
 #include "custom_app.h"
 #include "custom_stm.h"
 #include "stm32_seq.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "crs.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
