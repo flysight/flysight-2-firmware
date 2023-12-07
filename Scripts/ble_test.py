@@ -31,13 +31,12 @@ async def delete_file(address, file_name):
     async with BleakClient(address, adapter='hci0') as client:
         await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode())
 
-async def write_file(address, offset, local_filename, remote_filename):
+async def write_file(address, local_filename, remote_filename):
     async with BleakClient(address, adapter='hci0') as client:
         with open(local_filename, "rb") as f:
             data = f.read()
 
-        offset_bytes = offset.to_bytes(4, byteorder='little')
-        await client.write_gatt_char(CRS_RX_UUID, b'\x03' + offset_bytes + remote_filename.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode())
 
         with tqdm(desc="Sending Bytes", unit="B", unit_scale=True) as pbar:
             for i in range(0, len(data), 243):
@@ -143,7 +142,7 @@ def main():
     parser.add_argument('--list', action='store_true', help='List all available BLE devices.')
     parser.add_argument('--address', type=str, metavar='ADDRESS', help='Specify the BLE device address.')
     parser.add_argument('--dir', type=str, metavar='DIRECTORY', help='List contents of the specified directory.')
-    parser.add_argument('--read', nargs='+', help='Read a file from the device. Provide the offset, stride, remote file path, and an optional local file path.')
+    parser.add_argument('--read', nargs='+', help='Read a file from the device. Provide the offset, (stride-1), remote file path, and an optional local file path.')
     parser.add_argument('--write', nargs=2, metavar=('LOCAL_FILE', 'REMOTE_FILE'), help='Write a file to the device. Provide the local file path, and remote file path.')
     parser.add_argument('--create', type=str, metavar='FILE_NAME', help='Create a new file on the device with the specified name.')
     parser.add_argument('--delete', type=str, metavar='FILE_NAME', help='Delete the specified file from the device.')
@@ -159,8 +158,8 @@ def main():
         local_filename = local_filename[0] if local_filename else os.path.basename(remote_filename)
         asyncio.run(read_file(args.address, int(offset), int(stride), remote_filename, local_filename))
     elif args.address and args.write:
-        offset, local_filename, remote_filename = args.write
-        asyncio.run(write_file(args.address, int(offset), local_filename, remote_filename))
+        local_filename, remote_filename = args.write
+        asyncio.run(write_file(args.address, local_filename, remote_filename))
     elif args.address and args.create:
         asyncio.run(create_file(args.address, args.create))
     elif args.address and args.delete:
