@@ -77,8 +77,8 @@ static FIL file;
 static uint8_t buffer[FILE_READ_LENGTH];
 static DIR dir;
 
-static FSIZE_t read_stride;
-static FSIZE_t read_pos;
+static uint32_t read_stride;
+static uint32_t read_pos;
 
 static FS_CRS_Event_t event_queue[QUEUE_LENGTH];
 static uint8_t queue_read = 0;
@@ -163,11 +163,11 @@ static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event)
 					packet->data[packet->length] = 0;
 
 					// Open file
-					if (f_open(&file, (TCHAR *) &(packet->data[5]), FA_READ) == FR_OK)
+					if (f_open(&file, (TCHAR *) &(packet->data[9]), FA_READ) == FR_OK)
 					{
 						// Initialize read stride and position
-						read_stride = ((FSIZE_t) *((uint16_t *) &(packet->data[3])) + 1) * FILE_READ_LENGTH;
-						read_pos = (FSIZE_t) *((uint16_t *) &(packet->data[1])) * FILE_READ_LENGTH;
+						read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
+						read_pos = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
 
 						if (f_lseek(&file, read_pos) == FR_OK)
 						{

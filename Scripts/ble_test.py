@@ -19,20 +19,24 @@ attrib_description = {
     4: 'd'
 }
 
+# Bluetooth adapter
+#ble_adapter = 'hci0'
+ble_adapter = None
+
 async def mkdir(address, directory_name):
-    async with BleakClient(address, adapter='hci0') as client:
+    async with BleakClient(address, adapter=ble_adapter) as client:
         await client.write_gatt_char(CRS_RX_UUID, b'\x04' + directory_name.encode())
 
 async def create_file(address, file_name):
-    async with BleakClient(address, adapter='hci0') as client:
+    async with BleakClient(address, adapter=ble_adapter) as client:
         await client.write_gatt_char(CRS_RX_UUID, b'\x00' + file_name.encode())
 
 async def delete_file(address, file_name):
-    async with BleakClient(address, adapter='hci0') as client:
+    async with BleakClient(address, adapter=ble_adapter) as client:
         await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode())
 
 async def write_file(address, local_filename, remote_filename):
-    async with BleakClient(address, adapter='hci0') as client:
+    async with BleakClient(address, adapter=ble_adapter) as client:
         with open(local_filename, "rb") as f:
             data = f.read()
 
@@ -49,7 +53,7 @@ async def write_file(address, local_filename, remote_filename):
 
 async def read_file(address, offset, stride, remote_filename, local_filename, timeout=1):
     with tqdm(desc="Receiving Bytes", unit="B", unit_scale=True) as pbar:
-        async with BleakClient(address, adapter='hci0') as client:
+        async with BleakClient(address, adapter=ble_adapter) as client:
             file_data = bytearray()
             transfer_complete = asyncio.Event()
             packet_received = asyncio.Event()
@@ -66,8 +70,8 @@ async def read_file(address, offset, stride, remote_filename, local_filename, ti
                     packet_received.set()
 
             await client.start_notify(CRS_TX_UUID, file_notification_handler)
-            offset_bytes = offset.to_bytes(2, byteorder='little')
-            stride_bytes = stride.to_bytes(2, byteorder='little')
+            offset_bytes = offset.to_bytes(4, byteorder='little')
+            stride_bytes = stride.to_bytes(4, byteorder='little')
             await client.write_gatt_char(CRS_RX_UUID, b'\x02' + offset_bytes + stride_bytes + remote_filename.encode())
 
             try:
@@ -125,7 +129,7 @@ async def notification_handler(sender, data):
             print(parsed_info)
 
 async def list_directory(address, directory):
-    async with BleakClient(address, adapter='hci0') as client:
+    async with BleakClient(address, adapter=ble_adapter) as client:
         await client.start_notify(CRS_TX_UUID, notification_handler)
         await client.write_gatt_char(CRS_RX_UUID, b'\x05' + directory.encode())
         await asyncio.sleep(5)  # Wait for notifications
