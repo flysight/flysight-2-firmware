@@ -76,7 +76,7 @@ void APP_BLE_Init(void);
 APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
 
 /* USER CODE BEGIN EF */
-
+void APP_BLE_Adv_Set(APP_BLE_ConnStatus_t NewStatus);
 /* USER CODE END EF */
 
 #ifdef __cplusplus
