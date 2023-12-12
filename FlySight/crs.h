@@ -24,14 +24,8 @@
 #ifndef CRS_H_
 #define CRS_H_
 
-typedef enum
-{
-	FS_CRS_EVENT_RX_WRITE,
-	FS_CRS_EVENT_TX_READ,
-	FS_CRS_EVENT_DISCONNECT
-} FS_CRS_Event_t;
+#define FS_CRS_WINDOW_LENGTH 8
 
 void FS_CRS_Init(void);
-void FS_CRS_PushQueue(FS_CRS_Event_t event);
 
 #endif /* CRS_H_ */

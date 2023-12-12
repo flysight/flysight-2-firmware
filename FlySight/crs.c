@@ -56,12 +56,12 @@ typedef enum
 	FS_CRS_STATE_COUNT
 } FS_CRS_State_t;
 
-typedef FS_CRS_State_t FS_CRS_StateFunc_t(FS_CRS_Event_t event);
+typedef FS_CRS_State_t FS_CRS_StateFunc_t(void);
 
-static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event);
-static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event);
-static FS_CRS_State_t FS_CRS_State_Write(FS_CRS_Event_t event);
-static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event);
+static FS_CRS_State_t FS_CRS_State_Idle(void);
+static FS_CRS_State_t FS_CRS_State_Read(void);
+static FS_CRS_State_t FS_CRS_State_Write(void);
+static FS_CRS_State_t FS_CRS_State_Dir(void);
 
 static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 {
@@ -80,30 +80,6 @@ static DIR dir;
 static uint32_t read_stride;
 static uint32_t read_pos;
 
-static FS_CRS_Event_t event_queue[QUEUE_LENGTH];
-static uint8_t queue_read = 0;
-static uint8_t queue_write = 0;
-
-void FS_CRS_PushQueue(FS_CRS_Event_t event)
-{
-	// TODO: Log if this queue overflows
-
-	event_queue[queue_write] = event;
-	queue_write = (queue_write + 1) % QUEUE_LENGTH;
-
-	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-}
-
-FS_CRS_Event_t FS_CRS_PopQueue(void)
-{
-	// TODO: Log if this queue underflows
-
-	const FS_CRS_Event_t event = event_queue[queue_read];
-	queue_read = (queue_read + 1) % QUEUE_LENGTH;
-	return event;
-}
-
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
 	Custom_CRS_Packet_t *tx_packet;
@@ -117,124 +93,121 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 	}
 }
 
-static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event)
+static FS_CRS_State_t FS_CRS_State_Idle(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_IDLE;
 	Custom_CRS_Packet_t *packet;
 
-	if (event == FS_CRS_EVENT_RX_WRITE)
+	while ((next_state == FS_CRS_STATE_IDLE) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
-		if ((packet = Custom_CRS_GetNextRxPacket()))
+		if (packet->length > 0)
 		{
-			if (packet->length > 0)
+			// Handle commands
+			switch (packet->data[0])
 			{
-				// Handle commands
-				switch (packet->data[0])
+			case FS_CRS_COMMAND_CREATE:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Create file
+				if (f_open(&file, (TCHAR *) &(packet->data[1]),
+						FA_WRITE|FA_CREATE_NEW) == FR_OK)
 				{
-				case FS_CRS_COMMAND_CREATE:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Create file
-					if (f_open(&file, (TCHAR *) &(packet->data[1]),
-							FA_WRITE|FA_CREATE_NEW) == FR_OK)
-					{
-						f_close(&file);
-					}
-
-					// De-initialize disk
-					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					break;
-				case FS_CRS_COMMAND_DELETE:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Delete file
-					f_unlink((TCHAR *) &(packet->data[1]));
-
-					// De-initialize disk
-					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					break;
-				case FS_CRS_COMMAND_READ:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Terminate file name
-					packet->data[packet->length] = 0;
-
-					// Open file
-					if (f_open(&file, (TCHAR *) &(packet->data[9]), FA_READ) == FR_OK)
-					{
-						// Initialize read stride and position
-						read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
-						read_pos = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
-
-						if (f_lseek(&file, read_pos) == FR_OK)
-						{
-							// Call update task
-							FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
-
-							next_state = FS_CRS_STATE_READ;
-						}
-					}
-
-					if (next_state == FS_CRS_STATE_IDLE)
-					{
-						// De-initialize disk
-						FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					}
-					break;
-				case FS_CRS_COMMAND_WRITE:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Terminate file name
-					packet->data[packet->length] = 0;
-
-					// Open file
-					if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE) == FR_OK)
-					{
-						next_state = FS_CRS_STATE_WRITE;
-					}
-
-					if (next_state == FS_CRS_STATE_IDLE)
-					{
-						// De-initialize disk
-						FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					}
-					break;
-				case FS_CRS_COMMAND_MK_DIR:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Create directory
-					f_mkdir((TCHAR *) &(packet->data[1]));
-
-					// De-initialize disk
-					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					break;
-				case FS_CRS_COMMAND_READ_DIR:
-					// Initialize disk
-					FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-					// Terminate file name
-					packet->data[packet->length] = 0;
-
-					// Open directory
-					if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
-					{
-					    // Call update task
-					    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
-
-						next_state = FS_CRS_STATE_DIR;
-					}
-					else
-					{
-						// De-initialize disk
-						FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-					}
-					break;
+					f_close(&file);
 				}
+
+				// De-initialize disk
+				FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				break;
+			case FS_CRS_COMMAND_DELETE:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Delete file
+				f_unlink((TCHAR *) &(packet->data[1]));
+
+				// De-initialize disk
+				FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				break;
+			case FS_CRS_COMMAND_READ:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Terminate file name
+				packet->data[packet->length] = 0;
+
+				// Open file
+				if (f_open(&file, (TCHAR *) &(packet->data[9]), FA_READ) == FR_OK)
+				{
+					// Initialize read stride and position
+					read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
+					read_pos = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
+
+					if (f_lseek(&file, read_pos) == FR_OK)
+					{
+						// Call update task
+						UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+
+						next_state = FS_CRS_STATE_READ;
+					}
+				}
+
+				if (next_state == FS_CRS_STATE_IDLE)
+				{
+					// De-initialize disk
+					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				}
+				break;
+			case FS_CRS_COMMAND_WRITE:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Terminate file name
+				packet->data[packet->length] = 0;
+
+				// Open file
+				if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE) == FR_OK)
+				{
+					next_state = FS_CRS_STATE_WRITE;
+				}
+
+				if (next_state == FS_CRS_STATE_IDLE)
+				{
+					// De-initialize disk
+					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				}
+				break;
+			case FS_CRS_COMMAND_MK_DIR:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Create directory
+				f_mkdir((TCHAR *) &(packet->data[1]));
+
+				// De-initialize disk
+				FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				break;
+			case FS_CRS_COMMAND_READ_DIR:
+				// Initialize disk
+				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+				// Terminate file name
+				packet->data[packet->length] = 0;
+
+				// Open directory
+				if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
+				{
+					// Call update task
+					UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+
+					next_state = FS_CRS_STATE_DIR;
+				}
+				else
+				{
+					// De-initialize disk
+					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+				}
+				break;
 			}
 		}
 	}
@@ -242,29 +215,32 @@ static FS_CRS_State_t FS_CRS_State_Idle(FS_CRS_Event_t event)
 	return next_state;
 }
 
-static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
+static FS_CRS_State_t FS_CRS_State_Dir(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_DIR;
-	FILINFO fno;
 	Custom_CRS_Packet_t *packet;
+	FILINFO fno;
 
-	if (event == FS_CRS_EVENT_RX_WRITE)
+	if (!Custom_CRS_IsConnected())
 	{
-		if ((packet = Custom_CRS_GetNextRxPacket()))
+		next_state = FS_CRS_STATE_IDLE;
+	}
+
+	while ((next_state == FS_CRS_STATE_DIR) && (packet = Custom_CRS_GetNextRxPacket()))
+	{
+		if (packet->length > 0)
 		{
-			if (packet->length > 0)
+			// Handle commands
+			switch (packet->data[0])
 			{
-				// Handle commands
-				switch (packet->data[0])
-				{
-				case FS_CRS_COMMAND_CANCEL:
-					next_state = FS_CRS_STATE_IDLE;
-					break;
-				}
+			case FS_CRS_COMMAND_CANCEL:
+				next_state = FS_CRS_STATE_IDLE;
+				break;
 			}
 		}
 	}
-	else if (event == FS_CRS_EVENT_TX_READ)
+
+	while ((next_state == FS_CRS_STATE_DIR) && (packet = Custom_CRS_GetNextTxPacket()))
 	{
 		// Read a directory item
 		if (f_readdir(&dir, &fno) == FR_OK)
@@ -287,10 +263,6 @@ static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 			next_state = FS_CRS_STATE_IDLE;
 		}
 	}
-	else if (event == FS_CRS_EVENT_DISCONNECT)
-	{
-		next_state = FS_CRS_STATE_IDLE;
-	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
@@ -304,29 +276,32 @@ static FS_CRS_State_t FS_CRS_State_Dir(FS_CRS_Event_t event)
 	return next_state;
 }
 
-static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
+static FS_CRS_State_t FS_CRS_State_Read(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_READ;
-	UINT br;
 	Custom_CRS_Packet_t *packet;
+	UINT br;
 
-	if (event == FS_CRS_EVENT_RX_WRITE)
+	if (!Custom_CRS_IsConnected())
 	{
-		if ((packet = Custom_CRS_GetNextRxPacket()))
+		next_state = FS_CRS_STATE_IDLE;
+	}
+
+	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextRxPacket()))
+	{
+		if (packet->length > 0)
 		{
-			if (packet->length > 0)
+			// Handle commands
+			switch (packet->data[0])
 			{
-				// Handle commands
-				switch (packet->data[0])
-				{
-				case FS_CRS_COMMAND_CANCEL:
-					next_state = FS_CRS_STATE_IDLE;
-					break;
-				}
+			case FS_CRS_COMMAND_CANCEL:
+				next_state = FS_CRS_STATE_IDLE;
+				break;
 			}
 		}
 	}
-	else if (event == FS_CRS_EVENT_TX_READ)
+
+	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextTxPacket()))
 	{
 		if (f_eof(&file))
 		{
@@ -351,10 +326,6 @@ static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
 			next_state = FS_CRS_STATE_IDLE;
 		}
 	}
-	else if (event == FS_CRS_EVENT_DISCONNECT)
-	{
-		next_state = FS_CRS_STATE_IDLE;
-	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
@@ -368,41 +339,39 @@ static FS_CRS_State_t FS_CRS_State_Read(FS_CRS_Event_t event)
 	return next_state;
 }
 
-static FS_CRS_State_t FS_CRS_State_Write(FS_CRS_Event_t event)
+static FS_CRS_State_t FS_CRS_State_Write(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_WRITE;
 	UINT bw;
 	Custom_CRS_Packet_t *packet;
 
-	if (event == FS_CRS_EVENT_RX_WRITE)
-	{
-		if ((packet = Custom_CRS_GetNextRxPacket()))
-		{
-			if (packet->length > 0)
-			{
-				// Handle commands
-				switch (packet->data[0])
-				{
-				case FS_CRS_COMMAND_FILE_DATA:
-					if (packet->length > 1)
-					{
-						f_write(&file, &packet->data[1], packet->length - 1, &bw);
-					}
-					else
-					{
-						next_state = FS_CRS_STATE_IDLE;
-					}
-					break;
-				case FS_CRS_COMMAND_CANCEL:
-					next_state = FS_CRS_STATE_IDLE;
-					break;
-				}
-			}
-		}
-	}
-	else if (event == FS_CRS_EVENT_DISCONNECT)
+	if (!Custom_CRS_IsConnected())
 	{
 		next_state = FS_CRS_STATE_IDLE;
+	}
+
+	while ((next_state == FS_CRS_STATE_WRITE) && (packet = Custom_CRS_GetNextRxPacket()))
+	{
+		if (packet->length > 0)
+		{
+			// Handle commands
+			switch (packet->data[0])
+			{
+			case FS_CRS_COMMAND_FILE_DATA:
+				if (packet->length > 1)
+				{
+					f_write(&file, &packet->data[1], packet->length - 1, &bw);
+				}
+				else
+				{
+					next_state = FS_CRS_STATE_IDLE;
+				}
+				break;
+			case FS_CRS_COMMAND_CANCEL:
+				next_state = FS_CRS_STATE_IDLE;
+				break;
+			}
+		}
 	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
@@ -419,10 +388,7 @@ static FS_CRS_State_t FS_CRS_State_Write(FS_CRS_Event_t event)
 
 static void FS_CRS_Update(void)
 {
-	while (queue_read != queue_write)
-	{
-		state = state_table[state](FS_CRS_PopQueue());
-	}
+	state = state_table[state]();
 }
 
 void FS_CRS_Init(void)

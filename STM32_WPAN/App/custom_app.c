@@ -73,10 +73,14 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-Custom_CRS_Packet_t tx_packet;
-Custom_CRS_Packet_t rx_packet;
+static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH];
+static uint16_t tx_read_index, tx_write_index;
 
-uint8_t notify_flag;
+static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH];
+static uint16_t rx_read_index, rx_write_index;
+
+static uint8_t notify_flag;
+static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
@@ -89,6 +93,7 @@ static void Custom_Crs_tx_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
+static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnTxRead(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 /* USER CODE END PFP */
@@ -124,10 +129,10 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
       break;
 
-    case CUSTOM_STM_CRS_RX_WRITE_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_EVT */
+    case CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
       Custom_CRS_OnRxWrite(pNotification);
-      /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_EVT */
+      /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
       break;
 
     default:
@@ -161,7 +166,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 
     case CUSTOM_DISCON_HANDLE_EVT :
       /* USER CODE BEGIN CUSTOM_DISCON_HANDLE_EVT */
-      FS_CRS_PushQueue(FS_CRS_EVENT_DISCONNECT);
+      Custom_CRS_OnDisconnect();
       /* USER CODE END CUSTOM_DISCON_HANDLE_EVT */
       break;
 
@@ -183,7 +188,7 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
   // Register retry transmit task
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_RETRY_TX_ID, UTIL_SEQ_RFU, Custom_CRS_SendNextTxPacket);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_OnTxRead);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -241,54 +246,111 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(void)
 {
-  // Reset state
+  // Reset buffer indices
+  tx_read_index = 0;
+  tx_write_index = 0;
+
+  rx_read_index = 0;
+  rx_write_index = 0;
+
+  // Update state
   notify_flag = 0;
+  connected_flag = 1;
+}
+
+static void Custom_CRS_OnDisconnect(void)
+{
+  // Update state
+  connected_flag = 0;
+
+  // Call update task
+  UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 
 static void Custom_CRS_OnTxRead(void)
 {
-  // Check if there is another packet to send
-  FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
+  Custom_CRS_Packet_t *packet;
+
+  if (tx_read_index < tx_write_index)
+  {
+    packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
+    SizeCrs_Tx = packet->length;
+
+    if (Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data) == BLE_STATUS_SUCCESS)
+    {
+      ++tx_read_index;
+
+      // Call update task
+      UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+    }
+  }
+
+  if (notify_flag && (tx_read_index < tx_write_index))
+  {
+    // Call transmit task
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  }
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
 {
-  // Copy packet data
-  rx_packet.length = pNotification->DataTransfered.Length;
-  memcpy(rx_packet.data, pNotification->DataTransfered.pPayload,
-      pNotification->DataTransfered.Length);
+  Custom_CRS_Packet_t *packet;
 
-  // Handle the packet
-  FS_CRS_PushQueue(FS_CRS_EVENT_RX_WRITE);
+  if (rx_write_index < rx_read_index + FS_CRS_WINDOW_LENGTH)
+  {
+	packet = &rx_buffer[(rx_write_index++) % FS_CRS_WINDOW_LENGTH];
+	packet->length = pNotification->DataTransfered.Length;
+    memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
+
+	// Call update task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+  }
+  else
+  {
+    // TODO: Buffer overflow
+  }
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
 {
-  return &tx_packet;
+  Custom_CRS_Packet_t *ret = 0;
+
+  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
+  {
+	ret = &tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
+  }
+
+  return ret;
 }
 
 void Custom_CRS_SendNextTxPacket(void)
 {
-  tBleStatus res;
-
-  // Try to transmit packet data
-  SizeCrs_Tx = tx_packet.length;
-  res = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, tx_packet.data);
-
-  if (res != BLE_STATUS_SUCCESS)
+  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
   {
-    // Retry transmit operation
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_RETRY_TX_ID, CFG_SCH_PRIO_1);
-  }
-  else if (notify_flag)
-  {
-    // Check if there is another packet to send
-    FS_CRS_PushQueue(FS_CRS_EVENT_TX_READ);
+    ++tx_write_index;
+
+    if (notify_flag)
+    {
+      // Call transmit task
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+    }
   }
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
 {
-  return &rx_packet;
+  Custom_CRS_Packet_t *ret = 0;
+
+  if (rx_read_index < rx_write_index)
+  {
+	ret = &rx_buffer[(rx_read_index++) % FS_CRS_WINDOW_LENGTH];
+  }
+
+  return ret;
+}
+
+uint8_t Custom_CRS_IsConnected(void)
+{
+  return connected_flag;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

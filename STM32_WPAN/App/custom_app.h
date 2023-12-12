@@ -48,7 +48,7 @@ typedef struct
 /* USER CODE BEGIN ET */
 typedef struct
 {
-  uint8_t data[247];
+  uint8_t data[244];
   uint8_t length;
 } Custom_CRS_Packet_t;
 /* USER CODE END ET */
@@ -75,6 +75,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification);
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void);
 void Custom_CRS_SendNextTxPacket(void);
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
+uint8_t Custom_CRS_IsConnected(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus
