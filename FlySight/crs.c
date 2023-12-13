@@ -30,7 +30,7 @@
 #include "stm32_seq.h"
 
 #define QUEUE_LENGTH 4
-#define FILE_READ_LENGTH 243
+#define FILE_READ_LENGTH 242
 
 typedef enum
 {
@@ -42,6 +42,7 @@ typedef enum
 	FS_CRS_COMMAND_READ_DIR  = 0x05,
 	FS_CRS_COMMAND_FILE_DATA = 0x10,
 	FS_CRS_COMMAND_FILE_INFO = 0x11,
+	FS_CRS_COMMAND_FILE_ACK  = 0x12,
 	FS_CRS_COMMAND_CANCEL    = 0xff
 } FS_CRS_Command_t;
 
@@ -74,11 +75,15 @@ static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 static FS_CRS_State_t state = FS_CRS_STATE_IDLE;
 
 static FIL file;
-static uint8_t buffer[FILE_READ_LENGTH];
+static uint8_t buffer[FILE_READ_LENGTH + 1];
 static DIR dir;
 
 static uint32_t read_stride;
 static uint32_t read_pos;
+
+static uint32_t next_packet;
+static uint32_t next_ack;
+static uint32_t last_packet;
 
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
@@ -142,6 +147,11 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 					// Initialize read stride and position
 					read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
 					read_pos = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
+
+					// Initialize flow control
+					next_packet = 0;
+					next_ack = 0;
+					last_packet = -1;
 
 					if (f_lseek(&file, read_pos) == FR_OK)
 					{
@@ -228,7 +238,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 
 	while ((next_state == FS_CRS_STATE_DIR) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
-		if (packet->length > 0)
+		if (packet->length >= 1)
 		{
 			// Handle commands
 			switch (packet->data[0])
@@ -289,7 +299,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 
 	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
-		if (packet->length > 0)
+		if (packet->length >= 1)
 		{
 			// Handle commands
 			switch (packet->data[0])
@@ -297,20 +307,33 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			case FS_CRS_COMMAND_CANCEL:
 				next_state = FS_CRS_STATE_IDLE;
 				break;
+			case FS_CRS_COMMAND_FILE_ACK:
+				if (packet->length >= 2)
+				{
+					if (packet->data[1] == (next_ack & 0xff))
+					{
+						++next_ack;
+					}
+				}
+				break;
 			}
 		}
 	}
 
-	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextTxPacket()))
+	while ((next_state == FS_CRS_STATE_READ) &&
+			(packet = Custom_CRS_GetNextTxPacket()) &&
+			(next_packet < next_ack + FS_CRS_WINDOW_LENGTH) &&
+			(next_packet < last_packet))
 	{
+		buffer[0] = (next_packet & 0xff);
+
 		if (f_eof(&file))
 		{
 			// Send empty buffer to signal end of file
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, 0);
-
-			next_state = FS_CRS_STATE_IDLE;
+			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, 1);
+			last_packet = ++next_packet;
 		}
-		else if (f_read(&file, buffer, FILE_READ_LENGTH, &br) == FR_OK)
+		else if (f_read(&file, &buffer[1], FILE_READ_LENGTH, &br) == FR_OK)
 		{
 			if (read_stride > FILE_READ_LENGTH)
 			{
@@ -319,12 +342,18 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			}
 
 			// Send data
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, br);
+			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, br + 1);
+			++next_packet;
 		}
 		else
 		{
 			next_state = FS_CRS_STATE_IDLE;
 		}
+	}
+
+	if (next_ack == last_packet)
+	{
+		next_state = FS_CRS_STATE_IDLE;
 	}
 
 	if (next_state == FS_CRS_STATE_IDLE)
@@ -352,13 +381,13 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 
 	while ((next_state == FS_CRS_STATE_WRITE) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
-		if (packet->length > 0)
+		if (packet->length >= 1)
 		{
 			// Handle commands
 			switch (packet->data[0])
 			{
 			case FS_CRS_COMMAND_FILE_DATA:
-				if (packet->length > 1)
+				if (packet->length >= 2)
 				{
 					f_write(&file, &packet->data[1], packet->length - 1, &bw);
 				}

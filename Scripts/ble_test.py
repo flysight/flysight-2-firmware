@@ -25,27 +25,27 @@ ble_adapter = None
 
 async def mkdir(address, directory_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
-        await client.write_gatt_char(CRS_RX_UUID, b'\x04' + directory_name.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x04' + directory_name.encode(), response=False)
 
 async def create_file(address, file_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
-        await client.write_gatt_char(CRS_RX_UUID, b'\x00' + file_name.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x00' + file_name.encode(), response=False)
 
 async def delete_file(address, file_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
-        await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode(), response=False)
 
 async def write_file(address, local_filename, remote_filename):
     async with BleakClient(address, adapter=ble_adapter) as client:
         with open(local_filename, "rb") as f:
             data = f.read()
 
-        await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode(), response=False)
 
         with tqdm(desc="Sending Bytes", unit="B", unit_scale=True) as pbar:
             for i in range(0, len(data), 243):
                 chunk = data[i:i+243]
-                await client.write_gatt_char(CRS_RX_UUID, b'\x10' + chunk)
+                await client.write_gatt_char(CRS_RX_UUID, b'\x10' + chunk, response=False)
                 pbar.update(len(chunk))
 
         # Sending packet to signal completion
@@ -57,27 +57,33 @@ async def read_file(address, offset, stride, remote_filename, local_filename, ti
             file_data = bytearray()
             transfer_complete = asyncio.Event()
             packet_received = asyncio.Event()
+            next_packet_num = 0
 
-            def file_notification_handler(sender, data):
-                nonlocal file_data
+            async def file_notification_handler(sender, data):
+                nonlocal file_data, packet_received, next_packet_num
                 if data[0] == 0x10:
-                    if len(data) > 1:
-                        file_data.extend(data[1:])
-                        pbar.update(len(data)-1)  # Update the progress bar with the number of bytes received
-                    else:
-                        # Signal that the transfer is complete
-                        transfer_complete.set()
-                    packet_received.set()
+                    packet_num = int.from_bytes(data[1:2], byteorder='little')
+                    if packet_num == (next_packet_num & 0xff):
+                        if len(data) > 2:
+                            file_data.extend(data[2:])
+                            pbar.update(len(data)-2)  # Update the progress bar with the number of bytes received
+                        else:
+                            transfer_complete.set()
+                            
+                        next_packet_num += 1
+                        ack_packet = b'\x12' + packet_num.to_bytes(1, byteorder='little')
+                        await client.write_gatt_char(CRS_RX_UUID, ack_packet, response=False)
+                        packet_received.set()
 
             await client.start_notify(CRS_TX_UUID, file_notification_handler)
             offset_bytes = offset.to_bytes(4, byteorder='little')
             stride_bytes = stride.to_bytes(4, byteorder='little')
-            await client.write_gatt_char(CRS_RX_UUID, b'\x02' + offset_bytes + stride_bytes + remote_filename.encode())
+            await client.write_gatt_char(CRS_RX_UUID, b'\x02' + offset_bytes + stride_bytes + remote_filename.encode(), response=False)
 
             try:
                 while not transfer_complete.is_set():
                     packet_received.clear()
-                    await asyncio.wait_for(packet_received.wait(), 5)  # 5-second timeout for each packet
+                    await asyncio.wait_for(packet_received.wait(), timeout)  # timeout for each packet
             except asyncio.TimeoutError:
                 print(f"Timeout: No data received for {timeout} seconds.")
                 return
@@ -131,7 +137,7 @@ async def notification_handler(sender, data):
 async def list_directory(address, directory):
     async with BleakClient(address, adapter=ble_adapter) as client:
         await client.start_notify(CRS_TX_UUID, notification_handler)
-        await client.write_gatt_char(CRS_RX_UUID, b'\x05' + directory.encode())
+        await client.write_gatt_char(CRS_RX_UUID, b'\x05' + directory.encode(), response=False)
         await asyncio.sleep(5)  # Wait for notifications
         await client.stop_notify(CRS_TX_UUID)
 
