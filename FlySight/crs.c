@@ -32,6 +32,9 @@
 #define QUEUE_LENGTH 4
 #define FILE_READ_LENGTH 242
 
+#define TIMEOUT_MSEC  100
+#define TIMEOUT_TICKS (TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
+
 typedef enum
 {
 	FS_CRS_COMMAND_CREATE    = 0x00,
@@ -78,12 +81,16 @@ static FIL file;
 static uint8_t buffer[FILE_READ_LENGTH + 1];
 static DIR dir;
 
+static uint32_t read_offset;
 static uint32_t read_stride;
 static uint32_t read_pos;
 
 static uint32_t next_packet;
 static uint32_t next_ack;
 static uint32_t last_packet;
+
+static uint8_t ack_timer_id;
+static volatile uint8_t timeout_flag;
 
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
@@ -145,13 +152,18 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				if (f_open(&file, (TCHAR *) &(packet->data[9]), FA_READ) == FR_OK)
 				{
 					// Initialize read stride and position
+					read_offset = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
 					read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
-					read_pos = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
+					read_pos = read_offset;
 
 					// Initialize flow control
 					next_packet = 0;
 					next_ack = 0;
 					last_packet = -1;
+
+					// Start timeout timer
+					HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
+					timeout_flag = 0;
 
 					if (f_lseek(&file, read_pos) == FR_OK)
 					{
@@ -297,6 +309,18 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 		next_state = FS_CRS_STATE_IDLE;
 	}
 
+	if (timeout_flag)
+	{
+		next_packet = next_ack;
+		timeout_flag = 0;
+
+		read_pos = read_offset + next_packet * read_stride;
+		f_lseek(&file, read_pos);
+
+		// Reset timeout timer
+		HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
+	}
+
 	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
 		if (packet->length >= 1)
@@ -313,6 +337,9 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 					if (packet->data[1] == (next_ack & 0xff))
 					{
 						++next_ack;
+
+						// Reset timeout timer
+						HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
 					}
 				}
 				break;
@@ -358,6 +385,9 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
+		// Stop timeout timer
+		HW_TS_Stop(ack_timer_id);
+
 		// Close file
 		f_close(&file);
 
@@ -420,8 +450,19 @@ static void FS_CRS_Update(void)
 	state = state_table[state]();
 }
 
+static void FS_CRS_Timeout(void)
+{
+	timeout_flag = 1;
+
+	// Call update task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+}
+
 void FS_CRS_Init(void)
 {
 	// Initialize CRS task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, UTIL_SEQ_RFU, FS_CRS_Update);
+
+	// Initialize timeout timer
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &ack_timer_id, hw_ts_SingleShot, FS_CRS_Timeout);
 }
