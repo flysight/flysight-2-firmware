@@ -81,6 +81,7 @@ static uint16_t rx_read_index, rx_write_index;
 
 static uint8_t notify_flag;
 static uint8_t connected_flag = 0;
+static uint8_t tx_busy_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
@@ -96,6 +97,7 @@ static void Custom_CRS_OnConnect(void);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnTxRead(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
+static void Custom_CRS_Transmit(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -188,7 +190,7 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
   // Register retry transmit task
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_OnTxRead);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -269,23 +271,7 @@ static void Custom_CRS_OnDisconnect(void)
 
 static void Custom_CRS_OnTxRead(void)
 {
-  Custom_CRS_Packet_t *packet;
-
-  if (tx_read_index < tx_write_index)
-  {
-    packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
-    SizeCrs_Tx = packet->length;
-
-    if (Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data) == BLE_STATUS_SUCCESS)
-    {
-      ++tx_read_index;
-
-      // Call update task
-      UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-    }
-  }
-
-  if (notify_flag && (tx_read_index < tx_write_index))
+  if (!tx_busy_flag)
   {
     // Call transmit task
     UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
@@ -311,6 +297,40 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   }
 }
 
+static void Custom_CRS_Transmit(void)
+{
+  Custom_CRS_Packet_t *packet;
+
+  tx_busy_flag = 1;
+
+  if (tx_read_index < tx_write_index)
+  {
+	packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
+	SizeCrs_Tx = packet->length;
+
+	if (Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data) == BLE_STATUS_SUCCESS)
+	{
+	  ++tx_read_index;
+
+	  // Call update task
+	  UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+	}
+	else if (!notify_flag)
+	{
+      // Call transmit task
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+	}
+  }
+
+  if (notify_flag && (tx_read_index < tx_write_index))
+  {
+	// Call transmit task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  }
+
+  tx_busy_flag = 0;
+}
+
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
 {
   Custom_CRS_Packet_t *ret = 0;
@@ -329,7 +349,7 @@ void Custom_CRS_SendNextTxPacket(void)
   {
     ++tx_write_index;
 
-    if (notify_flag)
+    if (notify_flag && !tx_busy_flag)
     {
       // Call transmit task
       UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
