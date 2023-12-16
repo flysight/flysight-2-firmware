@@ -447,7 +447,7 @@
 /**
  * Select UART interfaces
  */
-#define CFG_DEBUG_TRACE_UART    0
+#define CFG_DEBUG_TRACE_UART    hw_lpuart1
 #define CFG_CONSOLE_MENU        0
 /******************************************************************************
  * USB interface
