@@ -5,6 +5,7 @@ from bleak import BleakScanner, BleakClient
 from struct import unpack
 from datetime import datetime
 from tqdm import tqdm
+import random
 
 # UUIDs for the CRS characteristics
 CRS_RX_UUID = "00000002-8e22-4541-9d4c-21edae82ed19"
@@ -23,6 +24,12 @@ attrib_description = {
 #ble_adapter = 'hci0'
 ble_adapter = None
 
+# Flow control parameters
+WINDOW_LENGTH = 8
+FRAME_LENGTH = 242
+TX_TIMEOUT = 0.1
+RX_TIMEOUT = 1
+
 async def mkdir(address, directory_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
         await client.write_gatt_char(CRS_RX_UUID, b'\x04' + directory_name.encode(), response=False)
@@ -36,22 +43,60 @@ async def delete_file(address, file_name):
         await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode(), response=False)
 
 async def write_file(address, local_filename, remote_filename):
-    async with BleakClient(address, adapter=ble_adapter) as client:
-        with open(local_filename, "rb") as f:
-            data = f.read()
+    with tqdm(desc="Sending Bytes", unit="B", unit_scale=True) as pbar:
+        async with BleakClient(address, adapter=ble_adapter) as client:
+            with open(local_filename, "rb") as f:
+                data = f.read()
 
-        await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode(), response=False)
+            next_packet_num = 0
+            next_ack_num = 0
+            last_packet_num = -1
+            next_ack_bytes = 0
+            ack_received = asyncio.Event()
 
-        with tqdm(desc="Sending Bytes", unit="B", unit_scale=True) as pbar:
-            for i in range(0, len(data), 243):
-                chunk = data[i:i+243]
-                await client.write_gatt_char(CRS_RX_UUID, b'\x10' + chunk, response=False)
-                pbar.update(len(chunk))
+            def file_notification_handler(sender, data):
+                nonlocal next_ack_num, next_ack_bytes, ack_received
+                if data[0] == 0x12:
+                    ack_num = int.from_bytes(data[1:2], byteorder='little', signed=False)
+                    print(f'Received ack_num={ack_num}; next_ack_num={next_ack_num}')
+                    if ack_num == (next_ack_num & 0xff):
+                        next_ack_num = next_ack_num + 1
+                        ack_received.set()
+                        pbar.update(next_ack_bytes)  # Update progress bar based on acknowledged bytes
 
-        # Sending packet to signal completion
-        await client.write_gatt_char(CRS_RX_UUID, b'\x10')
+            await client.start_notify(CRS_TX_UUID, file_notification_handler)
+            await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode())
 
-async def read_file(address, offset, stride, remote_filename, local_filename, timeout=1):
+            while next_ack_num != last_packet_num:
+                while (next_packet_num < next_ack_num + WINDOW_LENGTH) and (next_packet_num != last_packet_num):
+                    # Read from file
+                    i = next_packet_num * FRAME_LENGTH
+                    next_packet_num_bytes = (next_packet_num & 0xff).to_bytes(1, byteorder='little')
+                    print(f'next_packet_num_bytes={next_packet_num_bytes}')
+                    if i < len(data):
+                        chunk = data[i:i+FRAME_LENGTH]
+                        next_ack_bytes = len(chunk)
+                        await client.write_gatt_char(CRS_RX_UUID, b'\x10' + next_packet_num_bytes + chunk, response=False)
+                        print(f'Transmitted next_packet_num_bytes={next_packet_num_bytes}')
+                    else:
+                        next_ack_bytes = 0
+                        await client.write_gatt_char(CRS_RX_UUID, b'\x10' + next_packet_num_bytes, response=False)
+                        print(f'Transmitted packet_num={next_packet_num}')
+                        last_packet_num = next_packet_num + 1;
+
+                    next_packet_num += 1
+
+                try:
+                    await asyncio.wait_for(ack_received.wait(), TX_TIMEOUT)
+                    ack_received.clear()
+                except asyncio.TimeoutError:
+                    next_packet_num = next_ack_num
+                    print(f"Timeout: No ack received for {TX_TIMEOUT} seconds.")
+                    print(f'next_packet_num={next_packet_num}; next_ack_num={next_ack_num}; last_packet_num={last_packet_num}')
+
+            await client.stop_notify(CRS_TX_UUID)
+
+async def read_file(address, offset, stride, remote_filename, local_filename):
     with tqdm(desc="Receiving Bytes", unit="B", unit_scale=True) as pbar:
         async with BleakClient(address, adapter=ble_adapter) as client:
             file_data = bytearray()
@@ -63,13 +108,13 @@ async def read_file(address, offset, stride, remote_filename, local_filename, ti
                 nonlocal file_data, packet_received, next_packet_num
                 if data[0] == 0x10:
                     packet_num = int.from_bytes(data[1:2], byteorder='little')
-                    if packet_num == (next_packet_num & 0xff):
+                    if (packet_num == (next_packet_num & 0xff)) and (random.random() >= 0.3):
                         if len(data) > 2:
                             file_data.extend(data[2:])
                             pbar.update(len(data)-2)  # Update the progress bar with the number of bytes received
                         else:
                             transfer_complete.set()
-                            
+
                         next_packet_num += 1
                         ack_packet = b'\x12' + packet_num.to_bytes(1, byteorder='little')
                         await client.write_gatt_char(CRS_RX_UUID, ack_packet, response=False)
@@ -83,9 +128,9 @@ async def read_file(address, offset, stride, remote_filename, local_filename, ti
             try:
                 while not transfer_complete.is_set():
                     packet_received.clear()
-                    await asyncio.wait_for(packet_received.wait(), timeout)  # timeout for each packet
+                    await asyncio.wait_for(packet_received.wait(), RX_TIMEOUT)  # timeout for each packet
             except asyncio.TimeoutError:
-                print(f"Timeout: No data received for {timeout} seconds.")
+                print(f"Timeout: No data received for {RX_TIMEOUT} seconds.")
                 return
 
             await client.stop_notify(CRS_TX_UUID)

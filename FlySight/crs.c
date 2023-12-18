@@ -29,11 +29,15 @@
 #include "resource_manager.h"
 #include "stm32_seq.h"
 
-#define QUEUE_LENGTH 4
-#define FILE_READ_LENGTH 242
+#include <stdlib.h>
 
-#define TIMEOUT_MSEC  100
-#define TIMEOUT_TICKS (TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
+#define FRAME_LENGTH 242
+
+#define TX_TIMEOUT_MSEC  100
+#define TX_TIMEOUT_TICKS (TX_TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
+
+#define RX_TIMEOUT_MSEC  1000
+#define RX_TIMEOUT_TICKS (RX_TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 
 typedef enum
 {
@@ -78,7 +82,7 @@ static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 static FS_CRS_State_t state = FS_CRS_STATE_IDLE;
 
 static FIL file;
-static uint8_t buffer[FILE_READ_LENGTH + 1];
+static uint8_t buffer[FRAME_LENGTH + 1];
 static DIR dir;
 
 static uint32_t read_offset;
@@ -152,8 +156,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				if (f_open(&file, (TCHAR *) &(packet->data[9]), FA_READ) == FR_OK)
 				{
 					// Initialize read stride and position
-					read_offset = *((uint32_t *) &(packet->data[1])) * FILE_READ_LENGTH;
-					read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FILE_READ_LENGTH;
+					read_offset = *((uint32_t *) &(packet->data[1])) * FRAME_LENGTH;
+					read_stride = (*((uint32_t *) &(packet->data[5])) + 1) * FRAME_LENGTH;
 					read_pos = read_offset;
 
 					// Initialize flow control
@@ -162,7 +166,7 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 					last_packet = -1;
 
 					// Start timeout timer
-					HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
+					HW_TS_Start(ack_timer_id, TX_TIMEOUT_TICKS);
 					timeout_flag = 0;
 
 					if (f_lseek(&file, read_pos) == FR_OK)
@@ -190,6 +194,13 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				// Open file
 				if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE) == FR_OK)
 				{
+					// Initialize flow control
+					next_packet = 0;
+
+					// Start timeout timer
+					HW_TS_Start(ack_timer_id, RX_TIMEOUT_TICKS);
+					timeout_flag = 0;
+
 					next_state = FS_CRS_STATE_WRITE;
 				}
 
@@ -318,7 +329,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 		f_lseek(&file, read_pos);
 
 		// Reset timeout timer
-		HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
+		HW_TS_Start(ack_timer_id, TX_TIMEOUT_TICKS);
 	}
 
 	while ((next_state == FS_CRS_STATE_READ) && (packet = Custom_CRS_GetNextRxPacket()))
@@ -339,7 +350,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 						++next_ack;
 
 						// Reset timeout timer
-						HW_TS_Start(ack_timer_id, TIMEOUT_TICKS);
+						HW_TS_Start(ack_timer_id, TX_TIMEOUT_TICKS);
 					}
 				}
 				break;
@@ -360,9 +371,9 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, 1);
 			last_packet = ++next_packet;
 		}
-		else if (f_read(&file, &buffer[1], FILE_READ_LENGTH, &br) == FR_OK)
+		else if (f_read(&file, &buffer[1], FRAME_LENGTH, &br) == FR_OK)
 		{
-			if (read_stride > FILE_READ_LENGTH)
+			if (read_stride > FRAME_LENGTH)
 			{
 				read_pos += read_stride;
 				f_lseek(&file, read_pos);
@@ -409,6 +420,11 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 		next_state = FS_CRS_STATE_IDLE;
 	}
 
+	if (timeout_flag)
+	{
+		next_state = FS_CRS_STATE_IDLE;
+	}
+
 	while ((next_state == FS_CRS_STATE_WRITE) && (packet = Custom_CRS_GetNextRxPacket()))
 	{
 		if (packet->length >= 1)
@@ -419,11 +435,23 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 			case FS_CRS_COMMAND_FILE_DATA:
 				if (packet->length >= 2)
 				{
-					f_write(&file, &packet->data[1], packet->length - 1, &bw);
-				}
-				else
-				{
-					next_state = FS_CRS_STATE_IDLE;
+					if (packet->data[1] == (next_packet & 0xff))
+					{
+						if (rand() % 100 >= 30)
+						{
+							f_write(&file, &packet->data[1], packet->length - 1, &bw);
+							FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_ACK, &packet->data[1], 1);
+							++next_packet;
+
+							// Reset timeout timer
+							HW_TS_Start(ack_timer_id, RX_TIMEOUT_TICKS);
+						}
+					}
+
+					if (packet->length == 2)
+					{
+						next_state = FS_CRS_STATE_IDLE;
+					}
 				}
 				break;
 			case FS_CRS_COMMAND_CANCEL:
@@ -435,6 +463,9 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 
 	if (next_state == FS_CRS_STATE_IDLE)
 	{
+		// Stop timeout timer
+		HW_TS_Stop(ack_timer_id);
+
 		// Close file
 		f_close(&file);
 
