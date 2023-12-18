@@ -38,7 +38,7 @@ typedef struct
   /* CRS */
   uint8_t               Crs_tx_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
-
+  uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
 
   uint16_t              ConnectionHandle;
@@ -74,14 +74,12 @@ uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
 static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH];
-static uint16_t tx_read_index, tx_write_index;
+static uint32_t tx_read_index, tx_write_index;
 
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH];
-static uint16_t rx_read_index, rx_write_index;
+static uint32_t rx_read_index, rx_write_index;
 
-static uint8_t notify_flag;
 static uint8_t connected_flag = 0;
-static uint8_t tx_busy_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
@@ -95,7 +93,6 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
 static void Custom_CRS_OnDisconnect(void);
-static void Custom_CRS_OnTxRead(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 /* USER CODE END PFP */
@@ -113,22 +110,23 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* USER CODE END CUSTOM_STM_App_Notification_Custom_Evt_Opcode */
 
     /* CRS */
-    case CUSTOM_STM_CRS_TX_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_READ_EVT */
-      Custom_CRS_OnTxRead();
-      /* USER CODE END CUSTOM_STM_CRS_TX_READ_EVT */
-      break;
-
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
-      notify_flag = 1;
+      Custom_App_Context.Crs_tx_Notification_Status = 1;
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_0);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
     case CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
-      notify_flag = 0;
+      Custom_App_Context.Crs_tx_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_CRS_RX_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_CRS_RX_READ_EVT */
       break;
 
     case CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT:
@@ -189,14 +187,20 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  // Register retry transmit task
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
+
+  Custom_App_Context.Crs_tx_Notification_Status = 0;
+  Custom_App_Context.Crs_tx_Flow_Status = 1;
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
 
 /* USER CODE BEGIN FD */
-
+void Custom_APP_TxPoolAvailableNotification(void)
+{
+  Custom_App_Context.Crs_tx_Flow_Status = 1;
+  UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+}
 /* USER CODE END FD */
 
 /*************************************************************
@@ -256,7 +260,6 @@ static void Custom_CRS_OnConnect(void)
   rx_write_index = 0;
 
   // Update state
-  notify_flag = 0;
   connected_flag = 1;
 }
 
@@ -267,15 +270,6 @@ static void Custom_CRS_OnDisconnect(void)
 
   // Call update task
   UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-}
-
-static void Custom_CRS_OnTxRead(void)
-{
-  if (!tx_busy_flag)
-  {
-    // Call transmit task
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-  }
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)
@@ -293,42 +287,33 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   }
   else
   {
-    // TODO: Buffer overflow
+    APP_DBG_MSG("Custom_CRS_OnRxWrite: buffer overflow\n");
   }
 }
 
 static void Custom_CRS_Transmit(void)
 {
   Custom_CRS_Packet_t *packet;
+  tBleStatus status = BLE_STATUS_INVALID_PARAMS;
 
-  tx_busy_flag = 1;
-
-  if (tx_read_index < tx_write_index)
+  if ((tx_read_index < tx_write_index)
+      && Custom_App_Context.Crs_tx_Notification_Status
+      && Custom_App_Context.Crs_tx_Flow_Status)
   {
 	packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
 	SizeCrs_Tx = packet->length;
 
-	if (Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data) == BLE_STATUS_SUCCESS)
+	status = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
+	if (status == BLE_STATUS_INSUFFICIENT_RESOURCES)
 	{
-	  ++tx_read_index;
-
-	  // Call update task
-	  UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+      Custom_App_Context.Crs_tx_Flow_Status = 0;
 	}
-	else if (!notify_flag)
+	else
 	{
-      // Call transmit task
+      ++tx_read_index;
       UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
   }
-
-  if (notify_flag && (tx_read_index < tx_write_index))
-  {
-	// Call transmit task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-  }
-
-  tx_busy_flag = 0;
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
@@ -348,12 +333,11 @@ void Custom_CRS_SendNextTxPacket(void)
   if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
   {
     ++tx_write_index;
-
-    if (notify_flag && !tx_busy_flag)
-    {
-      // Call transmit task
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-    }
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  }
+  else
+  {
+    APP_DBG_MSG("Custom_CRS_SendNextTxPacket: buffer overflow\n");
   }
 }
 

@@ -129,7 +129,6 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
   hci_event_pckt *event_pckt;
   evt_blecore_aci *blecore_evt;
   aci_gatt_attribute_modified_event_rp0 *attribute_modified;
-  aci_gatt_read_permit_req_event_rp0    *read_req;
   Custom_STM_App_Notification_evt_t     Notification;
   /* USER CODE BEGIN Custom_STM_Event_Handler_1 */
 
@@ -212,19 +211,6 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
           /* USER CODE BEGIN EVT_BLUE_GATT_READ_PERMIT_REQ_BEGIN */
 
           /* USER CODE END EVT_BLUE_GATT_READ_PERMIT_REQ_BEGIN */
-          read_req = (aci_gatt_read_permit_req_event_rp0*)blecore_evt->data;
-          if (read_req->Attribute_Handle == (CustomContext.CustomCrs_TxHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
-          {
-            return_value = SVCCTL_EvtAckFlowEnable;
-            /*USER CODE BEGIN CUSTOM_STM_Service_1_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
-            Notification.Custom_Evt_Opcode = CUSTOM_STM_CRS_TX_READ_EVT;
-            Custom_STM_App_Notification(&Notification);
-            /*USER CODE END CUSTOM_STM_Service_1_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
-            aci_gatt_allow_read(read_req->Connection_Handle);
-            /*USER CODE BEGIN CUSTOM_STM_Service_1_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
-
-            /*USER CODE END CUSTOM_STM_Service_1_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
-          } /* if (read_req->Attribute_Handle == (CustomContext.CustomCrs_TxHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
           /* USER CODE BEGIN EVT_BLUE_GATT_READ_PERMIT_REQ_END */
 
           /* USER CODE END EVT_BLUE_GATT_READ_PERMIT_REQ_END */
@@ -335,9 +321,9 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomCrsHdle,
                           UUID_TYPE_128, &uuid,
                           SizeCrs_Tx,
-                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          CHAR_PROP_NOTIFY,
                           ATTR_PERMISSION_NONE,
-                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          GATT_DONT_NOTIFY_EVENTS,
                           0x10,
                           CHAR_VALUE_LEN_VARIABLE,
                           &(CustomContext.CustomCrs_TxHdle));
@@ -361,7 +347,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomCrsHdle,
                           UUID_TYPE_128, &uuid,
                           SizeCrs_Rx,
-                          CHAR_PROP_WRITE_WITHOUT_RESP,
+                          CHAR_PROP_READ | CHAR_PROP_WRITE_WITHOUT_RESP,
                           ATTR_PERMISSION_NONE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,

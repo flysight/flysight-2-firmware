@@ -25,18 +25,22 @@
 #include "app_common.h"
 #include "crs.h"
 #include "custom_app.h"
+#include "dbg_trace.h"
 #include "ff.h"
 #include "resource_manager.h"
 #include "stm32_seq.h"
 
 #include <stdlib.h>
 
+/* Uncomment the following to inject errors into the transmission */
+/* #define TEST_MODE */
+
 #define FRAME_LENGTH 242
 
 #define TX_TIMEOUT_MSEC  100
 #define TX_TIMEOUT_TICKS (TX_TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 
-#define RX_TIMEOUT_MSEC  1000
+#define RX_TIMEOUT_MSEC  10000
 #define RX_TIMEOUT_TICKS (RX_TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 
 typedef enum
@@ -435,17 +439,18 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 			case FS_CRS_COMMAND_FILE_DATA:
 				if (packet->length >= 2)
 				{
+#ifdef TEST_MODE
+					if ((packet->data[1] == (next_packet & 0xff)) && (rand() % 100 >= 30))
+#else
 					if (packet->data[1] == (next_packet & 0xff))
+#endif
 					{
-						if (rand() % 100 >= 30)
-						{
-							f_write(&file, &packet->data[1], packet->length - 1, &bw);
-							FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_ACK, &packet->data[1], 1);
-							++next_packet;
+						f_write(&file, &packet->data[1], packet->length - 1, &bw);
+						FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_ACK, &packet->data[1], 1);
+						++next_packet;
 
-							// Reset timeout timer
-							HW_TS_Start(ack_timer_id, RX_TIMEOUT_TICKS);
-						}
+						// Reset timeout timer
+						HW_TS_Start(ack_timer_id, RX_TIMEOUT_TICKS);
 					}
 
 					if (packet->length == 2)

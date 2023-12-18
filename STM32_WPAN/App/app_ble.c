@@ -674,7 +674,9 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         /* PAIRING */
 
         /* USER CODE BEGIN BLUE_EVT */
-
+        case ACI_GATT_TX_POOL_AVAILABLE_VSEVT_CODE:
+          Custom_APP_TxPoolAvailableNotification();
+          break;
         /* USER CODE END BLUE_EVT */
       }
       break; /* HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE */
