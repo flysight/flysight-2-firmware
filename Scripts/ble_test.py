@@ -169,11 +169,20 @@ def parse_filinfo(data):
 
 async def list_directory(address, directory):
     async with BleakClient(address, adapter=ble_adapter) as client:
+        next_packet_num = 0
+
         async def dir_notification_handler(sender, data):
+            nonlocal next_packet_num
             if data[0] == 0x11:
-                parsed_info = parse_filinfo(data[1:])
-                if parsed_info:
-                    print(parsed_info)
+                packet_num = int.from_bytes(data[1:2], byteorder='little')
+                if (packet_num == (next_packet_num & 0xff)):
+                    parsed_info = parse_filinfo(data[2:])
+                    if parsed_info:
+                        print(parsed_info)
+                    next_packet_num += 1
+                else:
+                    print(f"Error: Dropped packet.")
+                    return
 
         await client.start_notify(CRS_TX_UUID, dir_notification_handler)
         await client.write_gatt_char(CRS_RX_UUID, b'\x05' + directory.encode(), response=False)

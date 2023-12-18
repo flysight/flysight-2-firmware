@@ -311,6 +311,9 @@ static void Custom_CRS_Transmit(void)
 	else
 	{
       ++tx_read_index;
+
+      // Call update task and transmit next packet
+      UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
       UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
   }

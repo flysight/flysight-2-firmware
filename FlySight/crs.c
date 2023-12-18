@@ -234,6 +234,9 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				// Open directory
 				if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
 				{
+					// Initialize flow control
+					next_packet = 0;
+
 					// Call update task
 					UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
 
@@ -282,13 +285,14 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 		// Read a directory item
 		if (f_readdir(&dir, &fno) == FR_OK)
 		{
-			memcpy(buffer, &fno.fsize, sizeof(fno.fsize));
-			memcpy(buffer + 4, &fno.fdate, sizeof(fno.fdate));
-			memcpy(buffer + 6, &fno.ftime, sizeof(fno.ftime));
-			buffer[8] = fno.fattrib;
-			memcpy(buffer + 9, fno.fname, sizeof(fno.fname));
+			buffer[0] = ((next_packet++) & 0xff);
+			memcpy(buffer + 1, &fno.fsize, sizeof(fno.fsize));
+			memcpy(buffer + 5, &fno.fdate, sizeof(fno.fdate));
+			memcpy(buffer + 7, &fno.ftime, sizeof(fno.ftime));
+			buffer[9] = fno.fattrib;
+			memcpy(buffer + 10, fno.fname, sizeof(fno.fname));
 
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_INFO, buffer, 22);
+			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_INFO, buffer, 23);
 
 			if (fno.fname[0] == 0)
 			{
