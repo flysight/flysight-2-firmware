@@ -31,6 +31,8 @@
 
 typedef struct
 {
+	uint32_t iTOW;     // GPS time of week             (ms)
+
 	uint16_t year;     // Year                         (1999..2099)
 	uint8_t  month;    // Month                        (1..12)
 	uint8_t  day;      // Day of month                 (1..31)

@@ -28,6 +28,7 @@
 #include "audio_control.h"
 #include "baro.h"
 #include "config.h"
+#include "custom_app.h"
 #include "gnss.h"
 #include "hum.h"
 #include "imu.h"
@@ -129,6 +130,12 @@ void FS_GNSS_DataReady_Callback(void)
 	{
 		// Save to log file
 		FS_Log_WriteGNSSData(data);
+	}
+
+	if (Custom_APP_IsConnected())
+	{
+		// Update BLE characteristic
+		Custom_GNSS_Update(data);
 	}
 
 	hasFix = (data->gpsFix == 3);

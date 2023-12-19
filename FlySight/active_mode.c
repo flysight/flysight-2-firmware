@@ -34,20 +34,16 @@
 #include "imu.h"
 #include "log.h"
 #include "mag.h"
+#include "resource_manager.h"
 #include "sensor.h"
 #include "state.h"
 #include "vbat.h"
 
-static FATFS fs;
-
-extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern ADC_HandleTypeDef hadc1;
 
 void FS_ActiveMode_Init(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-
 	/* Initialize controller */
 	FS_Control_Init();
 
@@ -55,32 +51,8 @@ void FS_ActiveMode_Init(void)
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
 
-	/* Set GNSS_SAFEBOOT_N */
-	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_SET);
-
-	/* Enable VCC */
-	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_SET);
-
-	/* Configure MMC_NCS pin */
-	HAL_GPIO_WritePin(MMC_NCS_GPIO_Port, MMC_NCS_Pin, GPIO_PIN_SET);
-
-	GPIO_InitStruct.Pin = MMC_NCS_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
-
 	/* Initialize FatFS */
-	if (MX_FATFS_Init() != APP_OK)
-	{
-		Error_Handler();
-	}
-
-	/* Enable microSD card */
-	if (f_mount(&fs, "0:/", 1) != FR_OK)
-	{
-		Error_Handler();
-	}
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 	/* Read persistent state */
 	FS_State_Init();
@@ -263,29 +235,8 @@ void FS_ActiveMode_DeInit(void)
 		FS_Log_DeInit(FS_State_Get()->temp_folder);
 	}
 
-	/* Disable microSD card */
-	if (f_mount(0, "0:/", 0) != FR_OK)
-	{
-		Error_Handler();
-	}
-
-	/* Disable FatFS */
-	if (MX_FATFS_DeInit() != APP_OK)
-	{
-		Error_Handler();
-	}
-
-	/* Disable SPI */
-	HAL_SPI_DeInit(&hspi2);
-
-	/* Disable MMC_NCS pin */
-	HAL_GPIO_DeInit(MMC_NCS_GPIO_Port, MMC_NCS_Pin);
-
-	/* Disable VCC */
-	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
-
-	/* Reset GNSS_SAFEBOOT_N */
-	HAL_GPIO_WritePin(GNSS_SAFEBOOT_N_GPIO_Port, GNSS_SAFEBOOT_N_Pin, GPIO_PIN_RESET);
+	/* De-initialize FatFS */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 
 	/* Disable charging */
 	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_SET);

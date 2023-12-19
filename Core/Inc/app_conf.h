@@ -46,15 +46,32 @@
 /**
  * Define Advertising parameters
  */
-#define CFG_ADV_BD_ADDRESS                (0x000000000000)
-#define CFG_BLE_ADDRESS_TYPE              PUBLIC_ADDR /**< Bluetooth address types defined in ble_legacy.h */
+#define CFG_ADV_BD_ADDRESS                (0x11aabbccddee)
 
-#define CFG_FAST_CONN_ADV_INTERVAL_MIN    (0x0080)   /**< 80ms */
-#define CFG_FAST_CONN_ADV_INTERVAL_MAX    (0x00A0)  /**< 100ms */
-#define CFG_LP_CONN_ADV_INTERVAL_MIN      (0x640) /**< 1s */
-#define CFG_LP_CONN_ADV_INTERVAL_MAX      (0xFA0) /**< 2.5s */
+/**
+ * Define BD_ADDR type: define proper address. Can only be GAP_PUBLIC_ADDR (0x00) or GAP_STATIC_RANDOM_ADDR (0x01)
+ */
+#define CFG_IDENTITY_ADDRESS              GAP_PUBLIC_ADDR
+
+/**
+ * Define privacy: PRIVACY_DISABLED or PRIVACY_ENABLED
+ */
+#define CFG_PRIVACY                       PRIVACY_DISABLED
+
+/**
+ * Define BLE Address Type
+ * Bluetooth address types defined in ble_legacy.h
+ * if CFG_PRIVACY equals PRIVACY_DISABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_PUBLIC_ADDR or GAP_STATIC_RANDOM_ADDR
+ * if CFG_PRIVACY equals PRIVACY_ENABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_RESOLVABLE_PRIVATE_ADDR or GAP_NON_RESOLVABLE_PRIVATE_ADDR
+ */
+#define CFG_BLE_ADDRESS_TYPE              GAP_PUBLIC_ADDR
+
+#define CFG_FAST_CONN_ADV_INTERVAL_MIN    (0x0080)      /**< 80ms */
+#define CFG_FAST_CONN_ADV_INTERVAL_MAX    (0x00A0)      /**< 100ms */
+#define CFG_LP_CONN_ADV_INTERVAL_MIN      (0x640)     /**< 1s */
+#define CFG_LP_CONN_ADV_INTERVAL_MAX      (0xFA0)     /**< 2.5s */
 #define ADV_TYPE                          ADV_IND
-#define BLE_ADDR_TYPE                     PUBLIC_ADDR
+#define BLE_ADDR_TYPE                     GAP_PUBLIC_ADDR
 #define ADV_FILTER                        NO_WHITE_LIST_USE
 
 /**
@@ -69,13 +86,13 @@
 /**
  * Define IO capabilities
  */
-#define CFG_IO_CAPABILITY_DISPLAY_ONLY       (0x00)
-#define CFG_IO_CAPABILITY_DISPLAY_YES_NO     (0x01)
-#define CFG_IO_CAPABILITY_KEYBOARD_ONLY      (0x02)
-#define CFG_IO_CAPABILITY_NO_INPUT_NO_OUTPUT (0x03)
-#define CFG_IO_CAPABILITY_KEYBOARD_DISPLAY   (0x04)
+#define CFG_IO_CAPABILITY_DISPLAY_ONLY        (0x00)
+#define CFG_IO_CAPABILITY_DISPLAY_YES_NO      (0x01)
+#define CFG_IO_CAPABILITY_KEYBOARD_ONLY       (0x02)
+#define CFG_IO_CAPABILITY_NO_INPUT_NO_OUTPUT  (0x03)
+#define CFG_IO_CAPABILITY_KEYBOARD_DISPLAY    (0x04)
 
-#define CFG_IO_CAPABILITY              CFG_IO_CAPABILITY_DISPLAY_YES_NO
+#define CFG_IO_CAPABILITY                     CFG_IO_CAPABILITY_DISPLAY_YES_NO
 
 /**
  * Define MITM modes
@@ -83,7 +100,7 @@
 #define CFG_MITM_PROTECTION_NOT_REQUIRED      (0x00)
 #define CFG_MITM_PROTECTION_REQUIRED          (0x01)
 
-#define CFG_MITM_PROTECTION             CFG_MITM_PROTECTION_REQUIRED
+#define CFG_MITM_PROTECTION                   CFG_MITM_PROTECTION_REQUIRED
 
 /**
  * Define Secure Connections Support
@@ -126,14 +143,14 @@
 #define RX_2M                                           0x02
 
 /**
-*   Identity root key used to derive LTK and CSRK
+*   Identity root key used to derive IRK and DHK(Legacy)
 */
-#define CFG_BLE_IRK     {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0}
+#define CFG_BLE_IR     {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0}
 
 /**
-* Encryption root key used to derive LTK and CSRK
+* Encryption root key used to derive LTK(Legacy) and CSRK
 */
-#define CFG_BLE_ERK     {0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21, 0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21}
+#define CFG_BLE_ER     {0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21, 0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21}
 
 /**
  * SMPS supply
@@ -168,7 +185,7 @@
 
 #define L2CAP_INTERVAL_MIN              CONN_P(1000) /* 1s */
 #define L2CAP_INTERVAL_MAX              CONN_P(1000) /* 1s */
-#define L2CAP_SLAVE_LATENCY             0x0000
+#define L2CAP_PERIPHERAL_LATENCY             0x0000
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
 /* USER CODE BEGIN Specific_Parameters */
@@ -188,7 +205,7 @@
  * Maximum number of Services that can be stored in the GATT database.
  * Note that the GAP and GATT services are automatically added so this parameter should be 2 plus the number of user services
  */
-#define CFG_BLE_NUM_GATT_SERVICES   2
+#define CFG_BLE_NUM_GATT_SERVICES   8
 
 /**
  * Maximum number of Attributes
@@ -197,13 +214,13 @@
  * Note that certain characteristics and relative descriptors are added automatically during device initialization
  * so this parameters should be 9 plus the number of user Attributes
  */
-#define CFG_BLE_NUM_GATT_ATTRIBUTES 9
+#define CFG_BLE_NUM_GATT_ATTRIBUTES 68
 
 /**
  * Maximum supported ATT_MTU size
- * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS is set to 1"
+ * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_LL_ONLY flag set
  */
-#define CFG_BLE_MAX_ATT_MTU             (156)
+#define CFG_BLE_MAX_ATT_MTU             (250)
 
 /**
  * Size of the storage area for Attribute values
@@ -214,19 +231,19 @@
  *  - 2*DTM_NUM_LINK, if client configuration descriptor is used
  *  - 2, if extended properties is used
  *  The total amount of memory needed is the sum of the above quantities for each attribute.
- * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS is set to 1"
+ * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_LL_ONLY flag set
  */
 #define CFG_BLE_ATT_VALUE_ARRAY_SIZE    (1344)
 
 /**
  * Prepare Write List size in terms of number of packet
- * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS is set to 1"
+ * This parameter is ignored by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_LL_ONLY flag set
  */
 #define CFG_BLE_PREPARE_WRITE_LIST_SIZE         BLE_PREP_WRITE_X_ATT(CFG_BLE_MAX_ATT_MTU)
 
 /**
  * Number of allocated memory blocks
- * This parameter is overwritten by the CPU2 with an hardcoded optimal value when the parameter when CFG_BLE_OPTIONS is set to 1
+ * This parameter is overwritten by the CPU2 with an hardcoded optimal value when the parameter CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_LL_ONLY flag set
  */
 #define CFG_BLE_MBLOCK_COUNT            (BLE_MBLOCKS_CALC(CFG_BLE_PREPARE_WRITE_LIST_SIZE, CFG_BLE_MAX_ATT_MTU, CFG_BLE_NUM_LINK))
 
@@ -236,12 +253,12 @@
 #define CFG_BLE_DATA_LENGTH_EXTENSION   1
 
 /**
- * Sleep clock accuracy in Slave mode (ppm value)
+ * Sleep clock accuracy in Peripheral mode (ppm value)
  */
-#define CFG_BLE_SLAVE_SCA   500
+#define CFG_BLE_PERIPHERAL_SCA   500
 
 /**
- * Sleep clock accuracy in Master mode
+ * Sleep clock accuracy in Central mode
  * 0 : 251 ppm to 500 ppm
  * 1 : 151 ppm to 250 ppm
  * 2 : 101 ppm to 150 ppm
@@ -251,14 +268,20 @@
  * 6 : 21 ppm to 30 ppm
  * 7 : 0 ppm to 20 ppm
  */
-#define CFG_BLE_MASTER_SCA   0
+#define CFG_BLE_CENTRAL_SCA   0
 
 /**
- *  Source for the low speed clock for RF wake-up
- *  1 : external high speed crystal HSE/32/32
- *  0 : external low speed crystal ( no calibration )
+ * LsSource
+ * Some information for Low speed clock mapped in bits field
+ * - bit 0:   1: Calibration for the RF system wakeup clock source   0: No calibration for the RF system wakeup clock source
+ * - bit 1:   1: STM32WB5M Module device                             0: Other devices as STM32WBxx SOC, STM32WB1M module
+ * - bit 2:   1: HSE/1024 Clock config                               0: LSE Clock config
  */
-#define CFG_BLE_LSE_SOURCE  0
+#if defined(STM32WB5Mxx)
+  #define CFG_BLE_LS_SOURCE  (SHCI_C2_BLE_INIT_CFG_BLE_LS_NOCALIB | SHCI_C2_BLE_INIT_CFG_BLE_LS_MOD5MM_DEV | SHCI_C2_BLE_INIT_CFG_BLE_LS_CLK_LSE)
+#else
+  #define CFG_BLE_LS_SOURCE  (SHCI_C2_BLE_INIT_CFG_BLE_LS_NOCALIB | SHCI_C2_BLE_INIT_CFG_BLE_LS_OTHER_DEV | SHCI_C2_BLE_INIT_CFG_BLE_LS_CLK_LSE)
+#endif
 
 /**
  * Start up time of the high speed (16 or 32 MHz) crystal oscillator in units of 625/256 us (~2.44 us)
@@ -266,7 +289,7 @@
 #define CFG_BLE_HSE_STARTUP_TIME  0x148
 
 /**
- * Maximum duration of the connection event when the device is in Slave mode in units of 625/256 us (~2.44 us)
+ * Maximum duration of the connection event when the device is in Peripheral mode in units of 625/256 us (~2.44 us)
  */
 #define CFG_BLE_MAX_CONN_EVENT_LENGTH  (0xFFFFFFFF)
 
@@ -289,6 +312,10 @@
  * - SHCI_C2_BLE_INIT_OPTIONS_NO_EXT_ADV
  * - SHCI_C2_BLE_INIT_OPTIONS_CS_ALGO2
  * - SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2
+ * - SHCI_C2_BLE_INIT_OPTIONS_REDUC_GATTDB_NVM
+ * - SHCI_C2_BLE_INIT_OPTIONS_FULL_GATTDB_NVM
+ * - SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_USED
+ * - SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_NOTUSED
  * - SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_1
  * - SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3
  * which are used to set following configuration bits:
@@ -298,15 +325,34 @@
  *          0: with service change desc.
  * (bit 2): 1: device name Read-Only
  *          0: device name R/W
- * (bit 3): 1: extended advertizing supported       [NOT SUPPORTED]
- *          0: extended advertizing not supported   [NOT SUPPORTED]
+ * (bit 3): 1: extended advertizing supported
+ *          0: extended advertizing not supported
  * (bit 4): 1: CS Algo #2 supported
  *          0: CS Algo #2 not supported
+ * (bit 5): 1: Reduced GATT database in NVM
+ *          0: Full GATT database in NVM
+ * (bit 6): 1: GATT caching is used
+ *          0: GATT caching is not used
  * (bit 7): 1: LE Power Class 1
  *          0: LE Power Class 2-3
+ * other bits: complete with Options_extension flag
+ */
+#define CFG_BLE_OPTIONS  (SHCI_C2_BLE_INIT_OPTIONS_LL_HOST | SHCI_C2_BLE_INIT_OPTIONS_WITH_SVC_CHANGE_DESC | SHCI_C2_BLE_INIT_OPTIONS_DEVICE_NAME_RW | SHCI_C2_BLE_INIT_OPTIONS_NO_EXT_ADV | SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2 | SHCI_C2_BLE_INIT_OPTIONS_FULL_GATTDB_NVM | SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_NOTUSED | SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3)
+
+/**
+ * BLE stack Options_extension flags to be configured with:
+ * - SHCI_C2_BLE_INIT_OPTIONS_APPEARANCE_WRITABLE
+ * - SHCI_C2_BLE_INIT_OPTIONS_APPEARANCE_READONLY
+ * - SHCI_C2_BLE_INIT_OPTIONS_ENHANCED_ATT_SUPPORTED
+ * - SHCI_C2_BLE_INIT_OPTIONS_ENHANCED_ATT_NOTSUPPORTED
+ * which are used to set following configuration bits:
+ * (bit 0): 1: appearance Writable
+ *          0: appearance Read-Only
+ * (bit 1): 1: Enhanced ATT supported
+ *          0: Enhanced ATT not supported
  * other bits: reserved (shall be set to 0)
  */
-#define CFG_BLE_OPTIONS  (SHCI_C2_BLE_INIT_OPTIONS_LL_HOST | SHCI_C2_BLE_INIT_OPTIONS_WITH_SVC_CHANGE_DESC | SHCI_C2_BLE_INIT_OPTIONS_DEVICE_NAME_RW | SHCI_C2_BLE_INIT_OPTIONS_NO_EXT_ADV | SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2 | SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3)
+#define CFG_BLE_OPTIONS_EXT  (SHCI_C2_BLE_INIT_OPTIONS_APPEARANCE_READONLY | SHCI_C2_BLE_INIT_OPTIONS_ENHANCED_ATT_NOTSUPPORTED)
 
 #define CFG_BLE_MAX_COC_INITIATOR_NBR   (32)
 
@@ -324,7 +370,46 @@
  * other bits: reserved (shall be set to 0)
  */
 
-#define CFG_BLE_RX_MODEL_CONFIG         SHCI_C2_BLE_INIT_RX_MODEL_AGC_RSSI_LEGACY
+#define CFG_BLE_RX_MODEL_CONFIG         (SHCI_C2_BLE_INIT_RX_MODEL_AGC_RSSI_LEGACY)
+
+/* Maximum number of advertising sets.
+ * Range: 1 .. 8 with limitation:
+ * This parameter is linked to CFG_BLE_MAX_ADV_DATA_LEN such as both compliant with allocated Total memory computed with BLE_EXT_ADV_BUFFER_SIZE based
+ * on Max Extended advertising configuration supported.
+ * This parameter is considered by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_EXT_ADV flag set
+ */
+
+#define CFG_BLE_MAX_ADV_SET_NBR     (3)
+
+ /* Maximum advertising data length (in bytes)
+ * Range: 31 .. 1650 with limitation:
+ * This parameter is linked to CFG_BLE_MAX_ADV_SET_NBR such as both compliant with allocated Total memory computed with BLE_EXT_ADV_BUFFER_SIZE based
+ * on Max Extended advertising configuration supported.
+ * This parameter is considered by the CPU2 when CFG_BLE_OPTIONS has SHCI_C2_BLE_INIT_OPTIONS_EXT_ADV flag set
+ */
+
+#define CFG_BLE_MAX_ADV_DATA_LEN    (1650)
+
+ /* RF TX Path Compensation Value (16-bit signed integer). Units: 0.1 dB.
+  * Range: -1280 .. 1280
+  */
+
+#define CFG_BLE_TX_PATH_COMPENS    (0)
+
+ /* RF RX Path Compensation Value (16-bit signed integer). Units: 0.1 dB.
+  * Range: -1280 .. 1280
+  */
+
+#define CFG_BLE_RX_PATH_COMPENS    (0)
+
+  /* BLE core version (16-bit signed integer).
+   * - SHCI_C2_BLE_INIT_BLE_CORE_5_2
+   * - SHCI_C2_BLE_INIT_BLE_CORE_5_3
+   * - SHCI_C2_BLE_INIT_BLE_CORE_5_4
+   * which are used to set: 11(5.2), 12(5.3), 13(5.4).
+   */
+
+#define CFG_BLE_CORE_VERSION   (SHCI_C2_BLE_INIT_BLE_CORE_5_4)
 
 /******************************************************************************
  * Transport Layer
@@ -362,7 +447,7 @@
 /**
  * Select UART interfaces
  */
-#define CFG_DEBUG_TRACE_UART    0
+#define CFG_DEBUG_TRACE_UART    hw_lpuart1
 #define CFG_CONSOLE_MENU        0
 /******************************************************************************
  * USB interface
@@ -489,13 +574,13 @@ typedef enum
  * Debug
  ******************************************************************************/
 /**
- * When set, this resets some hw resources to set the device in the same state than the power up
- * The FW resets only register that may prevent the FW to run properly
+ * When set, this resets some hw resources to put the device in the same state as at power up.
+ * It resets only register that may prevent the FW to run properly.
  *
  * This shall be set to 0 in a final product
  *
  */
-#define CFG_HW_RESET_BY_FW         1
+#define CFG_HW_RESET_BY_FW         0
 
 /**
  * keep debugger enabled while in any low power mode when set to 1
@@ -584,9 +669,14 @@ typedef enum
 /**< Add in that list all tasks that may send a ACI/HCI command */
 typedef enum
 {
+  CFG_TASK_ADV_CANCEL_ID,
+#if (L2CAP_REQUEST_NEW_CONN_PARAM != 0 )
+  CFG_TASK_CONN_UPDATE_REG_ID,
+#endif
   CFG_TASK_HCI_ASYNCH_EVT_ID,
   /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
-
+  CFG_TASK_LINK_CONFIG_ID,
+  CFG_TASK_ADV_UPDATE_ID,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
@@ -603,7 +693,10 @@ typedef enum
     CFG_TASK_FS_LOG_UPDATE_ID,
     CFG_TASK_FS_AUDIO_CONTROL_PRODUCER_ID,
     CFG_TASK_FS_AUDIO_CONTROL_CONSUMER_ID,
-	CFG_TASK_FS_CONFIG_UPDATE_ID,
+    CFG_TASK_FS_CONFIG_UPDATE_ID,
+    CFG_TASK_CUSTOM_CRS_TRANSMIT_ID,
+    CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID,
+    CFG_TASK_FS_CRS_UPDATE_ID,
   /* USER CODE END CFG_Task_Id_With_NO_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_NO_HCICMD                                            /**< Shall be LAST in the list */
 } CFG_Task_Id_With_NO_HCI_Cmd_t;
