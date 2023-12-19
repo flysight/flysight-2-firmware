@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 
-#define FS_CONFIG_MAX_ALARMS    10
+#define FS_CONFIG_MAX_ALARMS    20
 #define FS_CONFIG_MAX_WINDOWS   2
 #define FS_CONFIG_MAX_SPEECH    3
 
