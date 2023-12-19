@@ -10,6 +10,7 @@ import random
 # UUIDs for the CRS characteristics
 CRS_RX_UUID = "00000002-8e22-4541-9d4c-21edae82ed19"
 CRS_TX_UUID = "00000001-8e22-4541-9d4c-21edae82ed19"
+GNSS_PV_UUID = "00000000-8e22-4541-9d4c-21edae82ed19"
 
 # File attribute definitions
 attrib_description = {
@@ -189,6 +190,24 @@ async def list_directory(address, directory):
         await asyncio.sleep(5)  # Wait for notifications
         await client.stop_notify(CRS_TX_UUID)
 
+async def display_gnss(address):
+    async with BleakClient(address, adapter=ble_adapter) as client:
+        async def gnss_notification_handler(sender, data):
+            iTOW, lon, lat, hMSL, velN, velE, velD = unpack("<L6l", data)
+            print(f'{iTOW/1e3:.3f}, '
+                  f'{lon/1e7:.7f}, {lat/1e7:.7f}, {hMSL/1e3:.3f}, '
+                  f'{velN/1e2:.2f}, {velE/1e2:.2f}, {velD/1e2:.2f}')
+
+        await client.start_notify(GNSS_PV_UUID, gnss_notification_handler)
+
+        try:
+            while True:
+                await asyncio.sleep(0.1)  # Sleep for a short time to yield control to other tasks
+        except KeyboardInterrupt:
+            print("Stopping notifications due to user interruption.")
+        finally:
+            await client.stop_notify(CRS_TX_UUID)
+
 async def list_devices():
     devices = await BleakScanner.discover()
     for device in devices:
@@ -206,6 +225,7 @@ def main():
     parser.add_argument('--delete', type=str, metavar='FILE_NAME', help='Delete the specified file from the device.')
     parser.add_argument('--mkdir', type=str, metavar='DIRECTORY_NAME', help='Create a new directory on the device with the specified name.')
     parser.add_argument('--test-mode', action='store_true', help='Enable test mode with packet dropping')
+    parser.add_argument('--gnss', action='store_true', help='Display live GNSS data')
     args = parser.parse_args()
 
     if args.list:
@@ -225,6 +245,8 @@ def main():
         asyncio.run(delete_file(args.address, args.delete))
     elif args.address and args.mkdir:
         asyncio.run(mkdir(args.address, args.mkdir))
+    elif args.address and args.gnss:
+        asyncio.run(display_gnss(args.address))
     else:
         print("Invalid arguments. Use --help for usage information.")
 
