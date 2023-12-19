@@ -30,7 +30,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "gnss.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -73,10 +73,13 @@ void Custom_APP_Init(void);
 void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification);
 /* USER CODE BEGIN EF */
 void Custom_APP_TxPoolAvailableNotification(void);
+uint8_t Custom_APP_IsConnected(void);
+
 Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void);
 void Custom_CRS_SendNextTxPacket(void);
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
-uint8_t Custom_CRS_IsConnected(void);
+
+void Custom_GNSS_Update(const FS_GNSS_Data_t *current);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

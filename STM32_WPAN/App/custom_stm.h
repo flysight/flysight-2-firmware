@@ -37,6 +37,8 @@ typedef enum
   /* CRS */
   CUSTOM_STM_CRS_TX,
   CUSTOM_STM_CRS_RX,
+  /* GNSS */
+  CUSTOM_STM_GNSS_PV,
 } Custom_STM_Char_Opcode_t;
 
 typedef enum
@@ -47,6 +49,10 @@ typedef enum
   /* CRS_RX */
   CUSTOM_STM_CRS_RX_READ_EVT,
   CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT,
+  /* GNSS_PV */
+  CUSTOM_STM_GNSS_PV_READ_EVT,
+  CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT,
+  CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT,
 
   CUSTOM_STM_BOOT_REQUEST_EVT
 } Custom_STM_Opcode_evt_t;
@@ -72,6 +78,7 @@ typedef struct
 /* Exported constants --------------------------------------------------------*/
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
+extern uint8_t SizeGnss_Pv;
 
 /* USER CODE BEGIN EC */
 

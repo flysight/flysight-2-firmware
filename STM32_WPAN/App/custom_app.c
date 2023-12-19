@@ -37,6 +37,8 @@ typedef struct
 {
   /* CRS */
   uint8_t               Crs_tx_Notification_Status;
+  /* GNSS */
+  uint8_t               Gnss_pv_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
   uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -79,6 +81,8 @@ static uint32_t tx_read_index, tx_write_index;
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
+static uint8_t gnss_pv_packet[28];
+
 static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
@@ -89,12 +93,16 @@ extern uint8_t SizeCrs_Rx;
 /* CRS */
 static void Custom_Crs_tx_Update_Char(void);
 static void Custom_Crs_tx_Send_Notification(void);
+/* GNSS */
+static void Custom_Gnss_pv_Update_Char(void);
+static void Custom_Gnss_pv_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
+static void Custom_GNSS_Transmit(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -133,6 +141,25 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
       Custom_CRS_OnRxWrite(pNotification);
       /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
+      break;
+
+    /* GNSS */
+    case CUSTOM_STM_GNSS_PV_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_GNSS_PV_READ_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Gnss_pv_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Gnss_pv_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       break;
 
     default:
@@ -188,6 +215,7 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
   Custom_App_Context.Crs_tx_Flow_Status = 1;
@@ -200,6 +228,11 @@ void Custom_APP_TxPoolAvailableNotification(void)
 {
   Custom_App_Context.Crs_tx_Flow_Status = 1;
   UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+}
+
+uint8_t Custom_APP_IsConnected(void)
+{
+  return connected_flag;
 }
 /* USER CODE END FD */
 
@@ -245,6 +278,46 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
   /* USER CODE BEGIN Crs_tx_NS_Last*/
 
   /* USER CODE END Crs_tx_NS_Last*/
+
+  return;
+}
+
+/* GNSS */
+void Custom_Gnss_pv_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_pv_UC_1*/
+
+  /* USER CODE END Gnss_pv_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_pv_UC_Last*/
+
+  /* USER CODE END Gnss_pv_UC_Last*/
+  return;
+}
+
+void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_pv_NS_1*/
+
+  /* USER CODE END Gnss_pv_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_pv_NS_Last*/
+
+  /* USER CODE END Gnss_pv_NS_Last*/
 
   return;
 }
@@ -362,8 +435,21 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
   return ret;
 }
 
-uint8_t Custom_CRS_IsConnected(void)
+static void Custom_GNSS_Transmit(void)
 {
-  return connected_flag;
+  Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
+}
+
+void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
+{
+  memcpy(&gnss_pv_packet[0], &(current->iTOW), sizeof(current->iTOW));
+  memcpy(&gnss_pv_packet[4], &(current->lon), sizeof(current->lon));
+  memcpy(&gnss_pv_packet[8], &(current->lat), sizeof(current->lat));
+  memcpy(&gnss_pv_packet[12], &(current->hMSL), sizeof(current->hMSL));
+  memcpy(&gnss_pv_packet[16], &(current->velN), sizeof(current->velN));
+  memcpy(&gnss_pv_packet[20], &(current->velE), sizeof(current->velE));
+  memcpy(&gnss_pv_packet[24], &(current->velD), sizeof(current->velD));
+
+  UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

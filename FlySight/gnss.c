@@ -577,6 +577,7 @@ static void FS_GNSS_ReceiveMessage(uint8_t msgReceived, uint32_t timeOfWeek)
 
 	if (gnssMsgReceived == UBX_MSG_ALL)
 	{
+		gnssData.iTOW = timeOfWeek;
 		FS_GNSS_DataReady_Callback();
 		gnssMsgReceived = 0;
 	}

@@ -304,7 +304,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 	Custom_CRS_Packet_t *packet;
 	FILINFO fno;
 
-	if (!Custom_CRS_IsConnected())
+	if (!Custom_APP_IsConnected())
 	{
 		next_state = FS_CRS_STATE_IDLE;
 	}
@@ -366,7 +366,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 	Custom_CRS_Packet_t *packet;
 	UINT br;
 
-	if (!Custom_CRS_IsConnected())
+	if (!Custom_APP_IsConnected())
 	{
 		next_state = FS_CRS_STATE_IDLE;
 	}
@@ -466,7 +466,7 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 	UINT bw;
 	Custom_CRS_Packet_t *packet;
 
-	if (!Custom_CRS_IsConnected())
+	if (!Custom_APP_IsConnected())
 	{
 		next_state = FS_CRS_STATE_IDLE;
 	}
