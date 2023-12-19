@@ -73,10 +73,10 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH];
+static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t tx_read_index, tx_write_index;
 
-static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH];
+static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t connected_flag = 0;
@@ -113,7 +113,7 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       Custom_App_Context.Crs_tx_Notification_Status = 1;
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_0);
+      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
@@ -293,13 +293,17 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 
 static void Custom_CRS_Transmit(void)
 {
+  static uint8_t tx_busy = 0;
   Custom_CRS_Packet_t *packet;
-  tBleStatus status = BLE_STATUS_INVALID_PARAMS;
+  tBleStatus status;
 
-  if ((tx_read_index < tx_write_index)
+  if (!tx_busy
+      && (tx_read_index < tx_write_index)
       && Custom_App_Context.Crs_tx_Notification_Status
       && Custom_App_Context.Crs_tx_Flow_Status)
   {
+    tx_busy = 1;
+
 	packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
 	SizeCrs_Tx = packet->length;
 
@@ -316,6 +320,8 @@ static void Custom_CRS_Transmit(void)
       UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
       UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
+
+    tx_busy = 0;
   }
 }
 

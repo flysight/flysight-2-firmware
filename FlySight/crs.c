@@ -54,6 +54,8 @@ typedef enum
 	FS_CRS_COMMAND_FILE_DATA = 0x10,
 	FS_CRS_COMMAND_FILE_INFO = 0x11,
 	FS_CRS_COMMAND_FILE_ACK  = 0x12,
+	FS_CRS_COMMAND_NAK       = 0xf0,
+	FS_CRS_COMMAND_ACK       = 0xf1,
 	FS_CRS_COMMAND_CANCEL    = 0xff
 } FS_CRS_Command_t;
 
@@ -113,6 +115,16 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 	}
 }
 
+static void FS_CRS_SendNak(uint8_t command)
+{
+	FS_CRS_SendPacket(FS_CRS_COMMAND_NAK, &command, sizeof(command));
+}
+
+static void FS_CRS_SendAck(uint8_t command)
+{
+	FS_CRS_SendPacket(FS_CRS_COMMAND_ACK, &command, sizeof(command));
+}
+
 static FS_CRS_State_t FS_CRS_State_Idle(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_IDLE;
@@ -133,7 +145,12 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				if (f_open(&file, (TCHAR *) &(packet->data[1]),
 						FA_WRITE|FA_CREATE_NEW) == FR_OK)
 				{
+					FS_CRS_SendAck(FS_CRS_COMMAND_CREATE);
 					f_close(&file);
+				}
+				else
+				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_CREATE);
 				}
 
 				// De-initialize disk
@@ -144,7 +161,14 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 				// Delete file
-				f_unlink((TCHAR *) &(packet->data[1]));
+				if (f_unlink((TCHAR *) &(packet->data[1])) == FR_OK)
+				{
+					FS_CRS_SendAck(FS_CRS_COMMAND_DELETE);
+				}
+				else
+				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_DELETE);
+				}
 
 				// De-initialize disk
 				FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
@@ -175,6 +199,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 
 					if (f_lseek(&file, read_pos) == FR_OK)
 					{
+						FS_CRS_SendAck(FS_CRS_COMMAND_READ);
+
 						// Call update task
 						UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
 
@@ -184,6 +210,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 
 				if (next_state == FS_CRS_STATE_IDLE)
 				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_READ);
+
 					// De-initialize disk
 					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 				}
@@ -198,6 +226,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				// Open file
 				if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE) == FR_OK)
 				{
+					FS_CRS_SendAck(FS_CRS_COMMAND_WRITE);
+
 					// Initialize flow control
 					next_packet = 0;
 
@@ -210,6 +240,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 
 				if (next_state == FS_CRS_STATE_IDLE)
 				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_WRITE);
+
 					// De-initialize disk
 					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 				}
@@ -219,7 +251,14 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 				// Create directory
-				f_mkdir((TCHAR *) &(packet->data[1]));
+				if (f_mkdir((TCHAR *) &(packet->data[1])) == FR_OK)
+				{
+					FS_CRS_SendAck(FS_CRS_COMMAND_MK_DIR);
+				}
+				else
+				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_MK_DIR);
+				}
 
 				// De-initialize disk
 				FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
@@ -234,6 +273,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				// Open directory
 				if (f_opendir(&dir, (TCHAR *) &(packet->data[1])) == FR_OK)
 				{
+					FS_CRS_SendAck(FS_CRS_COMMAND_READ_DIR);
+
 					// Initialize flow control
 					next_packet = 0;
 
@@ -244,6 +285,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				}
 				else
 				{
+					FS_CRS_SendNak(FS_CRS_COMMAND_READ_DIR);
+
 					// De-initialize disk
 					FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 				}
