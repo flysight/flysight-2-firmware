@@ -189,7 +189,13 @@
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
 /* USER CODE BEGIN Specific_Parameters */
-
+#define SCAN_P (0x320)
+#define SCAN_L (0x320)
+#define CONN_P1		(CONN_P(200))
+#define CONN_P2		(CONN_P(1000))
+#define SUPERV_TIMEOUT (400)
+#define CONN_L1   (CONN_L(10))
+#define CONN_L2   (CONN_L(10))
 /* USER CODE END Specific_Parameters */
 
 /******************************************************************************
@@ -677,6 +683,8 @@ typedef enum
   /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
   CFG_TASK_LINK_CONFIG_ID,
   CFG_TASK_ADV_UPDATE_ID,
+  CFG_TASK_START_SCAN_ID,
+  CFG_TASK_CONN_DEV_1_ID,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;

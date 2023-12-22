@@ -162,6 +162,9 @@ typedef struct
   APP_BLE_ConnStatus_t Device_Connection_Status;
   /* USER CODE BEGIN PTD_1*/
   uint8_t Advertising_mgr_timer_Id;
+  APP_BLE_ConnStatus_t EndDevice_Connection_Status[1];
+  uint16_t connectionHandleEndDevice1;
+  uint8_t EndDevice1Found;
   /* USER CODE END PTD_1 */
 }BleApplicationContext_t;
 
@@ -237,7 +240,8 @@ uint8_t a_AdvData[10] =
 };
 
 /* USER CODE BEGIN PV */
-
+tBDAddr P2P_SERVER1_BDADDR;
+uint16_t connection_handle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -257,6 +261,8 @@ static void Connection_Interval_Update_Req(void);
 static void LinkConfiguration(void);
 static void Adv_Mgr(void);
 static void Adv_Update(void);
+static void Scan_Request(void);
+static void ConnReq1(void);
 /* USER CODE END PFP */
 
 /* External variables --------------------------------------------------------*/
@@ -365,6 +371,10 @@ void APP_BLE_Init(void)
   /* USER CODE BEGIN APP_BLE_Init_4 */
   UTIL_SEQ_RegTask(1<<CFG_TASK_LINK_CONFIG_ID, UTIL_SEQ_RFU, LinkConfiguration);
   UTIL_SEQ_RegTask(1<<CFG_TASK_ADV_UPDATE_ID, UTIL_SEQ_RFU, Adv_Update);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_START_SCAN_ID, UTIL_SEQ_RFU, Scan_Request);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CONN_DEV_1_ID, UTIL_SEQ_RFU, ConnReq1);
+
+  BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
   /* USER CODE END APP_BLE_Init_4 */
 
   /**
@@ -432,7 +442,12 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
   /* PAIRING */
 
   /* USER CODE BEGIN SVCCTL_App_Notification */
-
+  hci_le_advertising_report_event_rp0 * p_le_advertising_event;
+  uint8_t result;
+  uint8_t role, event_type, event_data_size;
+  int k = 0;
+  uint8_t *adv_report_data;
+  uint8_t adtype, adlength;
   /* USER CODE END SVCCTL_App_Notification */
 
   p_event_pckt = (hci_event_pckt*) ((hci_uart_pckt *) p_Pckt)->data;
@@ -520,7 +535,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
            */
 
           APP_DBG_MSG(">>== HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE - Connection handle: 0x%x\n", p_connection_complete_event->Connection_Handle);
-          APP_DBG_MSG("     - Connection established with Central: @:%02x:%02x:%02x:%02x:%02x:%02x\n",
+          APP_DBG_MSG("     - Connection established with peer: @:%02x:%02x:%02x:%02x:%02x:%02x\n",
                       p_connection_complete_event->Peer_Address[5],
                       p_connection_complete_event->Peer_Address[4],
                       p_connection_complete_event->Peer_Address[3],
@@ -533,27 +548,55 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                       p_connection_complete_event->Supervision_Timeout*10
                      );
 
-          if (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_CONNECTING)
-          {
-            /* Connection as client */
-            BleApplicationContext.Device_Connection_Status = APP_BLE_CONNECTED_CLIENT;
+          connection_handle = p_connection_complete_event->Connection_Handle;
+          role = p_connection_complete_event->Role;
+          if (role == 0x00)
+          { /* ROLE CENTRAL */
+
+            uint8_t dev1 = 1;
+
+            for (int i = 0; i < 6; i++)
+            {
+              dev1 &= (P2P_SERVER1_BDADDR[i] == p_connection_complete_event->Peer_Address[i]);
+            }
+
+            if (dev1 == 1)
+            {
+              /* Inform Application it is End Device 1 */
+              APP_DBG_MSG("-- CONNECTION SUCCESS WITH END DEVICE 1\n\r");
+              BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_CONNECTED_CLIENT;
+              BleApplicationContext.connectionHandleEndDevice1 = connection_handle;
+              //handleNotification.P2P_Evt_Opcode = P2P_SERVER1_CONN_HANDLE_EVT;
+              //handleNotification.ConnectionHandle = connection_handle;
+              //Evt_Notification(&handleNotification);
+              result = aci_gatt_disc_all_primary_services(BleApplicationContext.connectionHandleEndDevice1);
+              if (result == BLE_STATUS_SUCCESS)
+              {
+                APP_DBG_MSG("\r\n\r** GATT SERVICES & CHARACTERISTICS DISCOVERY  \n\r");
+                APP_DBG_MSG("* GATT :  Start Searching Primary Services \r\n\r");
+              }
+              else
+              {
+                APP_DBG_MSG("BLE_CTRL_App_Notification(), All services discovery Failed \r\n\r");
+              }
+            }
           }
           else
           {
             /* Connection as server */
             BleApplicationContext.Device_Connection_Status = APP_BLE_CONNECTED_SERVER;
+            BleApplicationContext.BleApplicationContext_legacy.connectionHandle = p_connection_complete_event->Connection_Handle;
+            /**
+             * SPECIFIC to Custom Template APP
+             */
+            HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_HANDLE_EVT;
+            HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
+            Custom_APP_Notification(&HandleNotification);
+            /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
+            HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
+            UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_0);
+            /* USER CODE END HCI_EVT_LE_CONN_COMPLETE */
           }
-          BleApplicationContext.BleApplicationContext_legacy.connectionHandle = p_connection_complete_event->Connection_Handle;
-          /**
-           * SPECIFIC to Custom Template APP
-           */
-          HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_HANDLE_EVT;
-          HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
-          Custom_APP_Notification(&HandleNotification);
-          /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
-          HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
-          UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_0);
-          /* USER CODE END HCI_EVT_LE_CONN_COMPLETE */
           break; /* HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE */
         }
 
@@ -565,7 +608,63 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       }
 
       /* USER CODE BEGIN META_EVT */
+      case HCI_LE_ADVERTISING_REPORT_SUBEVT_CODE:
+        /* USER CODE BEGIN EVT_LE_ADVERTISING_REPORT */
 
+        /* USER CODE END EVT_LE_ADVERTISING_REPORT */
+        p_le_advertising_event = (hci_le_advertising_report_event_rp0 *) p_meta_evt->data;
+
+        event_type = p_le_advertising_event->Advertising_Report[0].Event_Type;
+
+        event_data_size = p_le_advertising_event->Advertising_Report[0].Length_Data;
+
+        /* WARNING: be careful when decoding advertising report as its raw format cannot be mapped on a C structure.
+        The data and RSSI values could not be directly decoded from the RAM using the data and RSSI field from hci_le_advertising_report_event_rp0 structure.
+        Instead they must be read by using offsets (please refer to BLE specification).
+        RSSI = (int8_t)*(uint8_t*) (adv_report_data + le_advertising_event->Advertising_Report[0].Length_Data);
+        */
+        adv_report_data = (uint8_t*)(&p_le_advertising_event->Advertising_Report[0].Length_Data) + 1;
+        k = 0;
+
+        /* search AD TYPE 0x09 (Complete Local Name) */
+        /* search AD Type 0x02 (16 bits UUIDS) */
+        if (event_type == ADV_IND)
+        {
+          /* ISOLATION OF BD ADDRESS AND LOCAL NAME */
+
+          while(k < event_data_size)
+          {
+            adlength = adv_report_data[k];
+            adtype = adv_report_data[k + 1];
+            switch (adtype)
+            {
+              case 0x09: /* now get local name */
+                /* USER CODE BEGIN get_local_name */
+                if (adlength >= 6 && !memcmp(&adv_report_data[k + 2], "ENGO 2", 6))
+                {
+                  BleApplicationContext.EndDevice1Found = 0x01;
+                  P2P_SERVER1_BDADDR[0] = p_le_advertising_event->Advertising_Report[0].Address[0];
+                  P2P_SERVER1_BDADDR[1] = p_le_advertising_event->Advertising_Report[0].Address[1];
+                  P2P_SERVER1_BDADDR[2] = p_le_advertising_event->Advertising_Report[0].Address[2];
+                  P2P_SERVER1_BDADDR[3] = p_le_advertising_event->Advertising_Report[0].Address[3];
+                  P2P_SERVER1_BDADDR[4] = p_le_advertising_event->Advertising_Report[0].Address[4];
+                  P2P_SERVER1_BDADDR[5] = p_le_advertising_event->Advertising_Report[0].Address[5];
+                  aci_gap_terminate_gap_proc(0x02);
+                }
+
+                /* USER CODE END get_local_name */
+                break;
+
+              default:
+                /* USER CODE BEGIN adtype_default */
+
+                /* USER CODE END adtype_default */
+                break;
+            }
+            k += adlength + 1;
+          } /* end while(k < event_data_size) */
+        } /* end if (event_type == ADV_IND) */
+        break;
       /* USER CODE END META_EVT */
       break; /* HCI_LE_META_EVT_CODE */
     }
@@ -596,7 +695,22 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         case ACI_GAP_PROC_COMPLETE_VSEVT_CODE:
           APP_DBG_MSG(">>== ACI_GAP_PROC_COMPLETE_VSEVT_CODE \r");
           /* USER CODE BEGIN EVT_BLUE_GAP_PROCEDURE_COMPLETE */
-
+          {
+            aci_gap_proc_complete_event_rp0 *p_gap_evt_proc_complete = (void*) p_blecore_evt->data;
+            /* CHECK GAP GENERAL DISCOVERY PROCEDURE COMPLETED & SUCCEED */
+            if (p_gap_evt_proc_complete->Procedure_Code == GAP_GENERAL_DISCOVERY_PROC
+                && p_gap_evt_proc_complete->Status == 0x00)
+            {
+              APP_DBG_MSG("-- GAP GENERAL DISCOVERY PROCEDURE_COMPLETED\n\r");
+              /*if a device found, connect to it, device 1 being chosen first if both found*/
+              if (BleApplicationContext.EndDevice1Found == 0x01
+                  && BleApplicationContext.EndDevice_Connection_Status[0] != APP_BLE_CONNECTED_CLIENT)
+              {
+                APP_DBG_MSG("-- ENGO 2 detected\n\r");
+                UTIL_SEQ_SetTask(1 << CFG_TASK_CONN_DEV_1_ID, CFG_SCH_PRIO_0);
+              }
+            }
+          }
           /* USER CODE END EVT_BLUE_GAP_PROCEDURE_COMPLETE */
           break; /* ACI_GAP_PROC_COMPLETE_VSEVT_CODE */
 
@@ -1317,6 +1431,57 @@ void APP_BLE_Adv_Set(APP_BLE_ConnStatus_t NewStatus)
 static void Adv_Update(void)
 {
   APP_BLE_Adv_Set(APP_BLE_LP_ADV);
+}
+
+static void Scan_Request(void)
+{
+  tBleStatus result;
+
+  if (BleApplicationContext.EndDevice_Connection_Status[0] != APP_BLE_CONNECTED_CLIENT)
+  {
+    BleApplicationContext.EndDevice1Found = 0x00;
+
+	result = aci_gap_start_general_discovery_proc(SCAN_P, SCAN_L, GAP_PUBLIC_ADDR, 1);
+	if (result == BLE_STATUS_SUCCESS)
+	{
+	  APP_DBG_MSG(" \r\n\r** START GENERAL DISCOVERY (SCAN) **  \r\n\r");
+	}
+	else
+	{
+	  APP_DBG_MSG("-- BLE_App_Start_Limited_Disc_Req, Failed \r\n\r");
+	}
+  }
+}
+
+static void ConnReq1(void)
+{
+  tBleStatus result;
+  APP_DBG_MSG("\r\n\r** CREATE CONNECTION TO END DEVICE 1 **  \r\n\r");
+  if (BleApplicationContext.EndDevice_Connection_Status[0] != APP_BLE_CONNECTED_CLIENT)
+  {
+    result = aci_gap_create_connection(SCAN_P,
+                                       SCAN_L,
+                                       GAP_PUBLIC_ADDR,
+                                       P2P_SERVER1_BDADDR,
+                                       GAP_PUBLIC_ADDR,
+                                       CONN_P1,
+                                       CONN_P2,
+                                       0,
+                                       SUPERV_TIMEOUT,
+                                       CONN_L1,
+                                       CONN_L2);
+
+    if (result == BLE_STATUS_SUCCESS)
+    {
+      BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_LP_CONNECTING;
+    }
+    else
+    {
+      BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
+    }
+  }
+
+  return;
 }
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
 /*************************************************************

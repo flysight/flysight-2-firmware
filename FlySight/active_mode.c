@@ -37,6 +37,7 @@
 #include "resource_manager.h"
 #include "sensor.h"
 #include "state.h"
+#include "stm32_seq.h"
 #include "vbat.h"
 
 extern UART_HandleTypeDef huart1;
@@ -44,6 +45,9 @@ extern ADC_HandleTypeDef hadc1;
 
 void FS_ActiveMode_Init(void)
 {
+	/* Begin discovery */
+	UTIL_SEQ_SetTask(1<<CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+
 	/* Initialize controller */
 	FS_Control_Init();
 
