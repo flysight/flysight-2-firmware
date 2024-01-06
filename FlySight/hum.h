@@ -24,6 +24,12 @@
 #ifndef HUM_H_
 #define HUM_H_
 
+typedef enum
+{
+  FS_HUM_OK       = 0x00,
+  FS_HUM_ERROR    = 0x01
+} FS_Hum_Result_t;
+
 typedef struct
 {
 	uint32_t time;			// ms
