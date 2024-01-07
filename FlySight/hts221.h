@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -26,9 +26,9 @@
 
 #include "hum.h"
 
-FS_Hum_Result_t FS_HTS221_Init(void);
+FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data);
 void FS_HTS221_Start(void);
 void FS_HTS221_Stop(void);
-void FS_HTS221_Read(FS_Hum_Data_t *data);
+void FS_HTS221_Read(void);
 
 #endif /* HTS221_H_ */

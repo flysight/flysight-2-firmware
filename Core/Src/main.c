@@ -38,6 +38,7 @@
 #include "mag.h"
 #include "mode.h"
 #include "sensor.h"
+#include "hts221.h"
 #include "vbat.h"
 #include "vbus.h"
 /* USER CODE END Includes */
@@ -1016,6 +1017,18 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
     FS_IMU_TransferError();
 }
 
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+  if (hi2c == &hi2c3)
+    FS_Sensor_TransferComplete();
+}
+
+void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+  if (hi2c == &hi2c3)
+    FS_Sensor_TransferComplete();
+}
+
 void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c3)
@@ -1059,7 +1072,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     FS_Baro_Read();
     break;
   case HUM_DRDY_Pin:
-    FS_Hum_Read();
+    FS_HTS221_Read();
     break;
   case MAG_INT_Pin:
     FS_Mag_Read();

@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -63,21 +63,28 @@ static uint8_t dataBuf[4];
 
 static FS_Hum_Data_t *humData;
 
-FS_Hum_Result_t FS_HTS221_Init(void)
+FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
 {
 	uint8_t buf[4];
 
 	uint8_t temp;
 	HAL_StatusTypeDef result;
 
-	// Check WHO_AM_I register value
+	// Keep local pointer to humidity data
+	humData = data;
+
+	// Read WHO_AM_I register value
 	do
 	{
 		result = FS_Sensor_Read(HTS221_ADDR, HTS221_REG_WHO_AM_I, buf, 1);
 	}
 	while (result != HAL_OK);
+
+	// Check WHO_AM_I register value
 	if (buf[0] != 0xbc)
+	{
 		return FS_HUM_ERROR;
+	}
 
 	// Software reset
 	do
@@ -215,10 +222,8 @@ static void FS_HTS221_Read_Callback(HAL_StatusTypeDef result)
 	}
 }
 
-void FS_HTS221_Read(FS_Hum_Data_t *data)
+void FS_HTS221_Read(void)
 {
-	humData = data;
 	humData->time = HAL_GetTick();
-
 	FS_Sensor_ReadAsync(HTS221_ADDR, HTS221_REG_HUMIDITY_OUT_L, dataBuf, 4, FS_HTS221_Read_Callback);
 }
