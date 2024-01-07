@@ -9,12 +9,12 @@
 #include "app_common.h"
 #include "hts221.h"
 #include "hum.h"
+#include "sht4x.h"
 
 typedef struct
 {
 	void (*Start)(void);
 	void (*Stop)(void);
-	void (*Read)(FS_Hum_Data_t *data);
 } FS_Hum_Interface_t;
 
 static FS_Hum_Interface_t humInterface;
@@ -22,11 +22,15 @@ static FS_Hum_Data_t humData;
 
 void FS_Hum_Init(void)
 {
-	if (FS_HTS221_Init() == FS_HUM_OK)
+	if (FS_SHT4X_Init(&humData) == FS_HUM_OK)
+	{
+		humInterface.Start = &FS_SHT4X_Start;
+		humInterface.Stop = &FS_SHT4X_Stop;
+	}
+	else if (FS_HTS221_Init(&humData) == FS_HUM_OK)
 	{
 		humInterface.Start = &FS_HTS221_Start;
 		humInterface.Stop = &FS_HTS221_Stop;
-		humInterface.Read = &FS_HTS221_Read;
 	}
 	else
 	{
@@ -42,11 +46,6 @@ void FS_Hum_Start(void)
 void FS_Hum_Stop(void)
 {
 	(*humInterface.Stop)();
-}
-
-void FS_Hum_Read(void)
-{
-	(*humInterface.Read)(&humData);
 }
 
 const FS_Hum_Data_t *FS_Hum_GetData(void)

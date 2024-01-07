@@ -26,7 +26,9 @@ static volatile bool busy = false;
 typedef enum
 {
 	Operation_Read,
-	Operation_Write
+	Operation_Write,
+	Operation_Recieve,
+	Operation_Transmit
 } Operation_t;
 
 typedef struct
@@ -85,9 +87,21 @@ static void BeginRead(void)
 	{
 		result = HAL_I2C_Mem_Read_DMA(&hi2c3, h->addr, h->reg, 1, h->pData, h->size);
 	}
-	else
+	else if (h->op == Operation_Write)
 	{
 		result = HAL_I2C_Mem_Write_DMA(&hi2c3, h->addr, h->reg, 1, h->pData, h->size);
+	}
+	else if (h->op == Operation_Recieve)
+	{
+		result = HAL_I2C_Master_Receive_DMA(&hi2c3, h->addr, h->pData, h->size);
+	}
+	else if (h->op == Operation_Transmit)
+	{
+		result = HAL_I2C_Master_Transmit_DMA(&hi2c3, h->addr, h->pData, h->size);
+	}
+	else
+	{
+		Error_Handler(); // Should never be called
 	}
 
 	if (result != HAL_OK)
@@ -115,6 +129,60 @@ static void NextHandler(HAL_StatusTypeDef result)
 	__set_PRIMASK(primask_bit);
 
 	if (busy)
+	{
+		BeginRead();
+	}
+}
+
+void FS_Sensor_TransmitAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+{
+	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
+	uint32_t primask_bit;
+	bool begin;
+
+	// Initialize handler
+	h->op = Operation_Transmit;
+	h->addr = addr;
+	h->pData = pData;
+	h->size = size;
+	h->Callback = Callback;
+
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
+	++handlerWrI;
+	begin = (mode == MODE_ACTIVE) && !busy;
+
+	__set_PRIMASK(primask_bit);
+
+	if (begin)
+	{
+		BeginRead();
+	}
+}
+
+void FS_Sensor_ReceiveAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+{
+	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
+	uint32_t primask_bit;
+	bool begin;
+
+	// Initialize handler
+	h->op = Operation_Recieve;
+	h->addr = addr;
+	h->pData = pData;
+	h->size = size;
+	h->Callback = Callback;
+
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
+	++handlerWrI;
+	begin = (mode == MODE_ACTIVE) && !busy;
+
+	__set_PRIMASK(primask_bit);
+
+	if (begin)
 	{
 		BeginRead();
 	}
@@ -173,6 +241,60 @@ void FS_Sensor_ReadAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t si
 	if (begin)
 	{
 		BeginRead();
+	}
+}
+
+HAL_StatusTypeDef FS_Sensor_Transmit(uint8_t addr, uint8_t *pData, uint16_t size)
+{
+	HAL_StatusTypeDef result;
+	uint32_t ms;
+
+	if (mode == MODE_ACTIVE)
+	{
+		return HAL_ERROR;
+	}
+	else
+	{
+		ms = HAL_GetTick();
+		do
+		{
+			if (HAL_GetTick() - ms > TIMEOUT)
+			{
+				Error_Handler();
+			}
+
+			result = HAL_I2C_Master_Transmit(&hi2c3, addr, pData, size, TIMEOUT);
+		}
+		while (result != HAL_OK);
+
+		return result;
+	}
+}
+
+HAL_StatusTypeDef FS_Sensor_Receive(uint8_t addr, uint8_t *pData, uint16_t size)
+{
+	HAL_StatusTypeDef result;
+	uint32_t ms;
+
+	if (mode == MODE_ACTIVE)
+	{
+		return HAL_ERROR;
+	}
+	else
+	{
+		ms = HAL_GetTick();
+		do
+		{
+			if (HAL_GetTick() - ms > TIMEOUT)
+			{
+				Error_Handler();
+			}
+
+			result = HAL_I2C_Master_Receive(&hi2c3, addr, pData, size, TIMEOUT);
+		}
+		while (result != HAL_OK);
+
+		return result;
 	}
 }
 
