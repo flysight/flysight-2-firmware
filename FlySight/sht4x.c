@@ -51,6 +51,7 @@ static FS_Hum_Data_t *humData;
 
 static uint8_t timer_id;
 
+static volatile uint8_t measure_ready;
 static volatile uint8_t measure_busy;
 
 static void FS_SHT4X_Read(void);
@@ -116,7 +117,8 @@ FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
 
 void FS_SHT4X_Start(void)
 {
-	// Reset measurement flag
+	// Reset measurement flags
+	measure_ready = 0;
 	measure_busy = 0;
 
 	// Start measurement timer
@@ -138,7 +140,7 @@ static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 	measure_busy = 0;
 
 	// Read raw measurements
-	if (result == HAL_OK)
+	if (measure_ready && (result == HAL_OK))
 	{
 		if ((CRC8(&buf[0], 2) == buf[2])
 				&& (CRC8(&buf[3], 2) == buf[5]))
@@ -158,6 +160,7 @@ static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 	humData->time = HAL_GetTick();
 	buf[0] = SHT4X_MEASURE_HIGH_PRECISION;
 	FS_Sensor_TransmitAsync(SHT4X_ADDR, buf, 1, 0);
+	measure_ready = 1;
 }
 
 static void FS_SHT4X_Read(void)
