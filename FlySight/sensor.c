@@ -246,108 +246,92 @@ void FS_Sensor_ReadAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t si
 
 HAL_StatusTypeDef FS_Sensor_Transmit(uint8_t addr, uint8_t *pData, uint16_t size)
 {
-	HAL_StatusTypeDef result;
+	HAL_StatusTypeDef result = HAL_ERROR;
 	uint32_t ms;
 
-	if (mode == MODE_ACTIVE)
-	{
-		return HAL_ERROR;
-	}
-	else
+	if (mode == MODE_INACTIVE)
 	{
 		ms = HAL_GetTick();
 		do
 		{
 			if (HAL_GetTick() - ms > TIMEOUT)
 			{
-				Error_Handler();
+				return HAL_TIMEOUT;
 			}
 
 			result = HAL_I2C_Master_Transmit(&hi2c3, addr, pData, size, TIMEOUT);
 		}
 		while (result != HAL_OK);
-
-		return result;
 	}
+
+	return result;
 }
 
 HAL_StatusTypeDef FS_Sensor_Receive(uint8_t addr, uint8_t *pData, uint16_t size)
 {
-	HAL_StatusTypeDef result;
+	HAL_StatusTypeDef result = HAL_ERROR;
 	uint32_t ms;
 
-	if (mode == MODE_ACTIVE)
-	{
-		return HAL_ERROR;
-	}
-	else
+	if (mode == MODE_INACTIVE)
 	{
 		ms = HAL_GetTick();
 		do
 		{
 			if (HAL_GetTick() - ms > TIMEOUT)
 			{
-				Error_Handler();
+				return HAL_TIMEOUT;
 			}
 
 			result = HAL_I2C_Master_Receive(&hi2c3, addr, pData, size, TIMEOUT);
 		}
 		while (result != HAL_OK);
-
-		return result;
 	}
+
+	return result;
 }
 
 HAL_StatusTypeDef FS_Sensor_Write(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size)
 {
-	HAL_StatusTypeDef result;
+	HAL_StatusTypeDef result = HAL_ERROR;
 	uint32_t ms;
 
-	if (mode == MODE_ACTIVE)
-	{
-		return HAL_ERROR;
-	}
-	else
+	if (mode == MODE_INACTIVE)
 	{
 		ms = HAL_GetTick();
 		do
 		{
 			if (HAL_GetTick() - ms > TIMEOUT)
 			{
-				Error_Handler();
+				return HAL_TIMEOUT;
 			}
 
 			result = HAL_I2C_Mem_Write(&hi2c3, addr, reg, 1, pData, size, TIMEOUT);
 		}
 		while (result != HAL_OK);
-
-		return result;
 	}
+
+	return result;
 }
 
 HAL_StatusTypeDef FS_Sensor_Read(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size)
 {
-	HAL_StatusTypeDef result;
+	HAL_StatusTypeDef result = HAL_ERROR;
 	uint32_t ms;
 
-	if (mode == MODE_ACTIVE)
-	{
-		return HAL_ERROR;
-	}
-	else
+	if (mode == MODE_INACTIVE)
 	{
 		ms = HAL_GetTick();
 		do
 		{
 			if (HAL_GetTick() - ms > TIMEOUT)
 			{
-				Error_Handler();
+				return HAL_TIMEOUT;
 			}
 
 			result = HAL_I2C_Mem_Read(&hi2c3, addr, reg, 1, pData, size, TIMEOUT);
 		}
 		while (result != HAL_OK);
-
-		return result;
 	}
+
+	return result;
 }

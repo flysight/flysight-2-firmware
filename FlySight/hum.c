@@ -11,6 +11,8 @@
 #include "hum.h"
 #include "sht4x.h"
 
+#define TIMEOUT 1000
+
 typedef struct
 {
 	void (*Start)(void);
@@ -22,19 +24,31 @@ static FS_Hum_Data_t humData;
 
 void FS_Hum_Init(void)
 {
-	if (FS_SHT4X_Init(&humData) == FS_HUM_OK)
+	uint32_t ms;
+
+	ms = HAL_GetTick();
+	while (1)
 	{
-		humInterface.Start = &FS_SHT4X_Start;
-		humInterface.Stop = &FS_SHT4X_Stop;
-	}
-	else if (FS_HTS221_Init(&humData) == FS_HUM_OK)
-	{
-		humInterface.Start = &FS_HTS221_Start;
-		humInterface.Stop = &FS_HTS221_Stop;
-	}
-	else
-	{
-		Error_Handler();	// Should never be called
+		if (HAL_GetTick() - ms > TIMEOUT)
+		{
+			Error_Handler();
+		}
+
+		// Check for SHT4x
+		if (FS_SHT4X_Init(&humData) == FS_HUM_OK)
+		{
+			humInterface.Start = &FS_SHT4X_Start;
+			humInterface.Stop = &FS_SHT4X_Stop;
+			break;
+		}
+
+		// Check for HTS221
+		if (FS_HTS221_Init(&humData) == FS_HUM_OK)
+		{
+			humInterface.Start = &FS_HTS221_Start;
+			humInterface.Stop = &FS_HTS221_Stop;
+			break;
+		}
 	}
 }
 
