@@ -25,6 +25,7 @@
 
 #include "main.h"
 #include "active_mode.h"
+#include "app_ble.h"
 #include "app_common.h"
 #include "button.h"
 #include "config_mode.h"
@@ -118,9 +119,13 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 	else if (event == FS_MODE_EVENT_BUTTON_RELEASED)
 	{
 		// Update button state
-		if (button_state != BUTTON_IDLE)
+		if (button_state == BUTTON_FIRST_PRESS)
 		{
 			button_state = BUTTON_RELEASED;
+		}
+		else if (button_state == BUTTON_SECOND_PRESS)
+		{
+			button_state = BUTTON_IDLE;
 		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
@@ -135,6 +140,11 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		{
 			FS_ActiveMode_Init();
 			next_mode = FS_MODE_STATE_ACTIVE;
+		}
+		else if (prev_state == BUTTON_RELEASED)
+		{
+			// Start fast advertising
+			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{

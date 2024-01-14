@@ -24,7 +24,6 @@
 #include <stdbool.h>
 
 #include "main.h"
-#include "app_ble.h"
 #include "app_common.h"
 #include "stm32_seq.h"
 #include "button.h"
@@ -84,9 +83,6 @@ static void FS_Button_Timer(void)
 		{
 			// Update mode
 			FS_Mode_PushQueue(FS_MODE_EVENT_BUTTON_PRESSED);
-
-			// Start fast advertising
-			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
 		}
 
 		// Stop debounce timer
