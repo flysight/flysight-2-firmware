@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,26 +21,14 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef HUM_H_
-#define HUM_H_
+#ifndef HTS221_H_
+#define HTS221_H_
 
-typedef enum
-{
-  FS_HUM_OK       = 0x00,
-  FS_HUM_ERROR    = 0x01
-} FS_Hum_Result_t;
+#include "hum.h"
 
-typedef struct
-{
-	uint32_t time;			// ms
-	uint16_t humidity;		// rH % * 10
-	uint16_t temperature;	// degrees C * 10
-} FS_Hum_Data_t;
+FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data);
+void FS_HTS221_Start(void);
+void FS_HTS221_Stop(void);
+void FS_HTS221_Read(void);
 
-void FS_Hum_Init(void);
-void FS_Hum_Start(void);
-void FS_Hum_Stop(void);
-const FS_Hum_Data_t *FS_Hum_GetData(void);
-void FS_Hum_DataReady_Callback(void);
-
-#endif /* HUM_H_ */
+#endif /* HTS221_H_ */
