@@ -85,18 +85,16 @@ FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
 
 	// Set up serial number read
 	buf[0] = SHT4X_READ_SERIAL_NUMBER;
-	do
+	if (FS_Sensor_Transmit(SHT4X_ADDR, buf, 1) != HAL_OK)
 	{
-		result = FS_Sensor_Transmit(SHT4X_ADDR, buf, 1);
+		return FS_HUM_ERROR;
 	}
-	while (result != HAL_OK);
 
 	// Read serial number
-	do
+	if (FS_Sensor_Receive(SHT4X_ADDR, buf, 6) != HAL_OK)
 	{
-		result = FS_Sensor_Receive(SHT4X_ADDR, buf, 6);
+		return FS_HUM_ERROR;
 	}
-	while (result != HAL_OK);
 
 	// Check serial number CRC
 	if ((CRC8(&buf[0], 2) != buf[2])

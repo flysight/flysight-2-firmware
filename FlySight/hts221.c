@@ -74,11 +74,10 @@ FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
 	humData = data;
 
 	// Read WHO_AM_I register value
-	do
+	if (FS_Sensor_Read(HTS221_ADDR, HTS221_REG_WHO_AM_I, buf, 1) != HAL_OK)
 	{
-		result = FS_Sensor_Read(HTS221_ADDR, HTS221_REG_WHO_AM_I, buf, 1);
+		return FS_HUM_ERROR;
 	}
-	while (result != HAL_OK);
 
 	// Check WHO_AM_I register value
 	if (buf[0] != 0xbc)
