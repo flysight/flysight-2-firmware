@@ -6,6 +6,7 @@
  */
 
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "main.h"
 #include "app_common.h"
@@ -35,34 +36,42 @@
 static          FS_Baro_Data_t baroBuf[BARO_COUNT];	// data buffer
 static          uint32_t       baroRdI;				// read index
 static volatile uint32_t       baroWrI;				// write index
+static          uint32_t       baroRemaining;		// minimum overhead
 
-static          FS_Hum_Data_t humBuf[HUM_COUNT];	// data buffer
-static          uint32_t      humRdI;				// read index
-static volatile uint32_t      humWrI;				// write index
+static          FS_Hum_Data_t  humBuf[HUM_COUNT];	// data buffer
+static          uint32_t       humRdI;				// read index
+static volatile uint32_t       humWrI;				// write index
+static          uint32_t       humRemaining;		// minimum overhead
 
-static          FS_Mag_Data_t magBuf[MAG_COUNT];	// data buffer
-static          uint32_t      magRdI;				// read index
-static volatile uint32_t      magWrI;				// write index
+static          FS_Mag_Data_t  magBuf[MAG_COUNT];	// data buffer
+static          uint32_t       magRdI;				// read index
+static volatile uint32_t       magWrI;				// write index
+static          uint32_t       magRemaining;		// minimum overhead
 
 static          FS_GNSS_Data_t gnssBuf[GNSS_COUNT];	// data buffer
 static          uint32_t       gnssRdI;				// read index
 static volatile uint32_t       gnssWrI;				// write index
+static          uint32_t       gnssRemaining;		// minimum overhead
 
 static          FS_GNSS_Time_t timeBuf[TIME_COUNT];	// data buffer
 static          uint32_t       timeRdI;				// read index
 static volatile uint32_t       timeWrI;				// write index
+static          uint32_t       timeRemaining;		// minimum overhead
 
 static          FS_GNSS_Raw_t  rawBuf[RAW_COUNT];	// data buffer
 static          uint32_t       rawRdI;				// read index
 static volatile uint32_t       rawWrI;				// write index
+static          uint32_t       rawRemaining;		// minimum overhead
 
 static          FS_IMU_Data_t  imuBuf[IMU_COUNT];	// data buffer
 static          uint32_t       imuRdI;				// read index
 static volatile uint32_t       imuWrI;				// write index
+static          uint32_t       imuRemaining;		// minimum overhead
 
 static          FS_VBAT_Data_t vbatBuf[VBAT_COUNT];	// data buffer
 static          uint32_t       vbatRdI;				// read index
 static volatile uint32_t       vbatWrI;				// write index
+static          uint32_t       vbatRemaining;		// minimum overhead
 
 static FIL gnssFile;
 static FIL sensorFile;
@@ -75,7 +84,16 @@ static bool validDateTime;
 static FS_GNSS_Data_t saved_data;
 
 static uint32_t updateCount;
+static uint32_t updateTotalTime;
+static uint32_t updateMaxTime;
+static uint32_t updateLastCall;
+static uint32_t updateMaxInterval;
+
 static uint32_t syncCount;
+static uint32_t syncTotalTime;
+static uint32_t syncMaxTime;
+static uint32_t syncLastCall;
+static uint32_t syncMaxInterval;
 
 typedef enum
 {
@@ -121,13 +139,13 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 void FS_Log_UpdateHum(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Hum_Data_t *data = &humBuf[humRdI % HUM_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
 	ptr = writeInt32ToBuf(ptr, data->humidity,    1, 1, ',');
@@ -138,7 +156,7 @@ void FS_Log_UpdateHum(void)
 	*(--ptr) = 'H';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++humRdI;
@@ -147,13 +165,13 @@ void FS_Log_UpdateHum(void)
 void FS_Log_UpdateBaro(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Baro_Data_t *data = &baroBuf[baroRdI % BARO_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
 	ptr = writeInt32ToBuf(ptr, data->pressure,    2, 1, ',');
@@ -165,7 +183,7 @@ void FS_Log_UpdateBaro(void)
 	*(--ptr) = 'B';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++baroRdI;
@@ -174,13 +192,13 @@ void FS_Log_UpdateBaro(void)
 void FS_Log_UpdateMag(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Mag_Data_t *data = &magBuf[magRdI % MAG_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
 	ptr = writeInt32ToBuf(ptr, data->z,           3, 1, ',');
@@ -193,7 +211,7 @@ void FS_Log_UpdateMag(void)
 	*(--ptr) = 'M';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++magRdI;
@@ -202,6 +220,7 @@ void FS_Log_UpdateMag(void)
 void FS_Log_UpdateGNSS(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_GNSS_Data_t *data = &gnssBuf[gnssRdI % GNSS_COUNT];
@@ -215,7 +234,6 @@ void FS_Log_UpdateGNSS(void)
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\n');
 	ptr = writeInt32ToBuf(ptr, data->sAcc,    2, 1, ',');
@@ -242,7 +260,7 @@ void FS_Log_UpdateGNSS(void)
 	*(--ptr) = 'G';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &gnssFile);
+	f_write(&gnssFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++gnssRdI;
@@ -251,13 +269,13 @@ void FS_Log_UpdateGNSS(void)
 void FS_Log_UpdateTime(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_GNSS_Time_t *time = &timeBuf[timeRdI % TIME_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, time->week,        0, 0, '\n');
 	ptr = writeInt32ToBuf(ptr, time->towMS,       3, 1, ',');
@@ -269,7 +287,7 @@ void FS_Log_UpdateTime(void)
 	*(--ptr) = 'T';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++timeRdI;
@@ -292,13 +310,13 @@ void FS_Log_UpdateRaw(void)
 void FS_Log_UpdateIMU(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_IMU_Data_t *data = &imuBuf[imuRdI % IMU_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
 	ptr = writeInt32ToBuf(ptr, data->az,          5, 1, ',');
@@ -314,7 +332,7 @@ void FS_Log_UpdateIMU(void)
 	*(--ptr) = 'I';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++imuRdI;
@@ -323,13 +341,13 @@ void FS_Log_UpdateIMU(void)
 void FS_Log_UpdateVBAT(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_VBAT_Data_t *data = &vbatBuf[vbatRdI % VBAT_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
 	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\n');
 	ptr = writeInt32ToBuf(ptr, data->time,    3, 1, ',');
@@ -340,7 +358,7 @@ void FS_Log_UpdateVBAT(void)
 	*(--ptr) = 'V';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++vbatRdI;
@@ -348,30 +366,38 @@ void FS_Log_UpdateVBAT(void)
 
 static void FS_Log_Update(void)
 {
-	const uint32_t ms = HAL_GetTick();
+	uint32_t msStart, msEnd;
 	const uint32_t gnssIndex = gnssWrI;
 	const uint32_t rawIndex = rawWrI;
 	FS_Log_SensorType_t next;
 
-	// Write all raw GNSS output
-	while (FS_Config_Get()->enable_raw &&
+	msStart = HAL_GetTick();
+
+	if (updateLastCall != 0)
+	{
+		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
+	}
+	updateLastCall = msStart;
+
+	// Write raw GNSS output
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			FS_Config_Get()->enable_raw &&
 			(rawRdI != rawIndex))
 	{
 		FS_Log_UpdateRaw();
 	}
 
-	// Write all GNSS log entries
-	while (gnssRdI != gnssIndex)
+	// Write GNSS log entries
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			(gnssRdI != gnssIndex))
 	{
 		FS_Log_UpdateGNSS();
 	}
 
-	// Write as many sensor log entries as we can
-	while ((next = FS_Log_GetNextSensor()) != FS_LOG_SENSOR_NONE)
+	// Write sensor log entries
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			((next = FS_Log_GetNextSensor()) != FS_LOG_SENSOR_NONE))
 	{
-		if (HAL_GetTick() >= ms + LOG_TIMEOUT)
-			break;
-
 		switch (next)
 		{
 		case FS_LOG_SENSOR_BARO:
@@ -404,10 +430,24 @@ static void FS_Log_Update(void)
 		// Call sync task
 		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
 	}
+
+	msEnd = HAL_GetTick();
+	updateTotalTime += msEnd - msStart;
+	updateMaxTime = MAX(updateMaxTime, msEnd - msStart);
 }
 
 static void FS_Log_Sync(void)
 {
+	uint32_t msStart, msEnd;
+
+	msStart = HAL_GetTick();
+
+	if (syncLastCall != 0)
+	{
+		syncMaxInterval = MAX(syncMaxInterval, msStart - syncLastCall);
+	}
+	syncLastCall = msStart;
+
 	switch (syncCount % 3)
 	{
 	case 0:
@@ -424,7 +464,11 @@ static void FS_Log_Sync(void)
 		break;
 	}
 
-	syncCount++;
+	++syncCount;
+
+	msEnd = HAL_GetTick();
+	syncTotalTime += msEnd - msStart;
+	syncMaxTime = MAX(syncMaxTime, msEnd - msStart);
 }
 
 static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
@@ -463,25 +507,42 @@ void FS_Log_Init(uint32_t temp_folder)
 	// Reset state
 	baroRdI = 0;
 	baroWrI = 0;
+	baroRemaining = BARO_COUNT;
 	humRdI = 0;
 	humWrI = 0;
+	humRemaining = HUM_COUNT;
 	magRdI = 0;
 	magWrI = 0;
+	magRemaining = MAG_COUNT;
 	gnssRdI = 0;
 	gnssWrI = 0;
+	gnssRemaining = GNSS_COUNT;
 	timeRdI = 0;
 	timeWrI = 0;
+	timeRemaining = TIME_COUNT;
 	rawRdI = 0;
 	rawWrI = 0;
+	rawRemaining = RAW_COUNT;
 	imuRdI = 0;
 	imuWrI = 0;
+	imuRemaining = IMU_COUNT;
 	vbatRdI = 0;
 	vbatWrI = 0;
+	vbatRemaining = VBAT_COUNT;
 
 	validDateTime = false;
 
 	updateCount = 0;
+	updateTotalTime = 0;
+	updateMaxTime = 0;
+	updateLastCall = 0;
+	updateMaxInterval = 0;
+
 	syncCount = 0;
+	syncTotalTime = 0;
+	syncMaxTime = 0;
+	syncLastCall = 0;
+	syncMaxInterval = 0;
 
 	// Create temporary folder
 	f_mkdir("/temp");
@@ -580,6 +641,28 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	// Delete timer
 	HW_TS_Delete(timer_id);
 
+	// Add event log entries for buffer info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu/%lu slots unused in $BARO message buffer", baroRemaining, BARO_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $HUM message buffer",  humRemaining, HUM_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $MAG message buffer",  magRemaining, MAG_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $GNSS message buffer", gnssRemaining, GNSS_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $TIME message buffer", timeRemaining, TIME_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $RAW message buffer",  rawRemaining, RAW_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $IMU message buffer",  imuRemaining, IMU_COUNT);
+	FS_Log_WriteEvent("%lu/%lu slots unused in $VBAT message buffer", vbatRemaining, VBAT_COUNT);
+
+	// Add event log entries for timing info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in log update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in log update task", updateMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to log update task", updateMaxInterval);
+
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in log sync task", syncTotalTime / syncCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in log sync task", syncMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to log sync task", syncMaxInterval);
+
 	// Close files
 	if (FS_Config_Get()->enable_raw)
 	{
@@ -645,88 +728,160 @@ void FS_Log_DeInit(uint32_t temp_folder)
 
 void FS_Log_WriteBaroData(const FS_Baro_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_Baro_Data_t *saved = &baroBuf[baroWrI % BARO_COUNT];
-	memcpy(saved, current, sizeof(FS_Baro_Data_t));
+	if (baroWrI < baroRdI + BARO_COUNT)
+	{
+		// Copy to circular buffer
+		FS_Baro_Data_t *saved = &baroBuf[baroWrI % BARO_COUNT];
+		memcpy(saved, current, sizeof(FS_Baro_Data_t));
 
-	// Increment write index
-	++baroWrI;
+		// Increment write index
+		++baroWrI;
+	}
+	else
+	{
+
+	}
+
+	baroRemaining = MIN(baroRemaining, baroRdI + BARO_COUNT - baroWrI);
 }
 
 void FS_Log_WriteHumData(const FS_Hum_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_Hum_Data_t *saved = &humBuf[humWrI % HUM_COUNT];
-	memcpy(saved, current, sizeof(FS_Hum_Data_t));
+	if (humWrI < humRdI + HUM_COUNT)
+	{
+		// Copy to circular buffer
+		FS_Hum_Data_t *saved = &humBuf[humWrI % HUM_COUNT];
+		memcpy(saved, current, sizeof(FS_Hum_Data_t));
 
-	// Increment write index
-	++humWrI;
+		// Increment write index
+		++humWrI;
+	}
+	else
+	{
+
+	}
+
+	humRemaining = MIN(humRemaining, humRdI + HUM_COUNT - humWrI);
 }
 
 void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_Mag_Data_t *saved = &magBuf[magWrI % MAG_COUNT];
-	memcpy(saved, current, sizeof(FS_Mag_Data_t));
+	if (magWrI < magRdI + MAG_COUNT)
+	{
+		// Copy to circular buffer
+		FS_Mag_Data_t *saved = &magBuf[magWrI % MAG_COUNT];
+		memcpy(saved, current, sizeof(FS_Mag_Data_t));
 
-	// Increment write index
-	++magWrI;
+		// Increment write index
+		++magWrI;
+	}
+	else
+	{
+
+	}
+
+	magRemaining = MIN(magRemaining, magRdI + MAG_COUNT - magWrI);
 }
 
 void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current)
 {
 	if (current->gpsFix == 3)
 	{
-		// Copy to circular buffer
-		FS_GNSS_Data_t *saved = &gnssBuf[gnssWrI % GNSS_COUNT];
-		memcpy(saved, current, sizeof(FS_GNSS_Data_t));
+		if (gnssWrI < gnssRdI + GNSS_COUNT)
+		{
+			// Copy to circular buffer
+			FS_GNSS_Data_t *saved = &gnssBuf[gnssWrI % GNSS_COUNT];
+			memcpy(saved, current, sizeof(FS_GNSS_Data_t));
 
-		// Increment write index
-		++gnssWrI;
+			// Increment write index
+			++gnssWrI;
+		}
+		else
+		{
+
+		}
+
+		gnssRemaining = MIN(gnssRemaining, gnssRdI + GNSS_COUNT - gnssWrI);
 	}
 }
 
 void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
 {
-	// Copy to circular buffer
-	FS_GNSS_Time_t *saved = &timeBuf[timeWrI % TIME_COUNT];
-	memcpy(saved, current, sizeof(FS_GNSS_Time_t));
+	if (timeWrI < timeRdI + TIME_COUNT)
+	{
+		// Copy to circular buffer
+		FS_GNSS_Time_t *saved = &timeBuf[timeWrI % TIME_COUNT];
+		memcpy(saved, current, sizeof(FS_GNSS_Time_t));
 
-	// Increment write index
-	++timeWrI;
+		// Increment write index
+		++timeWrI;
+	}
+	else
+	{
+
+	}
+
+	timeRemaining = MIN(timeRemaining, timeRdI + TIME_COUNT - timeWrI);
 }
 
 void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current)
 {
 	if (FS_Config_Get()->enable_raw)
 	{
-		// Copy to circular buffer
-		FS_GNSS_Raw_t *saved = &rawBuf[rawWrI % RAW_COUNT];
-		memcpy(saved, current, sizeof(FS_GNSS_Raw_t));
+		if (rawWrI < rawRdI + RAW_COUNT)
+		{
+			// Copy to circular buffer
+			FS_GNSS_Raw_t *saved = &rawBuf[rawWrI % RAW_COUNT];
+			memcpy(saved, current, sizeof(FS_GNSS_Raw_t));
 
-		// Increment write index
-		++rawWrI;
+			// Increment write index
+			++rawWrI;
+		}
+		else
+		{
+
+		}
+
+		rawRemaining = MIN(rawRemaining, rawRdI + RAW_COUNT - rawWrI);
 	}
 }
 
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_IMU_Data_t *saved = &imuBuf[imuWrI % IMU_COUNT];
-	memcpy(saved, current, sizeof(FS_IMU_Data_t));
+	if (imuWrI < imuRdI + IMU_COUNT)
+	{
+		// Copy to circular buffer
+		FS_IMU_Data_t *saved = &imuBuf[imuWrI % IMU_COUNT];
+		memcpy(saved, current, sizeof(FS_IMU_Data_t));
 
-	// Increment write index
-	++imuWrI;
+		// Increment write index
+		++imuWrI;
+	}
+	else
+	{
+
+	}
+
+	imuRemaining = MIN(imuRemaining, imuRdI + IMU_COUNT - imuWrI);
 }
 
 void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current)
 {
-	// Copy to circular buffer
-	FS_VBAT_Data_t *saved = &vbatBuf[vbatWrI % VBAT_COUNT];
-	memcpy(saved, current, sizeof(FS_VBAT_Data_t));
+	if (vbatWrI < vbatRdI + VBAT_COUNT)
+	{
+		// Copy to circular buffer
+		FS_VBAT_Data_t *saved = &vbatBuf[vbatWrI % VBAT_COUNT];
+		memcpy(saved, current, sizeof(FS_VBAT_Data_t));
 
-	// Increment write index
-	++vbatWrI;
+		// Increment write index
+		++vbatWrI;
+	}
+	else
+	{
+
+	}
+
+	vbatRemaining = MIN(vbatRemaining,  vbatRdI + VBAT_COUNT - vbatWrI);
 }
 
 void FS_Log_WriteEvent(const char *format, ...)

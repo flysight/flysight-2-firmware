@@ -9,6 +9,7 @@
 #include "app_common.h"
 #include "config.h"
 #include "gnss.h"
+#include "log.h"
 #include "state.h"
 #include "stm32_seq.h"
 
@@ -366,6 +367,12 @@ static enum
 	st_ck_b
 } gnssState;
 
+static uint32_t gnssCount;
+static uint32_t gnssTotalTime;
+static uint32_t gnssMaxTime;
+static uint32_t gnssLastCall;
+static uint32_t gnssMaxInterval;
+static uint32_t gnssRemaining;
 
 // UART handle
 extern UART_HandleTypeDef huart1;
@@ -779,6 +786,13 @@ void FS_GNSS_Init(void)
 	gnssMsgReceived = 0;
 	validTime = false;
 
+	gnssCount = 0;
+	gnssTotalTime = 0;
+	gnssMaxTime = 0;
+	gnssLastCall = 0;
+	gnssMaxInterval = 0;
+	gnssRemaining = GNSS_RX_BUF_LEN;
+
 	do
 	{
 		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
@@ -840,6 +854,13 @@ void FS_GNSS_DeInit(void)
 
 	// Delete GNSS update timer
 	HW_TS_Delete(timer_id);
+
+	// Add event log entries for buffer info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu/%lu slots unused in GNSS buffer", gnssRemaining, GNSS_RX_BUF_LEN);
+	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task", gnssTotalTime / gnssCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in GNSS update task", gnssMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to GNSS update task", gnssMaxInterval);
 }
 
 void FS_GNSS_Start(void)
@@ -886,7 +907,19 @@ static void FS_GNSS_Timer(void)
 
 static void FS_GNSS_Update(void)
 {
+	uint32_t msStart, msEnd;
 	uint32_t writeIndex = GNSS_RX_BUF_LEN - huart1.hdmarx->Instance->CNDTR;
+
+	msStart = HAL_GetTick();
+
+	if (gnssLastCall != 0)
+	{
+		gnssMaxInterval = MAX(gnssMaxInterval, msStart - gnssLastCall);
+	}
+	gnssLastCall = msStart;
+
+	// Update statistics
+	gnssRemaining = MIN(gnssRemaining,  gnssRxIndex + GNSS_RX_BUF_LEN - writeIndex);
 
 	while (gnssRxIndex != writeIndex)
 	{
@@ -902,6 +935,12 @@ static void FS_GNSS_Update(void)
 		FS_GNSS_RawReady_Callback();
 		gnssRawIndex = writeIndex / GNSS_RAW_BUF_LEN;
 	}
+
+	++gnssCount;
+
+	msEnd = HAL_GetTick();
+	gnssTotalTime += msEnd - msStart;
+	gnssMaxTime = MAX(gnssMaxTime, msEnd - msStart);
 }
 
 const FS_GNSS_Data_t *FS_GNSS_GetData(void)
