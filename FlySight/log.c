@@ -18,18 +18,18 @@
 #include "time.h"
 #include "version.h"
 
-#define LOG_TIMEOUT     5		// Write timeout
+#define LOG_TIMEOUT     25		// Write timeout
 
-#define LOG_UPDATE_MSEC 10
+#define LOG_UPDATE_MSEC 50
 #define LOG_UPDATE_RATE (LOG_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
-#define BARO_COUNT	4
+#define BARO_COUNT	20
 #define HUM_COUNT	2
-#define MAG_COUNT	2
-#define GNSS_COUNT	2
+#define MAG_COUNT	10
+#define GNSS_COUNT	3
 #define TIME_COUNT	2
-#define RAW_COUNT	2
-#define IMU_COUNT   133
+#define RAW_COUNT	5
+#define IMU_COUNT   667
 #define VBAT_COUNT  2
 
 static          FS_Baro_Data_t baroBuf[BARO_COUNT];	// data buffer
@@ -398,7 +398,7 @@ static void FS_Log_Update(void)
 
 	++updateCount;
 
-	if (updateCount % 33 == 0)
+	if (updateCount % 6 == 0)
 	{
 		// Call sync task
 		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
