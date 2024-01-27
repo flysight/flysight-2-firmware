@@ -73,6 +73,9 @@ static uint8_t timer_id;
 static bool validDateTime;
 static FS_GNSS_Data_t saved_data;
 
+static uint32_t updateCount;
+static uint32_t syncCount;
+
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
@@ -392,6 +395,35 @@ static void FS_Log_Update(void)
 			break;		// should never be called
 		}
 	}
+
+	++updateCount;
+
+	if (updateCount % 33 == 0)
+	{
+		// Call sync task
+		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
+	}
+}
+
+static void FS_Log_Sync(void)
+{
+	switch (syncCount % 3)
+	{
+	case 0:
+		f_sync(&gnssFile);
+		break;
+	case 1:
+		if (FS_Config_Get()->enable_raw)
+		{
+			f_sync(&rawFile);
+		}
+		break;
+	case 2:
+		f_sync(&sensorFile);
+		break;
+	}
+
+	syncCount++;
 }
 
 static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
@@ -444,7 +476,11 @@ void FS_Log_Init(uint32_t temp_folder)
 	imuWrI = 0;
 	vbatRdI = 0;
 	vbatWrI = 0;
+
 	validDateTime = false;
+
+	updateCount = 0;
+	syncCount = 0;
 
 	// Create temporary folder
 	f_mkdir("/temp");
@@ -497,6 +533,7 @@ void FS_Log_Init(uint32_t temp_folder)
 
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_SYNC_ID, UTIL_SEQ_RFU, FS_Log_Sync);
 
 	// Initialize update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Log_Timer);
