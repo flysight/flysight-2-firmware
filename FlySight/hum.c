@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "config.h"
 #include "hum.h"
 #include "sensor.h"
 
@@ -23,12 +24,12 @@
 #define HUM_REG_H1_T0_OUT      (0x3a | 0x80)
 #define HUM_REG_T0_OUT         (0x3c | 0x80)
 
-static enum {
+typedef enum {
 	HUM_ODR_OS   = 0,
 	HUM_ODR_1    = 1,
 	HUM_ODR_7    = 2,
 	HUM_ODR_12_5 = 3
-} humODR = HUM_ODR_1;
+} FS_Hum_ODR_t;
 
 static FS_Hum_Data_t humData;
 
@@ -138,6 +139,7 @@ void FS_Hum_Init(void)
 
 void FS_Hum_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	// Enable EXTI pin
@@ -149,7 +151,7 @@ void FS_Hum_Start(void)
 		Error_Handler();
 
 	// Active mode; Output data rate 12.5 Hz; block data update
-	buf[0] = 0x84 | humODR;
+	buf[0] = 0x84 | config->hum_odr;
 	if (FS_Sensor_Write(HUM_ADDR, HUM_REG_CTRL_REG1, buf, 1) != HAL_OK)
 		Error_Handler();
 }
