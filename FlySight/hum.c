@@ -28,7 +28,7 @@ static enum {
 	HUM_ODR_1    = 1,
 	HUM_ODR_7    = 2,
 	HUM_ODR_12_5 = 3
-} humODR = HUM_ODR_12_5;
+} humODR = HUM_ODR_1;
 
 static FS_Hum_Data_t humData;
 

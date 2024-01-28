@@ -28,7 +28,7 @@ static enum {
 	BARO_ODR_75   = 5,
 	BARO_ODR_100  = 6,
 	BARO_ODR_200  = 7
-} baroODR = BARO_ODR_25;
+} baroODR = BARO_ODR_10;
 
 static uint8_t dataBuf[5];
 static FS_Baro_Data_t baroData;
