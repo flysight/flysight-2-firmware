@@ -24,12 +24,12 @@
 #define LOG_UPDATE_MSEC 50
 #define LOG_UPDATE_RATE (LOG_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
-#define BARO_COUNT	30
-#define HUM_COUNT	3
-#define MAG_COUNT	15
-#define GNSS_COUNT	6
-#define TIME_COUNT	2
-#define RAW_COUNT	5
+#define BARO_COUNT  30
+#define HUM_COUNT   3
+#define MAG_COUNT   15
+#define GNSS_COUNT  6
+#define TIME_COUNT  2
+#define RAW_COUNT   5
 #define IMU_COUNT   667
 #define VBAT_COUNT  2
 
