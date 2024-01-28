@@ -684,7 +684,7 @@ static void consumerTimer(void)
 	tone_timer += toneRate;
 
 	// Call consumer task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_CONTROL_CONSUMER_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_CONTROL_CONSUMER_ID, CFG_SCH_PRIO_0);
 }
 
 static void consumerTask(void)
@@ -894,5 +894,5 @@ void FS_AudioControl_DeInit(void)
 void FS_AudioControl_UpdateGNSS(const FS_GNSS_Data_t *current)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_CONTROL_PRODUCER_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_CONTROL_PRODUCER_ID, CFG_SCH_PRIO_0);
 }
