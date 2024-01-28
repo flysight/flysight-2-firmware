@@ -604,6 +604,7 @@ void FS_Log_Init(uint32_t temp_folder)
 	f_printf(&eventFile, "$COL,EVNT,time,description\n");
 	f_printf(&eventFile, "$UNIT,EVNT,s,\n");
 	f_printf(&eventFile, "$DATA\n");
+	f_sync(&eventFile);
 
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
