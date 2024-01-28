@@ -147,7 +147,8 @@ void FS_Log_UpdateHum(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->humidity,    1, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -173,7 +174,8 @@ void FS_Log_UpdateBaro(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->pressure,    2, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -200,7 +202,8 @@ void FS_Log_UpdateMag(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->z,           3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->y,           3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->x,           3, 1, ',');
@@ -235,7 +238,8 @@ void FS_Log_UpdateGNSS(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\r');
 	ptr = writeInt32ToBuf(ptr, data->sAcc,    2, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
@@ -277,7 +281,8 @@ void FS_Log_UpdateTime(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, time->week,        0, 0, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, time->week,        0, 0, '\r');
 	ptr = writeInt32ToBuf(ptr, time->towMS,       3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, time->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -318,7 +323,8 @@ void FS_Log_UpdateIMU(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->az,          5, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->ay,          5, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->ax,          5, 1, ',');
@@ -349,7 +355,8 @@ void FS_Log_UpdateVBAT(void)
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
-	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->time,    3, 1, ',');
 	*(--ptr) = ',';
 	*(--ptr) = 'T';
