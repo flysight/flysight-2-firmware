@@ -13,7 +13,7 @@
 #include "state.h"
 #include "stm32_seq.h"
 
-#define GNSS_RATE           230400	// Baud rate
+#define GNSS_RATE           460800	// Baud rate
 #define GNSS_TIMEOUT        100		// ACK/NAK timeout (ms)
 
 #define GNSS_UPDATE_MSEC    40
