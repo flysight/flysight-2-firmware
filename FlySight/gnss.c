@@ -29,13 +29,11 @@
 #include "state.h"
 #include "stm32_seq.h"
 
-#define GNSS_RATE           230400	// Baud rate
+#define GNSS_RATE           921600	// Baud rate
 #define GNSS_TIMEOUT        100		// ACK/NAK timeout (ms)
 
-#define GNSS_UPDATE_MSEC    10
+#define GNSS_UPDATE_MSEC    40
 #define GNSS_UPDATE_RATE    (GNSS_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
-
-#define GNSS_SAVED_LEN      8		// Buffer for stored GNSS messages
 
 #define UBX_NUM_CHANNELS	72		// For MAX-M8
 #define UBX_PAYLOAD_LEN		(8+12*UBX_NUM_CHANNELS) // Payload for single UBX message

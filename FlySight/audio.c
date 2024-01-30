@@ -51,9 +51,9 @@
 #define AUDIO_INDEX_BITS       7
 #define AUDIO_INTERPOLATE_BITS 8
 
-#define AUDIO_FRAME_LEN        1024
+#define AUDIO_FRAME_LEN        2048
 
-#define AUDIO_UPDATE_MSEC 10
+#define AUDIO_UPDATE_MSEC 40
 #define AUDIO_UPDATE_RATE (AUDIO_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
 static const int16_t sineTable[] =
