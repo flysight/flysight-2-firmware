@@ -25,8 +25,9 @@
 
 #include "main.h"
 #include "app_common.h"
-#include "ff.h"
 #include "audio.h"
+#include "ff.h"
+#include "log.h"
 #include "stm32_seq.h"
 
 #define PLLSAI1_TIMEOUT_VALUE (2U) /* 2 ms */
@@ -107,6 +108,12 @@ static FS_Audio_State_t audioState = AUDIO_IDLE;
 
 static uint8_t timer_id;
 
+static uint32_t updateCount;
+static uint32_t updateTotalTime;
+static uint32_t updateMaxTime;
+static uint32_t updateLastCall;
+static uint32_t updateMaxInterval;
+
 extern I2C_HandleTypeDef hi2c1;
 extern SAI_HandleTypeDef hsai_BlockA1;
 
@@ -153,6 +160,12 @@ void FS_Audio_Init(void)
 	uint32_t tickstart;
 
 	uint8_t buf[1];
+
+	// Reset state
+	updateCount = 0;
+	updateTotalTime = 0;
+	updateMaxTime = 0;
+	updateMaxInterval = 0;
 
 	/* Initialize I2C1 */
 	MX_I2C1_Init();
@@ -269,6 +282,12 @@ void FS_Audio_DeInit(void)
 
 	// Delete audio update timer
 	HW_TS_Delete(timer_id);
+
+	// Add event log entries for timing info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in audio update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in audio update task", updateMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to audio update task", updateMaxInterval);
 }
 
 static void FS_Audio_LoadTone(void)
@@ -377,6 +396,9 @@ void FS_Audio_Beep(
 	// Initialize audio buffer
 	FS_Audio_InitTransfer(audioLen);
 
+	// Reset last update call time
+	updateLastCall = 0;
+
 	// Start audio update timer
 	HW_TS_Start(timer_id, AUDIO_UPDATE_RATE);
 }
@@ -403,6 +425,9 @@ static bool FS_Audio_PlayFile(
 
 	// Initialize audio buffer
 	FS_Audio_InitTransfer(audioLen);
+
+	// Reset last update call time
+	updateLastCall = 0;
 
 	// Start audio update timer
 	HW_TS_Start(timer_id, AUDIO_UPDATE_RATE);
@@ -532,10 +557,19 @@ static void FS_Audio_Timer(void)
 
 static void FS_Audio_Update(void)
 {
-	if (audioState == AUDIO_IDLE) return;
-
+	uint32_t msStart, msEnd;
 	uint32_t primask_bit;
 	uint32_t cndtr, count;
+
+	if (audioState == AUDIO_IDLE) return;
+
+	msStart = HAL_GetTick();
+
+	if (updateLastCall != 0)
+	{
+		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
+	}
+	updateLastCall = msStart;
 
 	/* Enter critical section */
 	primask_bit = __get_PRIMASK();
@@ -573,4 +607,10 @@ static void FS_Audio_Update(void)
 		// Update buffer
 		FS_Audio_Load();
 	}
+
+	++updateCount;
+
+	msEnd = HAL_GetTick();
+	updateTotalTime += msEnd - msStart;
+	updateMaxTime = MAX(updateMaxTime, msEnd - msStart);
 }

@@ -91,6 +91,12 @@ static uint8_t timer_id;
 static bool validDateTime;
 static FS_GNSS_Data_t saved_data;
 
+static uint32_t updateCount;
+static uint32_t updateTotalTime;
+static uint32_t updateMaxTime;
+static uint32_t updateLastCall;
+static uint32_t updateMaxInterval;
+
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
@@ -362,10 +368,18 @@ void FS_Log_UpdateVBAT(void)
 
 static void FS_Log_Update(void)
 {
-	const uint32_t ms = HAL_GetTick();
+	uint32_t msStart, msEnd;
 	const uint32_t gnssIndex = gnssWrI;
 	const uint32_t rawIndex = rawWrI;
 	FS_Log_SensorType_t next;
+
+	msStart = HAL_GetTick();
+
+	if (updateLastCall != 0)
+	{
+		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
+	}
+	updateLastCall = msStart;
 
 	// Write all raw GNSS output
 	while (FS_Config_Get()->enable_raw &&
@@ -383,7 +397,7 @@ static void FS_Log_Update(void)
 	// Write as many sensor log entries as we can
 	while ((next = FS_Log_GetNextSensor()) != FS_LOG_SENSOR_NONE)
 	{
-		if (HAL_GetTick() >= ms + LOG_TIMEOUT)
+		if (HAL_GetTick() >= msStart + LOG_TIMEOUT)
 			break;
 
 		switch (next)
@@ -410,6 +424,12 @@ static void FS_Log_Update(void)
 			break;		// should never be called
 		}
 	}
+
+	++updateCount;
+
+	msEnd = HAL_GetTick();
+	updateTotalTime += msEnd - msStart;
+	updateMaxTime = MAX(updateMaxTime, msEnd - msStart);
 }
 
 static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
@@ -462,7 +482,14 @@ void FS_Log_Init(uint32_t temp_folder)
 	imuWrI = 0;
 	vbatRdI = 0;
 	vbatWrI = 0;
+
 	validDateTime = false;
+
+	updateCount = 0;
+	updateTotalTime = 0;
+	updateMaxTime = 0;
+	updateLastCall = 0;
+	updateMaxInterval = 0;
 
 	// Create temporary folder
 	f_mkdir("/temp");
@@ -560,6 +587,12 @@ void FS_Log_DeInit(uint32_t temp_folder)
 
 	// Delete timer
 	HW_TS_Delete(timer_id);
+
+	// Add event log entries for timing info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in log update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in log update task", updateMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to log update task", updateMaxInterval);
 
 	// Close files
 	if (FS_Config_Get()->enable_raw)

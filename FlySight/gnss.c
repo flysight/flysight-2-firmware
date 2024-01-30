@@ -25,6 +25,7 @@
 #include "app_common.h"
 #include "config.h"
 #include "gnss.h"
+#include "log.h"
 #include "state.h"
 #include "stm32_seq.h"
 
@@ -382,6 +383,11 @@ static enum
 	st_ck_b
 } gnssState;
 
+static uint32_t updateCount;
+static uint32_t updateTotalTime;
+static uint32_t updateMaxTime;
+static uint32_t updateLastCall;
+static uint32_t updateMaxInterval;
 
 // UART handle
 extern UART_HandleTypeDef huart1;
@@ -796,6 +802,12 @@ void FS_GNSS_Init(void)
 	gnssMsgReceived = 0;
 	validTime = false;
 
+	updateCount = 0;
+	updateTotalTime = 0;
+	updateMaxTime = 0;
+	updateLastCall = 0;
+	updateMaxInterval = 0;
+
 	do
 	{
 		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
@@ -857,6 +869,12 @@ void FS_GNSS_DeInit(void)
 
 	// Delete GNSS update timer
 	HW_TS_Delete(timer_id);
+
+	// Add event log entries for timing info
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in GNSS update task", updateMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to GNSS update task", updateMaxInterval);
 }
 
 void FS_GNSS_Start(void)
@@ -903,7 +921,16 @@ static void FS_GNSS_Timer(void)
 
 static void FS_GNSS_Update(void)
 {
+	uint32_t msStart, msEnd;
 	uint32_t writeIndex = GNSS_RX_BUF_LEN - huart1.hdmarx->Instance->CNDTR;
+
+	msStart = HAL_GetTick();
+
+	if (updateLastCall != 0)
+	{
+		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
+	}
+	updateLastCall = msStart;
 
 	while (gnssRxIndex != writeIndex)
 	{
@@ -919,6 +946,12 @@ static void FS_GNSS_Update(void)
 		FS_GNSS_RawReady_Callback();
 		gnssRawIndex = writeIndex / GNSS_RAW_BUF_LEN;
 	}
+
+	++updateCount;
+
+	msEnd = HAL_GetTick();
+	updateTotalTime += msEnd - msStart;
+	updateMaxTime = MAX(updateMaxTime, msEnd - msStart);
 }
 
 const FS_GNSS_Data_t *FS_GNSS_GetData(void)
