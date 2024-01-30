@@ -155,15 +155,16 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 void FS_Log_UpdateHum(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Hum_Data_t *data = &humBuf[humRdI % HUM_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->humidity,    1, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -172,7 +173,7 @@ void FS_Log_UpdateHum(void)
 	*(--ptr) = 'H';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++humRdI;
@@ -181,15 +182,16 @@ void FS_Log_UpdateHum(void)
 void FS_Log_UpdateBaro(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Baro_Data_t *data = &baroBuf[baroRdI % BARO_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->pressure,    2, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -199,7 +201,7 @@ void FS_Log_UpdateBaro(void)
 	*(--ptr) = 'B';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++baroRdI;
@@ -208,15 +210,16 @@ void FS_Log_UpdateBaro(void)
 void FS_Log_UpdateMag(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_Mag_Data_t *data = &magBuf[magRdI % MAG_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 1, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->z,           3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->y,           3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->x,           3, 1, ',');
@@ -227,7 +230,7 @@ void FS_Log_UpdateMag(void)
 	*(--ptr) = 'M';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++magRdI;
@@ -236,6 +239,7 @@ void FS_Log_UpdateMag(void)
 void FS_Log_UpdateGNSS(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_GNSS_Data_t *data = &gnssBuf[gnssRdI % GNSS_COUNT];
@@ -249,9 +253,9 @@ void FS_Log_UpdateGNSS(void)
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\r');
 	ptr = writeInt32ToBuf(ptr, data->sAcc,    2, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
@@ -276,7 +280,7 @@ void FS_Log_UpdateGNSS(void)
 	*(--ptr) = 'G';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &gnssFile);
+	f_write(&gnssFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++gnssRdI;
@@ -285,15 +289,16 @@ void FS_Log_UpdateGNSS(void)
 void FS_Log_UpdateTime(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_GNSS_Time_t *time = &timeBuf[timeRdI % TIME_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, time->week,        0, 0, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, time->week,        0, 0, '\r');
 	ptr = writeInt32ToBuf(ptr, time->towMS,       3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, time->time,        3, 1, ',');
 	*(--ptr) = ',';
@@ -303,7 +308,7 @@ void FS_Log_UpdateTime(void)
 	*(--ptr) = 'T';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++timeRdI;
@@ -326,15 +331,16 @@ void FS_Log_UpdateRaw(void)
 void FS_Log_UpdateIMU(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_IMU_Data_t *data = &imuBuf[imuRdI % IMU_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->temperature, 2, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->az,          5, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->ay,          5, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->ax,          5, 1, ',');
@@ -348,7 +354,7 @@ void FS_Log_UpdateIMU(void)
 	*(--ptr) = 'I';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++imuRdI;
@@ -357,15 +363,16 @@ void FS_Log_UpdateIMU(void)
 void FS_Log_UpdateVBAT(void)
 {
 	char row[150];
+	UINT bw;
 
 	// Get current data point
 	FS_VBAT_Data_t *data = &vbatBuf[vbatRdI % VBAT_COUNT];
 
 	// Write to disk
 	char *ptr = row + sizeof(row);
-	*(--ptr) = 0;
 
-	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\n');
+	*(--ptr) = '\n';
+	ptr = writeInt32ToBuf(ptr, data->voltage, 3, 1, '\r');
 	ptr = writeInt32ToBuf(ptr, data->time,    3, 1, ',');
 	*(--ptr) = ',';
 	*(--ptr) = 'T';
@@ -374,7 +381,7 @@ void FS_Log_UpdateVBAT(void)
 	*(--ptr) = 'V';
 	*(--ptr) = '$';
 
-	f_puts(ptr, &sensorFile);
+	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
 
 	// Increment read index
 	++vbatRdI;
