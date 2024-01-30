@@ -25,6 +25,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "config.h"
 #include "mag.h"
 #include "sensor.h"
 
@@ -35,12 +36,12 @@
 #define MAG_REG_OUTX_L_REG    (0x68 | 0x80)
 #define MAG_TEMP_OUT_L_REG    (0x6e | 0x80)
 
-static enum {
+typedef enum {
 	MAG_ODR_10  = 0,
 	MAG_ODR_20  = 1,
 	MAG_ODR_50  = 2,
 	MAG_ODR_100 = 3
-} magODR = MAG_ODR_10;
+} FS_Mag_ODR_t;
 
 static uint8_t dataBuf[8];
 static bool magDataGood;
@@ -85,13 +86,14 @@ void FS_Mag_Init(void)
 
 void FS_Mag_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_6);
 
 	// Temperature compensation; output data rate 10 Hz; continuous mode
-	buf[0] = (magODR << 2) | 0x80;
+	buf[0] = (config->mag_odr << 2) | 0x80;
 	if (FS_Sensor_Write(MAG_ADDR, MAG_REG_CFG_REG_A, buf, 1) != HAL_OK)
 		Error_Handler();
 

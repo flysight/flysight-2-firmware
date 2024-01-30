@@ -24,6 +24,7 @@
 #include "main.h"
 #include "app_common.h"
 #include "baro.h"
+#include "config.h"
 #include "sensor.h"
 
 #define BARO_ADDR             0xba
@@ -35,7 +36,7 @@
 #define BARO_REG_PRESS_OUT_XL 0x28
 #define BARO_REG_TEMP_OUT_L   0x2b
 
-static enum {
+typedef enum {
 	BARO_ODR_OS   = 0,
 	BARO_ODR_1    = 1,
 	BARO_ODR_10   = 2,
@@ -44,7 +45,7 @@ static enum {
 	BARO_ODR_75   = 5,
 	BARO_ODR_100  = 6,
 	BARO_ODR_200  = 7
-} baroODR = BARO_ODR_25;
+} FS_Baro_ODR_t;
 
 static uint8_t dataBuf[5];
 static FS_Baro_Data_t baroData;
@@ -88,13 +89,14 @@ void FS_Baro_Init(void)
 
 void FS_Baro_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_13);
 
 	// Output data rate 25 Hz; block data update
-	buf[0] = (baroODR << 4) | 0x02;
+	buf[0] = (config->baro_odr << 4) | 0x02;
 	if (FS_Sensor_Write(BARO_ADDR, BARO_REG_CTRL_REG1, buf, 1) != HAL_OK)
 		Error_Handler();
 

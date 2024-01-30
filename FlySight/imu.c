@@ -25,6 +25,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "config.h"
 #include "imu.h"
 #include "stm32_seq.h"
 
@@ -44,7 +45,7 @@
 #define LSM6DSO_REG_CTRL10_C        0x19
 #define LSM6DSO_OUT_TEMP_L_REG      0x20
 
-static enum {
+typedef enum {
 	ACCEL_ODR_PD   = 0,
 	ACCEL_ODR_12_5 = 0x1,
 	ACCEL_ODR_26   = 0x2,
@@ -57,16 +58,16 @@ static enum {
 	ACCEL_ODR_3333 = 0x9,
 	ACCEL_ODR_6666 = 0xa,
 	ACCEL_ODR_1_6  = 0xb
-} accelODR = ACCEL_ODR_12_5;
+} FS_IMU_AccelODR_t;
 
-static enum {
+typedef enum {
 	ACCEL_FS_2  = 0,
 	ACCEL_FS_16 = 1,
 	ACCEL_FS_4  = 2,
 	ACCEL_FS_8  = 3
-} accelFS = ACCEL_FS_16;
+} FS_IMU_AccelFS_t;
 
-static enum {
+typedef enum {
 	GYRO_ODR_PD = 0,
 	GYRO_ODR_12_5 = 0x1,
 	GYRO_ODR_26   = 0x2,
@@ -78,14 +79,14 @@ static enum {
 	GYRO_ODR_1666 = 0x8,
 	GYRO_ODR_3333 = 0x9,
 	GYRO_ODR_6666 = 0xa
-} gyroODR = GYRO_ODR_12_5;
+} FS_IMU_GyroODR_t;
 
-static enum {
+typedef enum {
 	GYRO_FS_250  = 0,
 	GYRO_FS_500  = 1,
 	GYRO_FS_1000 = 2,
 	GYRO_FS_2000 = 3
-} gyroFS = GYRO_FS_2000;
+} FS_IMU_GyroFS_t;
 
 static int32_t accelFactor;
 static int32_t gyroFactor;
@@ -199,6 +200,7 @@ void FS_IMU_Init(void)
 
 void FS_IMU_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 	uint32_t primask_bit;
 
@@ -210,11 +212,11 @@ void FS_IMU_Start(void)
 	FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, buf, 1);
 
 	// Set accelerometer ODR and FS
-	buf[0] = (accelODR << 4) | (accelFS << 2);
+	buf[0] = (config->accel_odr << 4) | (config->accel_fs << 2);
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL1_XL, buf, 1);
 
 	// Set gyro ODR and FS
-	buf[0] = (gyroODR << 4) | (gyroFS << 2);
+	buf[0] = (config->gyro_odr << 4) | (config->gyro_fs << 2);
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL2_G, buf, 1);
 
 	// Set BDU and push-pull on INT1
@@ -225,7 +227,7 @@ void FS_IMU_Start(void)
 	buf[0] = 0x04;
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL4_C, buf, 1);
 
-	switch (accelFS)
+	switch (config->accel_fs)
 	{
 	case ACCEL_FS_2:  accelFactor = 2 * 100000; break;
 	case ACCEL_FS_4:  accelFactor = 4 * 100000; break;
@@ -233,7 +235,7 @@ void FS_IMU_Start(void)
 	case ACCEL_FS_16: accelFactor = 16 * 100000; break;
 	}
 
-	switch (gyroFS)
+	switch (config->gyro_fs)
 	{
 	case GYRO_FS_250:  gyroFactor = 250 * 1000; break;
 	case GYRO_FS_500:  gyroFactor = 500 * 1000; break;

@@ -257,6 +257,14 @@ void FS_Config_Init(void)
 	config.ble_tx_power   = 25;
 	config.enable_raw     = 1;
 	config.cold_start     = 0;
+
+	config.baro_odr       = 2;
+	config.hum_odr        = 1;
+	config.mag_odr        = 0;
+	config.accel_odr      = 1;
+	config.accel_fs       = 1;
+	config.gyro_odr       = 1;
+	config.gyro_fs        = 3;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -297,7 +305,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Min",       config.min,          val, TRUE);
 		HANDLE_VALUE("Max",       config.max,          val, TRUE);
 		HANDLE_VALUE("Limits",    config.limits,       val, val >= 0 && val <= 2);
-		HANDLE_VALUE("Volume",    config.volume,      8 - val, val >= 0 && val <= 8);
+		HANDLE_VALUE("Volume",    config.volume,       8 - val, val >= 0 && val <= 8);
 		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 4) || (val >= 8 && val <= 9) || (val == 11));
 		HANDLE_VALUE("Min_Val_2", config.min_2,        val, TRUE);
 		HANDLE_VALUE("Max_Val_2", config.max_2,        val, TRUE);
@@ -305,7 +313,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Max_Rate",  config.max_rate,     val * FS_CONFIG_RATE_ONE_HZ / 100, val >= 0);
 		HANDLE_VALUE("Flatline",  config.flatline,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Sp_Rate",   config.sp_rate,      val * 1000, val >= 0 && val <= 32);
-		HANDLE_VALUE("Sp_Volume", config.sp_volume,   8 - val, val >= 0 && val <= 8);
+		HANDLE_VALUE("Sp_Volume", config.sp_volume,    8 - val, val >= 0 && val <= 8);
 		HANDLE_VALUE("V_Thresh",  config.threshold,    val, TRUE);
 		HANDLE_VALUE("H_Thresh",  config.hThreshold,   val, TRUE);
 		HANDLE_VALUE("Use_SAS",   config.use_sas,      val, val == 0 || val == 1);
@@ -332,6 +340,14 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Ble_Tx_Power",   config.ble_tx_power,   val, val >= 0 || val <= 31);
 		HANDLE_VALUE("Enable_Raw",     config.enable_raw,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Cold_Start",     config.cold_start,     val, val == 0 || val == 1);
+
+		HANDLE_VALUE("Baro_ODR",  config.baro_odr,     val, val >= 0 && val <= 7);
+		HANDLE_VALUE("Hum_ODR",   config.hum_odr,      val, val >= 0 && val <= 3);
+		HANDLE_VALUE("Mag_ODR",   config.mag_odr,      val, val >= 0 && val <= 3);
+		HANDLE_VALUE("Accel_ODR", config.accel_odr,    val, val >= 0 && val <= 11);
+		HANDLE_VALUE("Accel_FS",  config.accel_fs,     val, val >= 0 && val <= 3);
+		HANDLE_VALUE("Gyro_ODR",  config.gyro_odr,     val, val >= 0 && val <= 10);
+		HANDLE_VALUE("Gyro_FS",   config.gyro_fs,      val, val >= 0 && val <= 3);
 
 		#undef HANDLE_VALUE
 
