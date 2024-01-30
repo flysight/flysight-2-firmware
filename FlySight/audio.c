@@ -133,7 +133,7 @@ void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 		HW_TS_Stop(timer_id);
 
 		// Call update task
-		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_1);
+		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_0);
 	}
 }
 
@@ -553,7 +553,7 @@ void FS_Audio_Stop(void)
 static void FS_Audio_Timer(void)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_0);
 }
 
 static void FS_Audio_Update(void)
