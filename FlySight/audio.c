@@ -113,6 +113,7 @@ static uint32_t updateTotalTime;
 static uint32_t updateMaxTime;
 static uint32_t updateLastCall;
 static uint32_t updateMaxInterval;
+static uint32_t bufferUsed;
 
 extern I2C_HandleTypeDef hi2c1;
 extern SAI_HandleTypeDef hsai_BlockA1;
@@ -166,6 +167,7 @@ void FS_Audio_Init(void)
 	updateTotalTime = 0;
 	updateMaxTime = 0;
 	updateMaxInterval = 0;
+	bufferUsed = 0;
 
 	/* Initialize I2C1 */
 	MX_I2C1_Init();
@@ -285,6 +287,7 @@ void FS_Audio_DeInit(void)
 
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu/%lu slots used in audio buffer", bufferUsed, AUDIO_FRAME_LEN);
 	FS_Log_WriteEvent("%lu ms average time spent in audio update task", updateTotalTime / updateCount);
 	FS_Log_WriteEvent("%lu ms maximum time spent in audio update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to audio update task", updateMaxInterval);
@@ -603,6 +606,19 @@ static void FS_Audio_Update(void)
 	{
 		// Get read position
 		readPos = (count + 1) * AUDIO_FRAME_LEN - cndtr;
+
+		// Update buffer statistics
+		if (writePos != lastFrame * AUDIO_FRAME_LEN)
+		{
+			if (writePos > readPos)
+			{
+				bufferUsed = MAX(bufferUsed, readPos + AUDIO_FRAME_LEN - writePos);
+			}
+			else
+			{
+				bufferUsed = AUDIO_FRAME_LEN;
+			}
+		}
 
 		// Update buffer
 		FS_Audio_Load();
