@@ -22,6 +22,7 @@
 ****************************************************************************/
 
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "main.h"
 #include "app_common.h"
@@ -83,6 +84,7 @@ static volatile uint32_t       vbatWrI;				// write index
 static FIL gnssFile;
 static FIL sensorFile;
 static FIL rawFile;
+static FIL eventFile;
 
 static uint8_t timer_id;
 
@@ -511,6 +513,19 @@ void FS_Log_Init(uint32_t temp_folder)
 	f_printf(&sensorFile, "$UNIT,VBAT,s,volt\n");
 	f_printf(&sensorFile, "$DATA\n");
 
+	// Open event log file
+	sprintf(filename, "/temp/%04lu/event.csv", temp_folder);
+	if (f_open(&eventFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	{
+		Error_Handler();
+	}
+
+	FS_Log_WriteCommonHeader(&eventFile);
+	f_printf(&eventFile, "$COL,EVNT,time,description\n");
+	f_printf(&eventFile, "$UNIT,EVNT,s,\n");
+	f_printf(&eventFile, "$DATA\n");
+	f_sync(&eventFile);
+
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
 
@@ -553,6 +568,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	}
 	f_close(&gnssFile);
 	f_close(&sensorFile);
+	f_close(&eventFile);
 
 	if (validDateTime)
 	{
@@ -692,4 +708,37 @@ void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current)
 
 	// Increment write index
 	++vbatWrI;
+}
+
+void FS_Log_WriteEvent(const char *format, ...)
+{
+	const uint32_t time = HAL_GetTick();
+	char row[100];
+	char *ptr;
+	UINT bw;
+
+	va_list args;
+
+	// Write to disk
+	ptr = row + sizeof(row);
+	ptr = writeInt32ToBuf(ptr, time, 3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'T';
+	*(--ptr) = 'N';
+	*(--ptr) = 'V';
+	*(--ptr) = 'E';
+	*(--ptr) = '$';
+
+	f_write(&eventFile, ptr, row + sizeof(row) - ptr, &bw);
+
+	f_puts("\"", &eventFile);
+
+	va_start(args, format);
+	vsprintf(row, format, args);
+	f_puts(row, &eventFile);
+	va_end(args);
+
+	f_puts("\"\n", &eventFile);
+
+	f_sync(&eventFile);
 }
