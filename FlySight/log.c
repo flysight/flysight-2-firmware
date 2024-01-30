@@ -402,25 +402,25 @@ static void FS_Log_Update(void)
 	}
 	updateLastCall = msStart;
 
-	// Write all raw GNSS output
-	while (FS_Config_Get()->enable_raw &&
+	// Write raw GNSS output
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			FS_Config_Get()->enable_raw &&
 			(rawRdI != rawIndex))
 	{
 		FS_Log_UpdateRaw();
 	}
 
-	// Write all GNSS log entries
-	while (gnssRdI != gnssIndex)
+	// Write GNSS log entries
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			(gnssRdI != gnssIndex))
 	{
 		FS_Log_UpdateGNSS();
 	}
 
-	// Write as many sensor log entries as we can
-	while ((next = FS_Log_GetNextSensor()) != FS_LOG_SENSOR_NONE)
+	// Write sensor log entries
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			((next = FS_Log_GetNextSensor()) != FS_LOG_SENSOR_NONE))
 	{
-		if (HAL_GetTick() >= msStart + LOG_TIMEOUT)
-			break;
-
 		switch (next)
 		{
 		case FS_LOG_SENSOR_BARO:
