@@ -51,11 +51,9 @@
 #define AUDIO_INDEX_BITS       7
 #define AUDIO_INTERPOLATE_BITS 8
 
-#define AUDIO_FRAME_LEN        1024
-#define AUDIO_FRAME_COUNT      1
-#define AUDIO_BUF_LEN          (AUDIO_FRAME_LEN * AUDIO_FRAME_COUNT)
+#define AUDIO_FRAME_LEN        2048
 
-#define AUDIO_UPDATE_MSEC 10
+#define AUDIO_UPDATE_MSEC 40
 #define AUDIO_UPDATE_RATE (AUDIO_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
 static const int16_t sineTable[] =
@@ -82,7 +80,7 @@ static uint32_t audioStep;
 static uint32_t audioChirp;
 static uint32_t audioLen = 0;
 
-static int16_t audioBuffer[AUDIO_BUF_LEN];
+static int16_t audioBuffer[AUDIO_FRAME_LEN];
 
 static volatile uint32_t frameCount;
 static volatile uint32_t lastFrame;
@@ -127,7 +125,7 @@ void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 	if ((++frameCount) != lastFrame)
 	{
 		// Begin DMA transfer
-		HAL_SAI_Transmit_DMA(hsai, (uint8_t*) audioBuffer, AUDIO_BUF_LEN);
+		HAL_SAI_Transmit_DMA(hsai, (uint8_t*) audioBuffer, AUDIO_FRAME_LEN);
 	}
 	else
 	{
@@ -135,7 +133,7 @@ void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 		HW_TS_Stop(timer_id);
 
 		// Call update task
-		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_1);
+		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_0);
 	}
 }
 
@@ -299,8 +297,8 @@ static void FS_Audio_LoadTone(void)
 
 	uint32_t size, i;
 
-	size = MIN(readPos + AUDIO_BUF_LEN - writePos, audioLen);
-	size = MIN(AUDIO_BUF_LEN, size);
+	size = MIN(readPos + AUDIO_FRAME_LEN - writePos, audioLen);
+	size = MIN(AUDIO_FRAME_LEN, size);
 
 	for (i = 0; i < size; ++i, phase += audioStep, audioStep += audioChirp)
 	{
@@ -313,7 +311,7 @@ static void FS_Audio_LoadTone(void)
 		const int16_t val = (val1 * a2 + val2 * a1) / (1 << AUDIO_INTERPOLATE_BITS);
 
 		// Copy sample into audioBuffer
-		audioBuffer[writePos % AUDIO_BUF_LEN] = val;
+		audioBuffer[writePos % AUDIO_FRAME_LEN] = val;
 
 		++writePos;
 	}
@@ -326,14 +324,14 @@ static void FS_Audio_LoadFile(void)
 	uint32_t size, s1, s2;
 	UINT br;
 
-	size = MIN(readPos + AUDIO_BUF_LEN - writePos, audioLen);
-	size = MIN(AUDIO_BUF_LEN, size);
+	size = MIN(readPos + AUDIO_FRAME_LEN - writePos, audioLen);
+	size = MIN(AUDIO_FRAME_LEN, size);
 
-	s1 = MIN(AUDIO_BUF_LEN - (writePos % AUDIO_BUF_LEN), size);
+	s1 = MIN(AUDIO_FRAME_LEN - (writePos % AUDIO_FRAME_LEN), size);
 	s2 = size - s1;
 
 	// Read a block of data
-	f_read(&audioFile, &audioBuffer[writePos % AUDIO_BUF_LEN], s1 * sizeof(audioBuffer[0]), &br);
+	f_read(&audioFile, &audioBuffer[writePos % AUDIO_FRAME_LEN], s1 * sizeof(audioBuffer[0]), &br);
 	f_read(&audioFile, &audioBuffer[0], s2 * sizeof(audioBuffer[0]), &br);
 
 	writePos += size;
@@ -555,7 +553,7 @@ void FS_Audio_Stop(void)
 static void FS_Audio_Timer(void)
 {
 	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_AUDIO_UPDATE_ID, CFG_SCH_PRIO_0);
 }
 
 static void FS_Audio_Update(void)

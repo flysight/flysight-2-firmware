@@ -26,8 +26,8 @@
 
 #include <stdbool.h>
 
-#define GNSS_RX_BUF_LEN		512						// Circular buffer for UART
-#define GNSS_RAW_BUF_LEN	(GNSS_RX_BUF_LEN / 2)	// Circular buffer for raw output
+#define GNSS_RX_BUF_LEN   2048  // Circular buffer for UART
+#define GNSS_RAW_BUF_LEN  512   // Circular buffer for raw output
 
 typedef struct
 {
