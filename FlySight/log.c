@@ -105,6 +105,12 @@ static uint32_t updateMaxTime;
 static uint32_t updateLastCall;
 static uint32_t updateMaxInterval;
 
+static uint32_t syncCount;
+static uint32_t syncTotalTime;
+static uint32_t syncMaxTime;
+static uint32_t syncLastCall;
+static uint32_t syncMaxInterval;
+
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
@@ -435,9 +441,50 @@ static void FS_Log_Update(void)
 
 	++updateCount;
 
+	if (updateCount % 33 == 0)
+	{
+		// Call sync task
+		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
+	}
+
 	msEnd = HAL_GetTick();
 	updateTotalTime += msEnd - msStart;
 	updateMaxTime = MAX(updateMaxTime, msEnd - msStart);
+}
+
+static void FS_Log_Sync(void)
+{
+	uint32_t msStart, msEnd;
+
+	msStart = HAL_GetTick();
+
+	if (syncLastCall != 0)
+	{
+		syncMaxInterval = MAX(syncMaxInterval, msStart - syncLastCall);
+	}
+	syncLastCall = msStart;
+
+	switch (syncCount % 3)
+	{
+	case 0:
+		f_sync(&gnssFile);
+		break;
+	case 1:
+		if (FS_Config_Get()->enable_raw)
+		{
+			f_sync(&rawFile);
+		}
+		break;
+	case 2:
+		f_sync(&sensorFile);
+		break;
+	}
+
+	++syncCount;
+
+	msEnd = HAL_GetTick();
+	syncTotalTime += msEnd - msStart;
+	syncMaxTime = MAX(syncMaxTime, msEnd - msStart);
 }
 
 static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
@@ -514,6 +561,12 @@ void FS_Log_Init(uint32_t temp_folder)
 	updateLastCall = 0;
 	updateMaxInterval = 0;
 
+	syncCount = 0;
+	syncTotalTime = 0;
+	syncMaxTime = 0;
+	syncLastCall = 0;
+	syncMaxInterval = 0;
+
 	// Create temporary folder
 	f_mkdir("/temp");
 	sprintf(filename, "/temp/%04lu", temp_folder);
@@ -578,6 +631,7 @@ void FS_Log_Init(uint32_t temp_folder)
 
 	// Initialize update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_UPDATE_ID, UTIL_SEQ_RFU, FS_Log_Update);
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_LOG_SYNC_ID, UTIL_SEQ_RFU, FS_Log_Sync);
 
 	// Initialize update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Log_Timer);
@@ -627,6 +681,11 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	FS_Log_WriteEvent("%lu ms average time spent in log update task", updateTotalTime / updateCount);
 	FS_Log_WriteEvent("%lu ms maximum time spent in log update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to log update task", updateMaxInterval);
+
+	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu ms average time spent in log sync task", syncTotalTime / syncCount);
+	FS_Log_WriteEvent("%lu ms maximum time spent in log sync task", syncMaxTime);
+	FS_Log_WriteEvent("%lu ms maximum time between calls to log sync task", syncMaxInterval);
 
 	// Close files
 	if (FS_Config_Get()->enable_raw)
