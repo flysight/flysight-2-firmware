@@ -118,6 +118,14 @@ typedef struct
 	uint8_t  ble_tx_power;
 	uint8_t  enable_raw;
 	uint8_t  cold_start;
+
+	uint8_t  baro_odr;
+	uint8_t  hum_odr;
+	uint8_t  mag_odr;
+	uint8_t  accel_odr;
+	uint8_t  accel_fs;
+	uint8_t  gyro_odr;
+	uint8_t  gyro_fs;
 } FS_Config_Data_t;
 
 typedef enum {

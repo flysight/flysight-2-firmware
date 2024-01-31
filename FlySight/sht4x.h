@@ -29,6 +29,5 @@
 FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data);
 void FS_SHT4X_Start(void);
 void FS_SHT4X_Stop(void);
-void FS_SHT4X_Read(void);
 
 #endif /* SHT4X_H_ */

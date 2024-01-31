@@ -23,12 +23,10 @@
 
 #include "main.h"
 #include "app_common.h"
-#include "hts221.h"
+#include "config.h"
 #include "hum.h"
 #include "sensor.h"
-
-#define SHT4X_MEAS_MSEC    100
-#define SHT4X_MEAS_RATE    (SHT4X_MEAS_MSEC*1000/CFG_TS_TICK_VAL)
+#include "sht4x.h"
 
 #define CRC_POLYNOMIAL 0x31
 
@@ -117,13 +115,32 @@ FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
 
 void FS_SHT4X_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
+
 	// Reset measurement flags
 	measure_ready = 0;
 	measure_busy = 0;
 
-	// Start measurement timer
+	// Create measurement timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_SHT4X_Read);
-	HW_TS_Start(timer_id, SHT4X_MEAS_RATE);
+
+	// Start measurement timer
+	switch(config->hum_odr)
+	{
+	case 0: // HTS221_ODR_OS
+		break;
+	case 1: // HTS221_ODR_1
+		HW_TS_Start(timer_id, 1000000UL / CFG_TS_TICK_VAL);
+		break;
+	case 2: // HTS221_ODR_7
+		HW_TS_Start(timer_id, 142857UL / CFG_TS_TICK_VAL);
+		break;
+	case 3: // HTS221_ODR_12_5
+		HW_TS_Start(timer_id, 80000UL / CFG_TS_TICK_VAL);
+		break;
+	default:
+		Error_Handler(); // Should never be called
+	}
 }
 
 void FS_SHT4X_Stop(void)

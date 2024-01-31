@@ -23,6 +23,7 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "config.h"
 #include "hts221.h"
 #include "hum.h"
 #include "sensor.h"
@@ -40,12 +41,12 @@
 #define HTS221_REG_H1_T0_OUT      (0x3a | 0x80)
 #define HTS221_REG_T0_OUT         (0x3c | 0x80)
 
-static enum {
+typedef enum {
 	HTS221_ODR_OS   = 0,
 	HTS221_ODR_1    = 1,
 	HTS221_ODR_7    = 2,
 	HTS221_ODR_12_5 = 3
-} humODR = HTS221_ODR_12_5;
+} FS_HTS221_ODR_t;
 
 static uint8_t H0_rH_x2;
 static uint8_t H1_rH_x2;
@@ -163,6 +164,7 @@ FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
 
 void FS_HTS221_Start(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	// Enable EXTI pin
@@ -174,7 +176,7 @@ void FS_HTS221_Start(void)
 		Error_Handler();
 
 	// Active mode; Output data rate 12.5 Hz; block data update
-	buf[0] = 0x84 | humODR;
+	buf[0] = 0x84 | config->hum_odr;
 	if (FS_Sensor_Write(HTS221_ADDR, HTS221_REG_CTRL_REG1, buf, 1) != HAL_OK)
 		Error_Handler();
 }
