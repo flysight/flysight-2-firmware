@@ -448,7 +448,7 @@ static void FS_Log_Update(void)
 
 	++updateCount;
 
-	if (updateCount % 33 == 0)
+	if (updateCount % 6 == 0)
 	{
 		// Call sync task
 		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
