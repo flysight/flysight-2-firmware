@@ -71,6 +71,7 @@
 #define UBX_CFG_VALSET      0x8a
 
 #define UBX_MON             0x0a
+#define UBX_MON_TXBUF       0x08
 #define UBX_MON_HW          0x09
 #define UBX_MON_SPAN        0x31
 
@@ -88,11 +89,9 @@
 #define UBX_SEC             0x27
 #define UBX_SEC_ECSIGN      0x04
 
-#define UBX_MSG_POSLLH      0x01
-#define UBX_MSG_PVT         0x02
-#define UBX_MSG_VELNED      0x04
-#define UBX_MSG_TIMEUTC     0x08
-#define UBX_MSG_ALL         (UBX_MSG_POSLLH | UBX_MSG_PVT | UBX_MSG_VELNED | UBX_MSG_TIMEUTC)
+#define UBX_MSG_PVT         0x01
+#define UBX_MSG_VELNED      0x02
+#define UBX_MSG_ALL         (UBX_MSG_PVT | UBX_MSG_VELNED)
 
 #define UBX_CFG_SEC_ECCFGSESSIONID0 0x06, 0x00, 0xf6, 0x50
 #define UBX_CFG_SEC_ECCFGSESSIONID1 0x07, 0x00, 0xf6, 0x50
@@ -317,6 +316,18 @@ typedef struct
 	uint8_t  refInfo;   // Time reference information
 }
 ubxTimTp_t;             // 16 bytes total
+
+typedef struct
+{
+	uint16_t pending[6];   // Bytes pending in transmit buffer
+	uint8_t  usage[6];     // Maximum usage in last period each target (%)
+	uint8_t  peakUsage[6]; // Maximum usage each target (%)
+	uint8_t  tUsage;       // Maximum usage last period all targets (%)
+	uint8_t  tPeakUsage;   // Maximum usage all targets (%)
+	uint8_t  errors;       // Error bitmask
+	uint8_t  reserved;     // Reserved
+}
+ubxMonTxbuf_t;             // 28 bytes total
 
 typedef struct
 {
@@ -590,21 +601,23 @@ static void FS_GNSS_ReceiveMessage(uint8_t msgReceived, uint32_t timeOfWeek)
 
 static void FS_GNSS_HandlePvt(void)
 {
+	gnssData.year = gnssPayload.navPvt.year;
+	gnssData.month = gnssPayload.navPvt.month;
+	gnssData.day = gnssPayload.navPvt.day;
+	gnssData.hour = gnssPayload.navPvt.hour;
+	gnssData.min = gnssPayload.navPvt.min;
+	gnssData.sec = gnssPayload.navPvt.sec;
+	gnssData.tAcc = gnssPayload.navPvt.tAcc;
+	gnssData.nano = gnssPayload.navPvt.nano;
 	gnssData.gpsFix = gnssPayload.navPvt.gpsFix;
 	gnssData.numSV = gnssPayload.navPvt.numSV;
+	gnssData.lon = gnssPayload.navPvt.lon;
+	gnssData.lat = gnssPayload.navPvt.lat;
+	gnssData.hMSL = gnssPayload.navPvt.hMSL;
+	gnssData.hAcc = gnssPayload.navPvt.hAcc;
+	gnssData.vAcc = gnssPayload.navPvt.vAcc;
 
 	FS_GNSS_ReceiveMessage(UBX_MSG_PVT, gnssPayload.navPvt.iTOW);
-}
-
-static void FS_GNSS_HandlePosition(void)
-{
-	gnssData.lon = gnssPayload.navPosLlh.lon;
-	gnssData.lat = gnssPayload.navPosLlh.lat;
-	gnssData.hMSL = gnssPayload.navPosLlh.hMSL;
-	gnssData.hAcc = gnssPayload.navPosLlh.hAcc;
-	gnssData.vAcc = gnssPayload.navPosLlh.vAcc;
-
-	FS_GNSS_ReceiveMessage(UBX_MSG_POSLLH, gnssPayload.navPosLlh.iTOW);
 }
 
 static void FS_GNSS_HandleVelocity(void)
@@ -617,20 +630,6 @@ static void FS_GNSS_HandleVelocity(void)
 	gnssData.sAcc = gnssPayload.navVelNed.sAcc;
 
 	FS_GNSS_ReceiveMessage(UBX_MSG_VELNED, gnssPayload.navVelNed.iTOW);
-}
-
-static void FS_GNSS_HandleTimeUTC(void)
-{
-	gnssData.tAcc = gnssPayload.navTimeUtc.tAcc;
-	gnssData.nano = gnssPayload.navTimeUtc.nano;
-	gnssData.year = gnssPayload.navTimeUtc.year;
-	gnssData.month = gnssPayload.navTimeUtc.month;
-	gnssData.day = gnssPayload.navTimeUtc.day;
-	gnssData.hour = gnssPayload.navTimeUtc.hour;
-	gnssData.min = gnssPayload.navTimeUtc.min;
-	gnssData.sec = gnssPayload.navTimeUtc.sec;
-
-	FS_GNSS_ReceiveMessage(UBX_MSG_TIMEUTC, gnssPayload.navTimeUtc.iTOW);
 }
 
 static void FS_GNSS_HandleTp(void)
@@ -650,14 +649,8 @@ static void FS_GNSS_HandleMessage(void)
 		case UBX_NAV_PVT:
 			FS_GNSS_HandlePvt();
 			break;
-		case UBX_NAV_POSLLH:
-			FS_GNSS_HandlePosition();
-			break;
 		case UBX_NAV_VELNED:
 			FS_GNSS_HandleVelocity();
-			break;
-		case UBX_NAV_TIMEUTC:
-			FS_GNSS_HandleTimeUTC();
 			break;
 		}
 		break;
@@ -685,20 +678,17 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NMEA, UBX_NMEA_GPGSV,  0},
 		{UBX_NMEA, UBX_NMEA_GPRMC,  0},
 		{UBX_NMEA, UBX_NMEA_GPVTG,  0},
-		{UBX_NAV,  UBX_NAV_POSLLH,  1},
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
-		{UBX_NAV,  UBX_NAV_TIMEUTC, 1},
-		{UBX_TIM,  UBX_TIM_TP ,     MIN(1, 1000 / config->rate)},
-		{UBX_SEC,  UBX_SEC_ECSIGN,  MIN(1, 10000 / config->rate)}
+		{UBX_TIM,  UBX_TIM_TP,      1},
+		{UBX_SEC,  UBX_SEC_ECSIGN,  10}
 	};
 
 	const ubxCfgMsg_t cfgMsgRaw[] =
 	{
-		{UBX_MON,  UBX_MON_HW,      1000 / config->rate},
-		{UBX_MON,  UBX_MON_SPAN,    1000 / config->rate},
-		{UBX_NAV,  UBX_NAV_SAT,     1000 / config->rate},
-		{UBX_NAV,  UBX_NAV_STATUS,  1000 / config->rate}
+		{UBX_MON,  UBX_MON_TXBUF,   1},
+		{UBX_MON,  UBX_MON_SPAN,    1},
+		{UBX_NAV,  UBX_NAV_SAT,     MAX(1, 1000 / config->rate)}
 	};
 
 	size_t i, n;
@@ -706,8 +696,8 @@ static void FS_GNSS_InitMessages(void)
 	const ubxCfgRate_t cfgRate =
 	{
 		.measRate   = config->rate, // Measurement rate (ms)
-		.navRate    = 1,        // Navigation rate (cycles)
-		.timeRef    = 0         // UTC time
+		.navRate    = 1,            // Navigation rate (cycles)
+		.timeRef    = 0             // UTC time
 	};
 
 	const ubxCfgNav5_t cfgNav5 =
@@ -944,11 +934,13 @@ static void FS_GNSS_Update(void)
 		}
 	}
 
-	if (FS_Config_Get()->enable_raw &&
-			(writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex))
+	if (FS_Config_Get()->enable_raw)
 	{
-		FS_GNSS_RawReady_Callback();
-		gnssRawIndex = writeIndex / GNSS_RAW_BUF_LEN;
+		while (writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex)
+		{
+			FS_GNSS_RawReady_Callback();
+			gnssRawIndex = (gnssRawIndex + 1) % (GNSS_RX_BUF_LEN / GNSS_RAW_BUF_LEN);
+		}
 	}
 
 	++updateCount;
