@@ -397,6 +397,7 @@ static uint32_t updateTotalTime;
 static uint32_t updateMaxTime;
 static uint32_t updateLastCall;
 static uint32_t updateMaxInterval;
+static uint32_t bufferUsed;
 
 // UART handle
 extern UART_HandleTypeDef huart1;
@@ -795,6 +796,7 @@ void FS_GNSS_Init(void)
 	updateMaxTime = 0;
 	updateLastCall = 0;
 	updateMaxInterval = 0;
+	bufferUsed = 0;
 
 	do
 	{
@@ -860,6 +862,7 @@ void FS_GNSS_DeInit(void)
 
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
+	FS_Log_WriteEvent("%lu/%lu slots used in GNSS buffer", bufferUsed, GNSS_RX_BUF_LEN);
 	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task", updateTotalTime / updateCount);
 	FS_Log_WriteEvent("%lu ms maximum time spent in GNSS update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to GNSS update task", updateMaxInterval);
@@ -919,6 +922,9 @@ static void FS_GNSS_Update(void)
 		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
 	}
 	updateLastCall = msStart;
+
+	// Update buffer statistics
+	bufferUsed = MAX(bufferUsed, (writeIndex - gnssRxIndex) % GNSS_RX_BUF_LEN);
 
 	while (gnssRxIndex != writeIndex)
 	{
