@@ -45,9 +45,9 @@ typedef struct
 	int32_t  lat;      // Latitude                     (deg)
 	int32_t  hMSL;     // Height above mean sea level  (mm)
 
-	int32_t  velN;     // North velocity               (cm/s)
-	int32_t  velE;     // East velocity                (cm/s)
-	int32_t  velD;     // Down velocity                (cm/s)
+	int32_t  velN;     // North velocity               (mm/s)
+	int32_t  velE;     // East velocity                (mm/s)
+	int32_t  velD;     // Down velocity                (mm/s)
 
 	int32_t  speed;    // 3D speed                     (cm/s)
 	int32_t  gSpeed;   // Ground speed                 (cm/s)
@@ -55,7 +55,7 @@ typedef struct
 	uint32_t tAcc;     // Time accuracy estimate       (ns)
 	uint32_t hAcc;     // Horizontal accuracy estimate (mm)
 	uint32_t vAcc;     // Vertical accuracy estimate   (mm)
-	uint32_t sAcc;     // Speed accuracy estimate      (cm/s)
+	uint32_t sAcc;     // Speed accuracy estimate      (mm/s)
 
 	uint8_t  gpsFix;   // GPS fix type
 	uint8_t  numSV;    // Number of SVs in solution

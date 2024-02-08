@@ -196,7 +196,7 @@ async def display_gnss(address):
             iTOW, lon, lat, hMSL, velN, velE, velD = unpack("<L6l", data)
             print(f'{iTOW/1e3:.3f}, '
                   f'{lon/1e7:.7f}, {lat/1e7:.7f}, {hMSL/1e3:.3f}, '
-                  f'{velN/1e2:.2f}, {velE/1e2:.2f}, {velD/1e2:.2f}')
+                  f'{velN/1e3:.3f}, {velE/1e3:.3f}, {velD/1e3:.3f}')
 
         await client.start_notify(GNSS_PV_UUID, gnss_notification_handler)
 

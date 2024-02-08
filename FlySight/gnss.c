@@ -616,18 +616,18 @@ static void FS_GNSS_HandlePvt(void)
 	gnssData.hMSL = gnssPayload.navPvt.hMSL;
 	gnssData.hAcc = gnssPayload.navPvt.hAcc;
 	gnssData.vAcc = gnssPayload.navPvt.vAcc;
+	gnssData.velN = gnssPayload.navPvt.velN;
+	gnssData.velE = gnssPayload.navPvt.velE;
+	gnssData.velD = gnssPayload.navPvt.velD;
+	gnssData.sAcc = gnssPayload.navPvt.sAcc;
 
 	FS_GNSS_ReceiveMessage(UBX_MSG_PVT, gnssPayload.navPvt.iTOW);
 }
 
 static void FS_GNSS_HandleVelocity(void)
 {
-	gnssData.velN = gnssPayload.navVelNed.velN;
-	gnssData.velE = gnssPayload.navVelNed.velE;
-	gnssData.velD = gnssPayload.navVelNed.velD;
 	gnssData.speed = gnssPayload.navVelNed.speed;
 	gnssData.gSpeed = gnssPayload.navVelNed.gSpeed;
-	gnssData.sAcc = gnssPayload.navVelNed.sAcc;
 
 	FS_GNSS_ReceiveMessage(UBX_MSG_VELNED, gnssPayload.navVelNed.iTOW);
 }

@@ -256,12 +256,12 @@ void FS_Log_UpdateGNSS(void)
 
 	*(--ptr) = '\n';
 	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\r');
-	ptr = writeInt32ToBuf(ptr, data->sAcc,    2, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->sAcc,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velD,    2, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velE,    2, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velN,    2, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->velD,    3, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->velE,    3, 1, ',');
+	ptr = writeInt32ToBuf(ptr, data->velN,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->hMSL,    3, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->lon,     7, 1, ',');
 	ptr = writeInt32ToBuf(ptr, data->lat,     7, 1, ',');
