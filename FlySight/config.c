@@ -232,6 +232,7 @@ void FS_Config_Init(void)
 	config.tz_offset     = 0;
 
 	config.init_mode     = 0;
+	*(config.init_filename) = '\0';
 
 	config.alarm_window_above = 0;
 	config.alarm_window_below = 0;
