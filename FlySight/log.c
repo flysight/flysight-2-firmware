@@ -736,6 +736,9 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		sprintf(oldPath, "/temp/%04lu/sensor.csv", temp_folder);
 		f_utime(oldPath, &fno);
 
+		sprintf(oldPath, "/temp/%04lu/event.csv", temp_folder);
+		f_utime(oldPath, &fno);
+
 		// Format date and time
 		sprintf(date, "%02d-%02d-%02d", year % 100, month, day);
 		sprintf(time, "%02d-%02d-%02d", hour, min, sec);
