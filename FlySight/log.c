@@ -590,6 +590,7 @@ void FS_Log_Init(uint32_t temp_folder)
 	f_printf(&gnssFile, "$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,numSV\n");
 	f_printf(&gnssFile, "$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,\n");
 	f_printf(&gnssFile, "$DATA\n");
+	f_sync(&gnssFile);
 
 	if (FS_Config_Get()->enable_raw)
 	{
@@ -599,6 +600,7 @@ void FS_Log_Init(uint32_t temp_folder)
 		{
 			Error_Handler();
 		}
+		f_sync(&rawFile);
 	}
 
 	// Open sensor log file
@@ -622,6 +624,7 @@ void FS_Log_Init(uint32_t temp_folder)
 	f_printf(&sensorFile, "$COL,VBAT,time,voltage\n");
 	f_printf(&sensorFile, "$UNIT,VBAT,s,volt\n");
 	f_printf(&sensorFile, "$DATA\n");
+	f_sync(&sensorFile);
 
 	// Open event log file
 	sprintf(filename, "/temp/%04lu/event.csv", temp_folder);
