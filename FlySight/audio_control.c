@@ -742,8 +742,8 @@ static void consumerTask(void)
 			else if (*speech_ptr == 't')
 			{
 				++speech_ptr;
-				filename[1] = *speech_ptr;
 				filename[0] = '1';
+				filename[1] = *speech_ptr;
 				filename[2] = '.';
 				filename[3] = 'w';
 				filename[4] = 'a';
@@ -792,6 +792,12 @@ static void consumerTask(void)
 						FS_Audio_Play("alt.wav", config->sp_volume * 5);
 						break;
 				}
+			}
+			else if (*speech_ptr == '/')
+			{
+				++speech_ptr;
+				FS_Audio_Play(speech_ptr, config->sp_volume * 5);
+				speech_ptr += strlen(speech_ptr) - 1;
 			}
 			else
 			{
@@ -850,7 +856,6 @@ void FS_AudioControl_Init(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t i;
-	char filename[13];
 
 	// Initialize state
 	cur_speech = 0;
@@ -894,10 +899,14 @@ void FS_AudioControl_Init(void)
 	}
 	else if (config->init_mode == 2)
 	{
-		filename[0] = '\0';
-		strncat(filename, config->init_filename, sizeof(filename) - 1);
-		strncat(filename, ".wav", sizeof(filename) - 1);
-		FS_Audio_Play(filename, config->sp_volume * 5);
+		if (strlen(config->init_filename))
+		{
+			strncpy(speech_buf, "/", sizeof(speech_buf));
+			strncat(speech_buf, config->init_filename,
+					sizeof(speech_buf) - strlen(speech_buf) - 1);
+			strncat(speech_buf, ".wav",
+					sizeof(speech_buf) - strlen(speech_buf) - 1);
+		}
 	}
 }
 
