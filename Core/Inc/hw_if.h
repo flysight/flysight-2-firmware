@@ -245,6 +245,14 @@ extern "C" {
    */
   void HW_TS_RTC_CountUpdated_AppNot(void);
 
+  /**
+   * @brief  Count the number of timers used
+   *
+   * @param  None
+   * @retval The number of timers used
+   */
+  uint8_t HW_TS_CountUsed();
+
 #ifdef __cplusplus
 }
 #endif
