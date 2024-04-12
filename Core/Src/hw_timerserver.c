@@ -891,3 +891,28 @@ __weak void HW_TS_RTC_Int_AppNot(uint32_t TimerProcessID, uint8_t TimerID, HW_TS
 
   return;
 }
+
+uint8_t HW_TS_CountUsed()
+{
+  uint8_t ret = 0;
+  uint8_t loop = 0;
+#if (CFG_HW_TS_USE_PRIMASK_AS_CRITICAL_SECTION == 1)
+  uint32_t primask_bit;
+#endif
+
+#if (CFG_HW_TS_USE_PRIMASK_AS_CRITICAL_SECTION == 1)
+  primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+  __disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+#endif
+
+  while((loop < CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER))
+  {
+    if (aTimerContext[loop].TimerIDStatus != TimerID_Free) ret++;
+    loop++;
+  }
+#if (CFG_HW_TS_USE_PRIMASK_AS_CRITICAL_SECTION == 1)
+  __set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+#endif
+
+  return(ret);
+}

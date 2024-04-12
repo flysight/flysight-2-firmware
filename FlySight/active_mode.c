@@ -74,6 +74,12 @@ void FS_ActiveMode_Init(void)
 	{
 		// Enable logging
 		FS_Log_Init(FS_State_Get()->temp_folder);
+
+		// Log timer usage adjusted for:
+		//   - FS_Control_Init
+		//   - FS_Log_Init
+		FS_Log_WriteEvent("%lu/%lu timers used before active mode initialization",
+				HW_TS_CountUsed() - 2, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
 	}
 
 	if (FS_Config_Get()->enable_audio)
@@ -231,6 +237,12 @@ void FS_ActiveMode_DeInit(void)
 
 	if (FS_Config_Get()->enable_logging)
 	{
+		// Log timer usage adjusted for:
+		//   - FS_Log_DeInit
+		FS_Log_WriteEvent("----------");
+		FS_Log_WriteEvent("%lu/%lu timers used after active mode de-initialization",
+				HW_TS_CountUsed() - 1, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
+
 		// Disable logging
 		FS_Log_DeInit(FS_State_Get()->temp_folder);
 	}
