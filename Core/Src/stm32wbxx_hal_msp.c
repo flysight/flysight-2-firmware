@@ -93,7 +93,7 @@ void HAL_MspInit(void)
 
   /* Peripheral interrupt init */
   /* HSEM_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(HSEM_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(HSEM_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(HSEM_IRQn);
 
   /* USER CODE BEGIN MspInit 1 */
@@ -146,7 +146,7 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
     HAL_GPIO_Init(VBAT_DIV_GPIO_Port, &GPIO_InitStruct);
 
     /* ADC1 interrupt Init */
-    HAL_NVIC_SetPriority(ADC1_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(ADC1_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(ADC1_IRQn);
   /* USER CODE BEGIN ADC1_MspInit 1 */
 
@@ -297,9 +297,9 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
     __HAL_LINKDMA(hi2c,hdmatx,hdma_i2c3_tx);
 
     /* I2C3 interrupt Init */
-    HAL_NVIC_SetPriority(I2C3_EV_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(I2C3_EV_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(I2C3_EV_IRQn);
-    HAL_NVIC_SetPriority(I2C3_ER_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(I2C3_ER_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(I2C3_ER_IRQn);
   /* USER CODE BEGIN I2C3_MspInit 1 */
 
@@ -469,7 +469,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     __HAL_LINKDMA(huart,hdmatx,hdma_lpuart1_tx);
 
     /* LPUART1 interrupt Init */
-    HAL_NVIC_SetPriority(LPUART1_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(LPUART1_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(LPUART1_IRQn);
   /* USER CODE BEGIN LPUART1_MspInit 1 */
 
@@ -532,7 +532,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     __HAL_LINKDMA(huart,hdmarx,hdma_usart1_rx);
 
     /* USART1 interrupt Init */
-    HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(USART1_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
   /* USER CODE BEGIN USART1_MspInit 1 */
 
