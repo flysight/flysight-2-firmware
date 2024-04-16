@@ -628,6 +628,7 @@ static void FS_GNSS_HandleVelocity(void)
 {
 	gnssData.speed = gnssPayload.navVelNed.speed;
 	gnssData.gSpeed = gnssPayload.navVelNed.gSpeed;
+	gnssData.heading = gnssPayload.navVelNed.heading;
 
 	FS_GNSS_ReceiveMessage(UBX_MSG_VELNED, gnssPayload.navVelNed.iTOW);
 }

@@ -32,6 +32,7 @@
 
 #define FS_CONFIG_UNITS_KMH     0
 #define FS_CONFIG_UNITS_MPH     1
+#define FS_CONFIG_UNITS_KNOTS   2
 
 #define FS_CONFIG_UNITS_METERS  0
 #define FS_CONFIG_UNITS_FEET    1
@@ -126,6 +127,13 @@ typedef struct
 	uint8_t  accel_fs;
 	uint8_t  gyro_odr;
 	uint8_t  gyro_fs;
+
+	int32_t  lat;
+	int32_t  lon;
+	int16_t  bearing;
+	uint16_t end_nav;
+	uint16_t max_dist;
+	uint16_t min_angle;
 } FS_Config_Data_t;
 
 typedef enum {

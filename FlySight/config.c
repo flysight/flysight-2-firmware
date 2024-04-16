@@ -266,6 +266,13 @@ void FS_Config_Init(void)
 	config.accel_fs       = 1;
 	config.gyro_odr       = 1;
 	config.gyro_fs        = 3;
+
+	config.lat            = 0;
+	config.lon            = 0;
+	config.bearing        = 0;
+	config.end_nav        = 0;
+	config.max_dist       = 10000;
+	config.min_angle      = 5;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -349,6 +356,13 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Accel_FS",  config.accel_fs,     val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Gyro_ODR",  config.gyro_odr,     val, val >= 0 && val <= 10);
 		HANDLE_VALUE("Gyro_FS",   config.gyro_fs,      val, val >= 0 && val <= 3);
+
+		HANDLE_VALUE("Lat",       config.lat,          val, val >= -900000000 && val <= 900000000);
+		HANDLE_VALUE("Lon",       config.lon,          val, val >= -1800000000 && val <= 1800000000);
+		HANDLE_VALUE("Bearing",   config.bearing,      val, val >= 0 && val <= 360);
+		HANDLE_VALUE("End_Nav",   config.end_nav,      val * 1000, TRUE);
+		HANDLE_VALUE("Max_Dist",  config.max_dist,     val, val >= 0 && val <= 10000);
+		HANDLE_VALUE("Min_Angle", config.min_angle,    val, val >= 0 && val <= 360);
 
 		#undef HANDLE_VALUE
 
