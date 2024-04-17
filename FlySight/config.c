@@ -204,7 +204,7 @@ static const char defaultConfig[] =
 
 void FS_Config_Init(void)
 {
-	config.model         = 7;
+	config.model         = FS_CONFIG_MODEL_AIRBORNE_2G;
 	config.rate          = 200;
 
 	config.mode          = FS_CONFIG_MODE_GLIDE_RATIO;
