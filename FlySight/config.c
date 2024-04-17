@@ -309,12 +309,12 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 
 		HANDLE_VALUE("Model",     config.model,        val, val >= 0 && val <= 8);
 		HANDLE_VALUE("Rate",      config.rate,         val, val >= 40 && val <= 1000);
-		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 4) || (val == 11));
+		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 7) || (val == 11));
 		HANDLE_VALUE("Min",       config.min,          val, TRUE);
 		HANDLE_VALUE("Max",       config.max,          val, TRUE);
 		HANDLE_VALUE("Limits",    config.limits,       val, val >= 0 && val <= 2);
 		HANDLE_VALUE("Volume",    config.volume,       8 - val, val >= 0 && val <= 8);
-		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 4) || (val >= 8 && val <= 9) || (val == 11));
+		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 9) || (val == 11));
 		HANDLE_VALUE("Min_Val_2", config.min_2,        val, TRUE);
 		HANDLE_VALUE("Max_Val_2", config.max_2,        val, TRUE);
 		HANDLE_VALUE("Min_Rate",  config.min_rate,     val * FS_CONFIG_RATE_ONE_HZ / 100, val >= 0);
