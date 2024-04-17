@@ -507,13 +507,13 @@ static void speakValue(
 		tVal = calcDistance(current->lat,current->lon,config->lat,config->lon);  // returns metres
 		switch (config->speech[cur_speech].units)
 		{
-		case FS_CONFIG_UNITS_KMH:
+		case FS_CONFIG_UNITS_METERS:
 			tVal = tVal / 10;
 			break;
-		case FS_CONFIG_UNITS_MPH:
+		case FS_CONFIG_UNITS_FEET:
 			tVal = (tVal * 100) / 1609;
 			break;
-		case FS_CONFIG_UNITS_KNOTS:
+		case FS_CONFIG_UNITS_NM:
 			tVal = (tVal * 100) / 1852;
 			break;
 		}
@@ -533,7 +533,7 @@ static void speakValue(
 		speech_ptr = writeInt32ToBuf(speech_ptr, 100 * atan2(current->velD, current->gSpeed) / M_PI * 180, 2, 1, 0);
 		break;
 	case FS_CONFIG_MODE_ALTITUDE:
-		if (config->speech[cur_speech].units == FS_CONFIG_UNITS_KMH)
+		if (config->speech[cur_speech].units == FS_CONFIG_UNITS_METERS)
 		{
 			step_size = 10000 * config->speech[cur_speech].decimals;
 		}
@@ -583,19 +583,19 @@ static void speakValue(
 	case FS_CONFIG_MODE_DISTANCE_TO_DESTINATION:
 		switch (config->speech[cur_speech].units)
 		{
-		case FS_CONFIG_UNITS_KMH:
-			*(end_ptr++) = 'i';
-			break;
-		case FS_CONFIG_UNITS_MPH:
+		case FS_CONFIG_UNITS_METERS:
 			*(end_ptr++) = 'K';
 			break;
-		case FS_CONFIG_UNITS_KNOTS:
+		case FS_CONFIG_UNITS_FEET:
+			*(end_ptr++) = 'i';
+			break;
+		case FS_CONFIG_UNITS_NM:
 			*(end_ptr++) = 'n';
 			break;
 		}
 		break;
 	case FS_CONFIG_MODE_ALTITUDE:
-		*(end_ptr++) = (config->speech[cur_speech].units == FS_CONFIG_UNITS_KMH) ? 'm' : 'f';
+		*(end_ptr++) = (config->speech[cur_speech].units == FS_CONFIG_UNITS_METERS) ? 'm' : 'f';
 		break;
 	}
 
