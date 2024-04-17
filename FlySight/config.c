@@ -207,13 +207,13 @@ void FS_Config_Init(void)
 	config.model         = 7;
 	config.rate          = 200;
 
-	config.mode          = 2;
+	config.mode          = FS_CONFIG_MODE_GLIDE_RATIO;
 	config.min           = 0;
 	config.max           = 300;
 	config.limits        = 1;
 	config.volume        = 2;
 
-	config.mode_2        = 9;
+	config.mode_2        = FS_CONFIG_MODE_CHANGE_IN_VALUE_1;
 	config.min_2         = 300;
 	config.max_2         = 1500;
 	config.min_rate      = FS_CONFIG_RATE_ONE_HZ;

@@ -223,13 +223,13 @@ static void getValues(
 
 	switch (mode)
 	{
-	case 0: // Horizontal speed
+	case FS_CONFIG_MODE_HORIZONTAL_SPEED:
 		*val = (current->gSpeed * 1024) / speed_mul;
 		break;
-	case 1: // Vertical speed
+	case FS_CONFIG_MODE_VERTICAL_SPEED:
 		*val = (current->velD * 1024) / speed_mul;
 		break;
-	case 2: // Glide ratio
+	case FS_CONFIG_MODE_GLIDE_RATIO:
 		if (current->velD != 0)
 		{
 			*val = 10000 * (int32_t) current->gSpeed / current->velD;
@@ -237,7 +237,7 @@ static void getValues(
 			*max *= 100;
 		}
 		break;
-	case 3: // Inverse glide ratio
+	case FS_CONFIG_MODE_INVERSE_GLIDE_RATIO:
 		if (current->gSpeed != 0)
 		{
 			*val = 10000 * current->velD / (int32_t) current->gSpeed;
@@ -245,10 +245,10 @@ static void getValues(
 			*max *= 100;
 		}
 		break;
-	case 4: // Total speed
+	case FS_CONFIG_MODE_TOTAL_SPEED:
 		*val = (current->speed * 1024) / speed_mul;
 		break;
-	case 5: // Direction to destination
+	case FS_CONFIG_MODE_DIRECTION_TO_DESTINATION:
 		//check if too far from destination for Nav, would indicate user error with Lat & Lon
 		if ((calcDistance(current->lat,current->lon,config->lat,config->lon) < config->max_dist) || (config->max_dist == 0))
 		{
@@ -257,7 +257,7 @@ static void getValues(
 			{
 				tVal=calcDirection(current->lat,current->lon,config->lat,config->lon,current->heading);
 				//check if heading not within UBX_min_angle deg of bearing or tones needed for other measurement
-				if ((ABS(tVal) > config->min_angle) || (config->mode_2 != 5) || (config->min_angle==0))
+				if ((ABS(tVal) > config->min_angle) || (config->mode_2 != FS_CONFIG_MODE_DIRECTION_TO_DESTINATION) || (config->min_angle==0))
 				{
 					*min = -180;
 					*max = 180;
@@ -274,7 +274,7 @@ static void getValues(
 			}
 		}
 		break;
-	case 6: // Distance to destination
+	case FS_CONFIG_MODE_DISTANCE_TO_DESTINATION:
 		*min = 0;
 		if(config->max_dist != 0 )
 		{
@@ -294,13 +294,13 @@ static void getValues(
 			*val = 0;  //set to lowest pitch/Hz
 		}
 		break;
-	case 7: // Direction to bearing
+	case FS_CONFIG_MODE_DIRECTION_TO_BEARING: // Direction to bearing
 		//check if above height tone should be silenced
 		if ((current->hMSL > (config->end_nav+config->dz_elev)) || (config->end_nav == 0))
 		{
 			tVal=calcRelBearing(config->bearing,current->heading);
 			//check if heading not within UBX_min_angle deg of bearing or tones needed for other measurement
-			if ((ABS(tVal) > config->min_angle) || (config->mode_2 != 7) || (config->min_angle==0))
+			if ((ABS(tVal) > config->min_angle) || (config->mode_2 != FS_CONFIG_MODE_DIRECTION_TO_BEARING) || (config->min_angle==0))
 			{
 				*min = -180;
 				*max = 180;
@@ -316,7 +316,7 @@ static void getValues(
 			}
 		}
 		break;
-	case 10: // Left/right
+	case FS_CONFIG_MODE_LEFT_RIGHT:
 		//check if too far from destination for Nav, would indicate user error with Lat & Lon
 		if ((calcDistance(current->lat,current->lon,config->lat,config->lon) < config->max_dist) || (config->max_dist == 0))
 		{
@@ -344,7 +344,7 @@ static void getValues(
 			}
 		}
 		break;
-	case 11: // Dive angle
+	case FS_CONFIG_MODE_DIVE_ANGLE:
 		*val = atan2(current->velD, current->gSpeed) / M_PI * 180;
 		break;
 	}
@@ -460,13 +460,13 @@ static void speakValue(
 
 	switch (config->speech[cur_speech].mode)
 	{
-	case 0: // Horizontal speed
+	case FS_CONFIG_MODE_HORIZONTAL_SPEED:
 		speech_ptr = writeInt32ToBuf(speech_ptr, (current->gSpeed * 1024) / speed_mul, 2, 1, 0);
 		break;
-	case 1: // Vertical speed
+	case FS_CONFIG_MODE_VERTICAL_SPEED:
 		speech_ptr = writeInt32ToBuf(speech_ptr, (current->velD * 1024) / speed_mul, 2, 1, 0);
 		break;
-	case 2: // Glide ratio
+	case FS_CONFIG_MODE_GLIDE_RATIO:
 		if (current->velD != 0)
 		{
 			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) current->gSpeed / current->velD, 2, 1, 0);
@@ -476,7 +476,7 @@ static void speakValue(
 			*(--speech_ptr) = '\0';
 		}
 		break;
-	case 3: // Inverse glide ratio
+	case FS_CONFIG_MODE_INVERSE_GLIDE_RATIO:
 		if (current->gSpeed != 0)
 		{
 			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) current->velD / current->gSpeed, 2, 1, 0);
@@ -486,10 +486,10 @@ static void speakValue(
 			*(--speech_ptr) = '\0';
 		}
 		break;
-	case 4: // Total speed
+	case FS_CONFIG_MODE_TOTAL_SPEED:
 		speech_ptr = writeInt32ToBuf(speech_ptr, (current->speed * 1024) / speed_mul, 2, 1, 0);
 		break;
-	case 5: // Direction to destination
+	case FS_CONFIG_MODE_DIRECTION_TO_DESTINATION:
 		//check if too far from destination for Nav, would indicate user error with Lat & Lon
 		if ((calcDistance(current->lat,current->lon,config->lat,config->lon) < config->max_dist) || (config->max_dist == 0))
 		{
@@ -502,7 +502,7 @@ static void speakValue(
 			}
 		}
 		break;
-	case 6: // Distance to destination
+	case FS_CONFIG_MODE_DISTANCE_TO_DESTINATION:
 		config->speech[cur_speech].decimals = 1;
 		tVal = calcDistance(current->lat,current->lon,config->lat,config->lon);  // returns metres
 		switch (config->speech[cur_speech].units)
@@ -520,7 +520,7 @@ static void speakValue(
 		tVal = tVal + 5; //for correct rounding when reducing to one decimal place
 		speech_ptr = writeInt32ToBuf(speech_ptr, tVal, 2, 1, 0);
 		break;
-	case 7: // Direction to bearing
+	case FS_CONFIG_MODE_DIRECTION_TO_BEARING:
 		//check if above height tone should be silenced
 		if ((current->hMSL > (config->end_nav+config->dz_elev)) || (config->end_nav == 0))
 		{
@@ -529,10 +529,10 @@ static void speakValue(
 			speech_ptr = writeInt32ToBuf(speech_ptr, ABS(tVal)*100, 2, 1, 0);
 		}
 		break;
-	case 11: // Dive angle
+	case FS_CONFIG_MODE_DIVE_ANGLE:
 		speech_ptr = writeInt32ToBuf(speech_ptr, 100 * atan2(current->velD, current->gSpeed) / M_PI * 180, 2, 1, 0);
 		break;
-	case 12: // Altitude
+	case FS_CONFIG_MODE_ALTITUDE:
 		if (config->speech[cur_speech].units == FS_CONFIG_UNITS_KMH)
 		{
 			step_size = 10000 * config->speech[cur_speech].decimals;
@@ -558,7 +558,7 @@ static void speakValue(
 
 	// Step 2: Truncate to the desired number of decimal places
 
-	if (config->speech[cur_speech].mode != 5)
+	if (config->speech[cur_speech].mode != FS_CONFIG_MODE_DIRECTION_TO_DESTINATION)
 	{
 		if (config->speech[cur_speech].decimals == 0) end_ptr -= 4;
 		else end_ptr -= 3 - config->speech[cur_speech].decimals;
@@ -568,19 +568,19 @@ static void speakValue(
 
 	switch (config->speech[cur_speech].mode)
 	{
-	case 0: // Horizontal speed
-	case 1: // Vertical speed
-	case 2: // Glide ratio
-	case 3: // Inverse glide ratio
-	case 4: // Total speed
-	case 11: // Dive angle
+	case FS_CONFIG_MODE_HORIZONTAL_SPEED:
+	case FS_CONFIG_MODE_VERTICAL_SPEED:
+	case FS_CONFIG_MODE_GLIDE_RATIO:
+	case FS_CONFIG_MODE_INVERSE_GLIDE_RATIO:
+	case FS_CONFIG_MODE_TOTAL_SPEED:
+	case FS_CONFIG_MODE_DIVE_ANGLE:
 		break;
-	case 5: // Direction to destination
-	case 7: // Direction to bearing
+	case FS_CONFIG_MODE_DIRECTION_TO_DESTINATION:
+	case FS_CONFIG_MODE_DIRECTION_TO_BEARING:
 		if(tVal < 0)			*(end_ptr++) = 'l';
 		else if (tVal > 0)		*(end_ptr++) = 'r';
 		break;
-	case 6: // Distance to destination
+	case FS_CONFIG_MODE_DISTANCE_TO_DESTINATION:
 		switch (config->speech[cur_speech].units)
 		{
 		case FS_CONFIG_UNITS_KMH:
@@ -594,7 +594,7 @@ static void speakValue(
 			break;
 		}
 		break;
-	case 12: // Altitude
+	case FS_CONFIG_MODE_ALTITUDE:
 		*(end_ptr++) = (config->speech[cur_speech].units == FS_CONFIG_UNITS_KMH) ? 'm' : 'f';
 		break;
 	}
@@ -739,9 +739,9 @@ static void updateTones(
 
 	getValues(current, config, config->mode, &val_1, &min_1, &max_1);
 
-	if (config->mode_2 == 5) // Direction to destination
+	if (config->mode_2 == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION) // Direction to destination
 	{
-		if (config->mode == 5)  //no need to re-calculate direction
+		if (config->mode == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION)  //no need to re-calculate direction
 		{
 			val_2 = ABS(val_1);
 		}
@@ -754,9 +754,9 @@ static void updateTones(
 		min_2 = 0;
 		max_2 = pow(180, 3);
 	}
-	else if (config->mode_2 == 7) // Direction to bearing
+	else if (config->mode_2 == FS_CONFIG_MODE_DIRECTION_TO_BEARING) // Direction to bearing
 	{
-		if (config->mode == 7)  //no need to re-calculate direction
+		if (config->mode == FS_CONFIG_MODE_DIRECTION_TO_BEARING)  //no need to re-calculate direction
 		{
 			val_2 = ABS(val_1);
 		}
@@ -768,7 +768,7 @@ static void updateTones(
 		min_2 = 0;
 		max_2 = 180;
 	}
-	else if (config->mode_2 == 8)
+	else if (config->mode_2 == FS_CONFIG_MODE_MAGNITUDE_OF_VALUE_1)
 	{
 		getValues(current, config, config->mode, &val_2, &min_2, &max_2);
 		if (val_2 != INVALID_VALUE)
@@ -776,7 +776,7 @@ static void updateTones(
 			val_2 = ABS(val_2);
 		}
 	}
-	else if (config->mode_2 == 9)
+	else if (config->mode_2 == FS_CONFIG_MODE_CHANGE_IN_VALUE_1)
 	{
 		x2 = x1;
 		x1 = x0;
@@ -811,7 +811,7 @@ static void updateTones(
 			{
 				for (i = 0; i < config->num_speech; ++i)
 				{
-					if ((config->speech[cur_speech].mode != 5) ||
+					if ((config->speech[cur_speech].mode != FS_CONFIG_MODE_DIRECTION_TO_DESTINATION) ||
 						(current->hMSL - config->dz_elev >= ALT_MIN * 1000))
 					{
 						speakValue(config, current);
@@ -1124,7 +1124,7 @@ void FS_AudioControl_Init(void)
 
 	for (i = 0; i < config->num_speech; ++i)
 	{
-		if (config->speech[i].mode == 5)
+		if (config->speech[i].mode == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION)
 		{
 			flags |= FLAG_SAY_ALTITUDE;
 		}
