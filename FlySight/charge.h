@@ -37,7 +37,7 @@ typedef enum
 	FS_CHARGE_COMPLETE
 } FS_Charge_State_t;
 
-void FS_Charge_Set(FS_Charge_Current_t charge_current);
+void FS_Charge_SetCurrent(FS_Charge_Current_t charge_current);
 FS_Charge_State_t FS_Charge_GetState(void);
 
 #endif /* CHARGE_H_ */

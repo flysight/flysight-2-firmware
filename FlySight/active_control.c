@@ -63,7 +63,7 @@ void FS_ActiveControl_Init(void)
 	FS_LED_On();
 
 	// Enable charging
-	FS_Charge_Set(FS_State_Get()->charge_current);
+	FS_Charge_SetCurrent(FS_State_Get()->charge_current);
 
 	// Initialize LED timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_ActiveControl_LED_Timer);
@@ -82,7 +82,7 @@ void FS_ActiveControl_DeInit(void)
 	HW_TS_Delete(led_timer_id);
 
 	// Disable charging
-	FS_Charge_Set(FS_CHARGE_DISABLE);
+	FS_Charge_SetCurrent(FS_CHARGE_DISABLE);
 
 	// Turn off LEDs
 	FS_LED_Off();

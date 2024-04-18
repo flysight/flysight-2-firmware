@@ -37,7 +37,7 @@ FS_Charge_State_t FS_Charge_GetState(void)
 	}
 }
 
-void FS_Charge_Set(FS_Charge_Current_t charge_current)
+void FS_Charge_SetCurrent(FS_Charge_Current_t charge_current)
 {
 	GPIO_PinState chg_en_lo, chg_en_hi;
 

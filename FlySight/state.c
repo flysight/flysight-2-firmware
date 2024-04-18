@@ -54,15 +54,18 @@ static void FS_State_WriteHex_32(FIL *file, const uint32_t *data, uint32_t count
 	}
 }
 
-#include <stdint.h>
-
 static uint32_t hexCharToUint(char c)
 {
-    if (c >= '0' && c <= '9') {
+    if (c >= '0' && c <= '9')
+    {
         return c - '0';
-    } else if (c >= 'a' && c <= 'f') {
+    }
+    else if (c >= 'a' && c <= 'f')
+    {
         return 10 + (c - 'a');
-    } else if (c >= 'A' && c <= 'F') {
+    }
+    else if (c >= 'A' && c <= 'F')
+    {
         return 10 + (c - 'A');
     }
     return 0; // Optionally handle invalid character error
@@ -72,9 +75,11 @@ static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
 {
     uint32_t i, j, value;
 
-    for (i = 0; i < count; ++i) {
+    for (i = 0; i < count; ++i)
+    {
         value = 0;
-        for (j = 0; j < 8; ++j) {
+        for (j = 0; j < 8; ++j)
+        {
             value = value << 4;
             value |= hexCharToUint(str[i * 8 + j]);
         }

@@ -66,7 +66,7 @@ void FS_USBControl_Init(void)
 	FS_LED_On();
 
 	// Enable charging
-	FS_Charge_Set(FS_State_Get()->charge_current);
+	FS_Charge_SetCurrent(FS_State_Get()->charge_current);
 
 	// Start update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_USBControl_Timer);
@@ -85,7 +85,7 @@ void FS_USBControl_DeInit(void)
 	HW_TS_Delete(timer_id);
 
 	// Disable charging
-	FS_Charge_Set(FS_CHARGE_DISABLE);
+	FS_Charge_SetCurrent(FS_CHARGE_DISABLE);
 
 	// Turn off LEDs
 	FS_LED_Off();
