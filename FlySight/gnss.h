@@ -51,6 +51,7 @@ typedef struct
 
 	int32_t  speed;    // 3D speed                     (cm/s)
 	int32_t  gSpeed;   // Ground speed                 (cm/s)
+	int32_t  heading;  // 2D heading                   (deg)
 
 	uint32_t tAcc;     // Time accuracy estimate       (ns)
 	uint32_t hAcc;     // Horizontal accuracy estimate (mm)

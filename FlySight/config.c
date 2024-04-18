@@ -204,16 +204,16 @@ static const char defaultConfig[] =
 
 void FS_Config_Init(void)
 {
-	config.model         = 7;
+	config.model         = FS_CONFIG_MODEL_AIRBORNE_2G;
 	config.rate          = 200;
 
-	config.mode          = 2;
+	config.mode          = FS_CONFIG_MODE_GLIDE_RATIO;
 	config.min           = 0;
 	config.max           = 300;
 	config.limits        = 1;
 	config.volume        = 2;
 
-	config.mode_2        = 9;
+	config.mode_2        = FS_CONFIG_MODE_CHANGE_IN_VALUE_1;
 	config.min_2         = 300;
 	config.max_2         = 1500;
 	config.min_rate      = FS_CONFIG_RATE_ONE_HZ;
@@ -266,6 +266,13 @@ void FS_Config_Init(void)
 	config.accel_fs       = 1;
 	config.gyro_odr       = 1;
 	config.gyro_fs        = 3;
+
+	config.lat            = 0;
+	config.lon            = 0;
+	config.bearing        = 0;
+	config.end_nav        = 0;
+	config.max_dist       = 10000;
+	config.min_angle      = 5;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -302,12 +309,12 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 
 		HANDLE_VALUE("Model",     config.model,        val, val >= 0 && val <= 8);
 		HANDLE_VALUE("Rate",      config.rate,         val, val >= 40 && val <= 1000);
-		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 4) || (val == 11));
+		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 7) || (val == 11));
 		HANDLE_VALUE("Min",       config.min,          val, TRUE);
 		HANDLE_VALUE("Max",       config.max,          val, TRUE);
 		HANDLE_VALUE("Limits",    config.limits,       val, val >= 0 && val <= 2);
 		HANDLE_VALUE("Volume",    config.volume,       8 - val, val >= 0 && val <= 8);
-		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 4) || (val >= 8 && val <= 9) || (val == 11));
+		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 9) || (val == 11));
 		HANDLE_VALUE("Min_Val_2", config.min_2,        val, TRUE);
 		HANDLE_VALUE("Max_Val_2", config.max_2,        val, TRUE);
 		HANDLE_VALUE("Min_Rate",  config.min_rate,     val * FS_CONFIG_RATE_ONE_HZ / 100, val >= 0);
@@ -349,6 +356,13 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Accel_FS",  config.accel_fs,     val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Gyro_ODR",  config.gyro_odr,     val, val >= 0 && val <= 10);
 		HANDLE_VALUE("Gyro_FS",   config.gyro_fs,      val, val >= 0 && val <= 3);
+
+		HANDLE_VALUE("Lat",       config.lat,          val, val >= -900000000 && val <= 900000000);
+		HANDLE_VALUE("Lon",       config.lon,          val, val >= -1800000000 && val <= 1800000000);
+		HANDLE_VALUE("Bearing",   config.bearing,      val, val >= 0 && val <= 360);
+		HANDLE_VALUE("End_Nav",   config.end_nav,      val * 1000, TRUE);
+		HANDLE_VALUE("Max_Dist",  config.max_dist,     val, val >= 0 && val <= 10000);
+		HANDLE_VALUE("Min_Angle", config.min_angle,    val, val >= 0 && val <= 360);
 
 		#undef HANDLE_VALUE
 
