@@ -34,8 +34,14 @@ typedef enum
 	FS_RESOURCE_COUNT
 } FS_Resource_t;
 
+typedef enum
+{
+	FS_RESOURCE_MANAGER_SUCCESS,
+	FS_RESOURCE_MANAGER_FAILURE
+} FS_ResourceManager_Result_t;
+
 void FS_ResourceManager_Init(void);
-void FS_ResourceManager_RequestResource(FS_Resource_t resource);
+FS_ResourceManager_Result_t FS_ResourceManager_RequestResource(FS_Resource_t resource);
 void FS_ResourceManager_ReleaseResource(FS_Resource_t resource);
 
 #endif /* RESOURCE_MANAGER_H_ */
