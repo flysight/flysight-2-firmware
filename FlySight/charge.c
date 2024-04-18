@@ -23,20 +23,9 @@
 
 #include "main.h"
 #include "app_common.h"
-#include "led.h"
+#include "charge.h"
 
-#define UPDATE_MSEC    1000
-#define UPDATE_TIMEOUT (UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
-
-typedef enum
-{
-	FS_CHARGE_ACTIVE = 0,
-	FS_CHARGE_COMPLETE
-} FS_Charge_State_t;
-
-static uint8_t timer_id;
-
-static FS_Charge_State_t FS_Charge_RawState(void)
+FS_Charge_State_t FS_Charge_GetState(void)
 {
 	if (HAL_GPIO_ReadPin(CHG_STAT_GPIO_Port, CHG_STAT_Pin))
 	{
@@ -48,44 +37,13 @@ static FS_Charge_State_t FS_Charge_RawState(void)
 	}
 }
 
-static void FS_Charge_Timer(void)
+void FS_Charge_Set(FS_Charge_Current_t charge_current)
 {
-	// Get charge state
-	FS_Charge_State_t raw_state = FS_Charge_RawState();
+	GPIO_PinState chg_en_lo, chg_en_hi;
 
-	if (raw_state == FS_CHARGE_ACTIVE)
-	{
-		/* Turn on red LED */
-		FS_LED_SetColour(FS_LED_RED);
-	}
-	else
-	{
-		/* Turn on green LED */
-		FS_LED_SetColour(FS_LED_GREEN);
-	}
-}
+	chg_en_lo = ((~charge_current) >> 0) & 1;
+	chg_en_hi = ((~charge_current) >> 1) & 1;
 
-void FS_Charge_Init(void)
-{
-	// Enable charging
-	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
-
-	// Initialize LEDs
-	FS_Charge_Timer();
-
-	// Start update timer
-	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Charge_Timer);
-	HW_TS_Start(timer_id, UPDATE_TIMEOUT);
-}
-
-void FS_Charge_DeInit(void)
-{
-	// Stop update timer
-	HW_TS_Stop(timer_id);
-	HW_TS_Delete(timer_id);
-
-	// Disable charging
-	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, chg_en_lo);
+	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, chg_en_hi);
 }

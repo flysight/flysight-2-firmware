@@ -24,7 +24,20 @@
 #ifndef CHARGE_H_
 #define CHARGE_H_
 
-void FS_Charge_Init(void);
-void FS_Charge_DeInit(void);
+#define FS_CHARGE_DISABLE 0
+#define FS_CHARGE_100MA   1
+#define FS_CHARGE_200MA   2
+#define FS_CHARGE_300MA   3
+
+typedef uint8_t FS_Charge_Current_t;
+
+typedef enum
+{
+	FS_CHARGE_ACTIVE = 0,
+	FS_CHARGE_COMPLETE
+} FS_Charge_State_t;
+
+void FS_Charge_Set(FS_Charge_Current_t charge_current);
+FS_Charge_State_t FS_Charge_GetState(void);
 
 #endif /* CHARGE_H_ */

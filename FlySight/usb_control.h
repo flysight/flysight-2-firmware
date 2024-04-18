@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,23 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef STATE_H_
-#define STATE_H_
+#ifndef USB_CONTROL_H_
+#define USB_CONTROL_H_
 
-#include "charge.h"
+void FS_USBControl_Init(void);
+void FS_USBControl_DeInit(void);
 
-typedef struct
-{
-	uint32_t device_id[3];
-	uint32_t session_id[3];
-	char     config_filename[13];
-	uint32_t temp_folder;
-	FS_Charge_Current_t charge_current;
-} FS_State_Data_t;
-
-void FS_State_Init(void);
-const FS_State_Data_t *FS_State_Get(void);
-void FS_State_NextSession(void);
-void FS_State_SetConfigFilename(const char *filename);
-
-#endif /* STATE_H_ */
+#endif /* CONTROL_H_ */

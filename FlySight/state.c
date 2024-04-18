@@ -54,6 +54,34 @@ static void FS_State_WriteHex_32(FIL *file, const uint32_t *data, uint32_t count
 	}
 }
 
+#include <stdint.h>
+
+static uint32_t hexCharToUint(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return 10 + (c - 'a');
+    } else if (c >= 'A' && c <= 'F') {
+        return 10 + (c - 'A');
+    }
+    return 0; // Optionally handle invalid character error
+}
+
+static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
+{
+    uint32_t i, j, value;
+
+    for (i = 0; i < count; ++i) {
+        value = 0;
+        for (j = 0; j < 8; ++j) {
+            value = value << 4;
+            value |= hexCharToUint(str[i * 8 + j]);
+        }
+        data[i] = value;
+    }
+}
+
 static void FS_State_Read(void)
 {
 	char    buffer[100];
@@ -61,6 +89,7 @@ static void FS_State_Read(void)
 
 	char    *name;
 	char    *result;
+	int32_t val;
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -78,16 +107,26 @@ static void FS_State_Read(void)
 		result = strtok(0, " \r\n\t:");
 		if (result == 0) continue ;
 
+		val = atol(result);
+
+		if (!strcmp(name, "Session_ID"))
+		{
+			FS_State_ReadHex_32(result, state.session_id, 3);
+		}
+
 		if (!strcmp(name, "Config_File"))
 		{
 			result[12] = '\0';
 			strncpy(state.config_filename, result, sizeof(state.config_filename));
 		}
 
-		if (!strcmp(name, "Temp_Folder"))
-		{
-			state.temp_folder = atol(result);
-		}
+		#define HANDLE_VALUE(s,w,r,t) \
+			if ((t) && !strcmp(name, (s))) { (w) = (r); }
+
+		HANDLE_VALUE("Temp_Folder", state.temp_folder,    val, val >= 0);
+		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
+
+		#undef HANDLE_VALUE
 	}
 
 	f_close(&stateFile);
@@ -137,6 +176,13 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
 	f_printf(&stateFile, "Temp_Folder:  %04lu\n\n", state.temp_folder);
 
+	f_printf(&stateFile, "; System configuration\n\n");
+
+	f_printf(&stateFile, "Charging:     %u ; 0 = No charging\n", state.charge_current);
+	f_printf(&stateFile, "                ; 1 = 100 mA\n");
+	f_printf(&stateFile, "                ; 2 = 200 mA (recommended)\n");
+	f_printf(&stateFile, "                ; 3 = 300 mA\n\n");
+
 	f_printf(&stateFile, "; Bootloader public key\n\n");
 
 	f_printf(&stateFile, "Pubkey_X:     ");
@@ -153,24 +199,33 @@ static void FS_State_Write(void)
 
 void FS_State_Init(void)
 {
-	HAL_StatusTypeDef res;
-	uint32_t counter;
-	uint32_t tickstart;
-
 	/* Initialize persistent state */
 	state.config_filename[0] = 0;
 	state.temp_folder = -1;
+	state.charge_current = 2;
 
 	/* Read current state */
 	FS_State_Read();
-
-	/* Increment temporary folder number */
-	++state.temp_folder;
 
 	/* Get device ID */
 	state.device_id[0] = HAL_GetUIDw0();
 	state.device_id[1] = HAL_GetUIDw1();
 	state.device_id[2] = HAL_GetUIDw2();
+}
+
+const FS_State_Data_t *FS_State_Get(void)
+{
+	return &state;
+}
+
+void FS_State_NextSession(void)
+{
+	HAL_StatusTypeDef res;
+	uint32_t counter;
+	uint32_t tickstart;
+
+	/* Increment temporary folder number */
+	++state.temp_folder;
 
 	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
 
@@ -208,11 +263,6 @@ void FS_State_Init(void)
 
 	/* Write updated state */
 	FS_State_Write();
-}
-
-const FS_State_Data_t *FS_State_Get(void)
-{
-	return &state;
 }
 
 void FS_State_SetConfigFilename(const char *filename)
