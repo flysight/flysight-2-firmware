@@ -22,13 +22,13 @@
 ****************************************************************************/
 
 #include "main.h"
+#include "active_control.h"
 #include "app_common.h"
 #include "app_fatfs.h"
 #include "audio.h"
 #include "audio_control.h"
 #include "baro.h"
 #include "config.h"
-#include "control.h"
 #include "gnss.h"
 #include "hum.h"
 #include "imu.h"
@@ -44,18 +44,15 @@ extern ADC_HandleTypeDef hadc1;
 
 void FS_ActiveMode_Init(void)
 {
-	/* Initialize controller */
-	FS_Control_Init();
-
-	/* Enable charging */
-	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
-
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 	/* Read persistent state */
 	FS_State_Init();
+	FS_State_NextSession();
+
+	/* Initialize controller */
+	FS_ActiveControl_Init();
 
 	/* Initialize configuration */
 	FS_Config_Init();
@@ -167,7 +164,7 @@ void FS_ActiveMode_Init(void)
 void FS_ActiveMode_DeInit(void)
 {
 	/* Disable controller */
-	FS_Control_DeInit();
+	FS_ActiveControl_DeInit();
 
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
 	{
@@ -249,8 +246,4 @@ void FS_ActiveMode_DeInit(void)
 
 	/* De-initialize FatFS */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-
-	/* Disable charging */
-	HAL_GPIO_WritePin(CHG_EN_LO_GPIO_Port, CHG_EN_LO_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(CHG_EN_HI_GPIO_Port, CHG_EN_HI_Pin, GPIO_PIN_SET);
 }

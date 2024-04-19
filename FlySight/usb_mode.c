@@ -23,37 +23,25 @@
 
 #include "main.h"
 #include "app_common.h"
-#include "charge.h"
-#include "led.h"
 #include "resource_manager.h"
+#include "state.h"
+#include "usb_control.h"
 #include "usb_device.h"
 #include "usbd_core.h"
-#include "usbd_storage_if.h"
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern UART_HandleTypeDef huart1;
 
-static void FS_USBMode_BeginActivity(void)
-{
-	FS_LED_Off();
-}
-
-
-static void FS_USBMode_EndActivity(void)
-{
-	FS_LED_On();
-}
-
 void FS_USBMode_Init(void)
 {
-	/* Enable charge status */
-	FS_Charge_Init();
-
-	/* Turn on LEDs */
-	FS_LED_On();
-
 	/* Initialize microSD */
-	FS_ResourceManager_RequestResource(FS_RESOURCE_MICROSD);
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+	// Read persistent state
+	FS_State_Init();
+
+	/* Initialize controller */
+	FS_USBControl_Init();
 
 	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
 
@@ -62,21 +50,12 @@ void FS_USBMode_Init(void)
 
 	/* Enable USB interface */
 	MX_USB_Device_Init();
-
-	/* Set disk activity callbacks */
-	USBD_SetActivityCallbacks(FS_USBMode_BeginActivity, FS_USBMode_EndActivity);
 }
 
 void FS_USBMode_DeInit(void)
 {
-	/* Clear disk activity callbacks */
-	USBD_SetActivityCallbacks(0, 0);
-
-	/* Turn off LEDs */
-	FS_LED_Off();
-
-	/* Disable charge status */
-	FS_Charge_DeInit();
+	/* Disable controller */
+	FS_USBControl_DeInit();
 
 	/* Algorithm to use USB on CPU1 comes from AN5289 Figure 9 */
 
@@ -102,5 +81,5 @@ void FS_USBMode_DeInit(void)
 	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
 
 	/* De-initialize microSD */
-	FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 }

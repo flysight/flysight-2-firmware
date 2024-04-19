@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,10 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef CONTROL_H_
-#define CONTROL_H_
+#ifndef USB_CONTROL_H_
+#define USB_CONTROL_H_
 
-void FS_Control_Init(void);
-void FS_Control_DeInit(void);
+void FS_USBControl_Init(void);
+void FS_USBControl_DeInit(void);
 
 #endif /* CONTROL_H_ */

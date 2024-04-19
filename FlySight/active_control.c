@@ -27,6 +27,7 @@
 #include "app_common.h"
 #include "audio_control.h"
 #include "baro.h"
+#include "charge.h"
 #include "config.h"
 #include "custom_app.h"
 #include "gnss.h"
@@ -35,6 +36,7 @@
 #include "led.h"
 #include "log.h"
 #include "mag.h"
+#include "state.h"
 #include "vbat.h"
 
 #define LED_BLINK_MSEC      900
@@ -49,33 +51,39 @@ static volatile enum {
 	FS_CONTROL_ACTIVE
 } state = FS_CONTROL_INACTIVE;
 
-static void FS_Control_LED_Timer(void)
+static void FS_ActiveControl_LED_Timer(void)
 {
 	// Turn on LED
 	FS_LED_On();
 }
 
-void FS_Control_Init(void)
+void FS_ActiveControl_Init(void)
 {
-	// Turn on green LED
+	// Initialize LEDs
 	FS_LED_SetColour(FS_LED_GREEN);
 	FS_LED_On();
 
+	// Enable charging
+	FS_Charge_SetCurrent(FS_State_Get()->charge_current);
+
 	// Initialize LED timer
-	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_Control_LED_Timer);
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_ActiveControl_LED_Timer);
 
 	// Initialize state
 	hasFix = false;
 	state = FS_CONTROL_ACTIVE;
 }
 
-void FS_Control_DeInit(void)
+void FS_ActiveControl_DeInit(void)
 {
 	// Update state
 	state = FS_CONTROL_INACTIVE;
 
 	// Delete timer
 	HW_TS_Delete(led_timer_id);
+
+	// Disable charging
+	FS_Charge_SetCurrent(FS_CHARGE_DISABLE);
 
 	// Turn off LEDs
 	FS_LED_Off();

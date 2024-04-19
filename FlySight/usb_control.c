@@ -21,23 +21,72 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef STATE_H_
-#define STATE_H_
+#include <stdbool.h>
 
+#include "main.h"
+#include "app_common.h"
 #include "charge.h"
+#include "led.h"
+#include "state.h"
+#include "usbd_storage_if.h"
 
-typedef struct
+#define UPDATE_MSEC    1000
+#define UPDATE_TIMEOUT (UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
+
+static uint8_t timer_id;
+
+static void FS_USBControl_Timer(void)
 {
-	uint32_t device_id[3];
-	uint32_t session_id[3];
-	char     config_filename[13];
-	uint32_t temp_folder;
-	FS_Charge_Current_t charge_current;
-} FS_State_Data_t;
+	if (FS_Charge_GetState() == FS_CHARGE_ACTIVE)
+	{
+		// Turn on red LED
+		FS_LED_SetColour(FS_LED_RED);
+	}
+	else
+	{
+		// Turn on green LED
+		FS_LED_SetColour(FS_LED_GREEN);
+	}
+}
 
-void FS_State_Init(void);
-const FS_State_Data_t *FS_State_Get(void);
-void FS_State_NextSession(void);
-void FS_State_SetConfigFilename(const char *filename);
+static void FS_USBControl_BeginActivity(void)
+{
+	FS_LED_Off();
+}
 
-#endif /* STATE_H_ */
+static void FS_USBControl_EndActivity(void)
+{
+	FS_LED_On();
+}
+
+void FS_USBControl_Init(void)
+{
+	// Initialize LEDs
+	FS_USBControl_Timer();
+	FS_LED_On();
+
+	// Enable charging
+	FS_Charge_SetCurrent(FS_State_Get()->charge_current);
+
+	// Start update timer
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_USBControl_Timer);
+	HW_TS_Start(timer_id, UPDATE_TIMEOUT);
+
+	// Set disk activity callbacks
+	USBD_SetActivityCallbacks(FS_USBControl_BeginActivity, FS_USBControl_EndActivity);
+}
+
+void FS_USBControl_DeInit(void)
+{
+	// Clear disk activity callbacks
+	USBD_SetActivityCallbacks(0, 0);
+
+	// Delete timer
+	HW_TS_Delete(timer_id);
+
+	// Disable charging
+	FS_Charge_SetCurrent(FS_CHARGE_DISABLE);
+
+	// Turn off LEDs
+	FS_LED_Off();
+}
