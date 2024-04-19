@@ -36,6 +36,7 @@
 #include "led.h"
 #include "log.h"
 #include "mag.h"
+#include "state.h"
 #include "vbat.h"
 
 #define LED_BLINK_MSEC      900
