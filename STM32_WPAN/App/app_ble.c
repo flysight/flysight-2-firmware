@@ -246,10 +246,8 @@ static void BLE_StatusNot(HCI_TL_CmdStatus_t Status);
 static void Ble_Tl_Init(void);
 static void Ble_Hci_Gap_Gatt_Init(void);
 static const uint8_t* BleGetBdAddress(void);
-#ifndef DISABLE_BLE_ADV
 static void Adv_Request(APP_BLE_ConnStatus_t NewStatus);
 static void Adv_Cancel(void);
-#endif
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0)
 static void BLE_SVC_L2CAP_Conn_Update(uint16_t ConnectionHandle);
 static void Connection_Interval_Update_Req(void);
@@ -258,10 +256,8 @@ static void Connection_Interval_Update_Req(void);
 /* USER CODE BEGIN PFP */
 static void LinkConfiguration(void);
 
-#ifndef DISABLE_BLE_ADV
 static void Adv_Mgr(void);
 static void Adv_Update(void);
-#endif
 /* USER CODE END PFP */
 
 /* External variables --------------------------------------------------------*/
@@ -365,15 +361,11 @@ void APP_BLE_Init(void)
    * From here, all initialization are BLE application specific
    */
 
-#ifndef DISABLE_BLE_ADV
   UTIL_SEQ_RegTask(1<<CFG_TASK_ADV_CANCEL_ID, UTIL_SEQ_RFU, Adv_Cancel);
-#endif
 
   /* USER CODE BEGIN APP_BLE_Init_4 */
   UTIL_SEQ_RegTask(1<<CFG_TASK_LINK_CONFIG_ID, UTIL_SEQ_RFU, LinkConfiguration);
-#ifndef DISABLE_BLE_ADV
   UTIL_SEQ_RegTask(1<<CFG_TASK_ADV_UPDATE_ID, UTIL_SEQ_RFU, Adv_Update);
-#endif
   /* USER CODE END APP_BLE_Init_4 */
 
   /**
@@ -402,10 +394,8 @@ void APP_BLE_Init(void)
   Custom_APP_Init();
 
   /* USER CODE BEGIN APP_BLE_Init_3 */
-#ifndef DISABLE_BLE_ADV
   /* Create timer to handle the connection state machine */
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &(BleApplicationContext.Advertising_mgr_timer_Id), hw_ts_SingleShot, Adv_Mgr);
-#endif
   /* USER CODE END APP_BLE_Init_3 */
 
   /**
@@ -414,12 +404,10 @@ void APP_BLE_Init(void)
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
-#ifndef DISABLE_BLE_ADV
   /**
    * Start to Advertise to be connected by a Client
    */
   Adv_Request(APP_BLE_FAST_ADV);
-#endif
 
   /* USER CODE BEGIN APP_BLE_Init_2 */
 
@@ -487,10 +475,8 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       }
       /* USER CODE END EVT_DISCONN_COMPLETE_1 */
 
-#ifndef DISABLE_BLE_ADV
       /* restart advertising */
       Adv_Request(APP_BLE_FAST_ADV);
-#endif
 
       /**
        * SPECIFIC to Custom Template APP
@@ -1031,7 +1017,6 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   APP_DBG_MSG("==>> End Ble_Hci_Gap_Gatt_Init function\n\r");
 }
 
-#ifndef DISABLE_BLE_ADV
 static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
@@ -1076,7 +1061,6 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 
   return;
 }
-#endif
 
 const uint8_t* BleGetBdAddress(void)
 {
@@ -1135,7 +1119,6 @@ const uint8_t* BleGetBdAddress(void)
  * SPECIFIC FUNCTIONS FOR CUSTOM
  *
  *************************************************************/
-#ifndef DISABLE_BLE_ADV
 static void Adv_Cancel(void)
 {
   /* USER CODE BEGIN Adv_Cancel_1 */
@@ -1166,7 +1149,6 @@ static void Adv_Cancel(void)
 
   return;
 }
-#endif
 
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0)
 void BLE_SVC_L2CAP_Conn_Update(uint16_t ConnectionHandle)
@@ -1232,7 +1214,6 @@ static void LinkConfiguration(void)
   }
 }
 
-#ifndef DISABLE_BLE_ADV
 static void Adv_Mgr(void)
 {
   /**
@@ -1338,7 +1319,6 @@ static void Adv_Update(void)
 {
   APP_BLE_Adv_Set(APP_BLE_LP_ADV);
 }
-#endif
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
 /*************************************************************
  *

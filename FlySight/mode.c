@@ -143,10 +143,8 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		}
 		else if (prev_state == BUTTON_RELEASED)
 		{
-#ifndef DISABLE_BLE_ADV
 			// Start fast advertising
 			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
-#endif
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{

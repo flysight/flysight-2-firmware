@@ -669,9 +669,7 @@ typedef enum
 /**< Add in that list all tasks that may send a ACI/HCI command */
 typedef enum
 {
-#ifndef DISABLE_BLE_ADV
   CFG_TASK_ADV_CANCEL_ID,
-#endif
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0 )
   CFG_TASK_CONN_UPDATE_REG_ID,
 #endif
