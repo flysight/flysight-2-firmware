@@ -237,7 +237,13 @@ uint8_t a_AdvData[10] =
 };
 
 /* USER CODE BEGIN PV */
-
+uint8_t a_ManufData[6] = {sizeof(a_ManufData)-1,
+                          AD_TYPE_MANUFACTURER_SPECIFIC_DATA,
+						  0xdb,
+						  0x09,
+						  0x00,
+						  0x01
+                          };
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -1303,6 +1309,17 @@ void APP_BLE_Adv_Set(APP_BLE_ConnStatus_t NewStatus)
     if (NewStatus == APP_BLE_FAST_ADV)
     {
       APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
+
+      ret = aci_gap_update_adv_data(sizeof(a_ManufData), (uint8_t*) a_ManufData);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("==>> Start Fast Advertising Failed , result: %d \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
+      }
+
       /* Start Timer to STOP ADV - TIMEOUT - and next Restart Low Power Advertising */
       HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
     }
