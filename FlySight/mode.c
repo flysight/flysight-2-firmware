@@ -125,7 +125,11 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		}
 		else if (button_state == BUTTON_SECOND_PRESS)
 		{
+			// Update button state
 			button_state = BUTTON_IDLE;
+
+			// Start fast advertising
+			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
 		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
@@ -140,11 +144,6 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		{
 			FS_ActiveMode_Init();
 			next_mode = FS_MODE_STATE_ACTIVE;
-		}
-		else if (prev_state == BUTTON_RELEASED)
-		{
-			// Start fast advertising
-			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{
