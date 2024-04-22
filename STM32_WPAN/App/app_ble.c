@@ -242,7 +242,7 @@ uint8_t a_ManufData[6] = {sizeof(a_ManufData)-1,
 						  0xdb,
 						  0x09,
 						  0x00,
-						  0x01
+						  0x00
                           };
 /* USER CODE END PV */
 
@@ -1052,6 +1052,17 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 /* USER CODE BEGIN Adv_Request_1*/
   /* Start Timer to STOP ADV - TIMEOUT - and next Restart Low Power Advertising */
   HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
+
+  a_ManufData[5] = 0x00;
+  ret = aci_gap_update_adv_data(sizeof(a_ManufData), (uint8_t*) a_ManufData);
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("==>> Start Fast Advertising Failed , result: %d \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
+  }
 /* USER CODE END Adv_Request_1*/
 
   /* Update Advertising data */
@@ -1291,8 +1302,28 @@ void APP_BLE_Adv_Set(APP_BLE_ConnStatus_t NewStatus)
     APP_DBG_MSG("==>> aci_gap_set_discoverable - Success\n");
   }
 
+  if (NewStatus == APP_BLE_FAST_ADV)
+  {
+    /* Start Timer to STOP ADV - TIMEOUT - and next Restart Low Power Advertising */
+    HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
+  }
+
   /* Update Advertising data */
-  ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+  if (NewStatus == APP_BLE_FAST_ADV)
+  {
+    a_ManufData[5] = 0x01;
+  }
+  else
+  {
+    a_ManufData[5] = 0x00;
+  }
+
+  ret = aci_gap_update_adv_data(sizeof(a_ManufData), (uint8_t*) a_ManufData);
+  if (ret == BLE_STATUS_SUCCESS)
+  {
+    ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+  }
+
   if (ret != BLE_STATUS_SUCCESS)
   {
     if (NewStatus == APP_BLE_FAST_ADV)
@@ -1309,19 +1340,6 @@ void APP_BLE_Adv_Set(APP_BLE_ConnStatus_t NewStatus)
     if (NewStatus == APP_BLE_FAST_ADV)
     {
       APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
-
-      ret = aci_gap_update_adv_data(sizeof(a_ManufData), (uint8_t*) a_ManufData);
-      if (ret != BLE_STATUS_SUCCESS)
-      {
-        APP_DBG_MSG("==>> Start Fast Advertising Failed , result: %d \n\r", ret);
-      }
-      else
-      {
-        APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
-      }
-
-      /* Start Timer to STOP ADV - TIMEOUT - and next Restart Low Power Advertising */
-      HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
     }
     else
     {
