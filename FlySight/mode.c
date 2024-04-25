@@ -127,9 +127,6 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		{
 			// Update button state
 			button_state = BUTTON_IDLE;
-
-			// Start fast advertising
-			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
 		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
