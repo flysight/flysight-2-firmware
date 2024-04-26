@@ -76,7 +76,8 @@ void APP_BLE_Init(void);
 APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
 
 /* USER CODE BEGIN EF */
-
+void APP_BLE_RequestPairing(void (*Callback)(void));
+void APP_BLE_CancelPairing(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus
