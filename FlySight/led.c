@@ -34,25 +34,29 @@ typedef enum
 static FS_LED_Colour_t savedColour = FS_LED_RED;
 static LED_State_t savedState = LED_OFF;
 
+extern TIM_HandleTypeDef htim1;
+
 static void update(void)
 {
 	if (savedState == LED_ON)
 	{
 		if (savedColour == FS_LED_RED)
 		{
-			HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
+			TIM1->CCR1 = 100;
+			TIM1->CCR2 = 0;
 		}
 		else
 		{
-			HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_SET);
+			TIM1->CCR1 = 0;
+			TIM1->CCR2 = 100;
 		}
+		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	}
 	else
 	{
-		HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
+		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
 	}
 }
 
