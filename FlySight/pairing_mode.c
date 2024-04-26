@@ -36,7 +36,7 @@ void FS_PairingMode_Init(void)
 {
 	// Initialize LEDs
 	FS_LED_SetColour(FS_LED_GREEN);
-	FS_LED_On();
+	FS_LED_Pulse();
 
 	// Request pairing
 	APP_BLE_RequestPairing(FS_PairingMode_Callback);
