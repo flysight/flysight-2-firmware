@@ -188,6 +188,7 @@ int main(void)
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &watchdog_timer_id, hw_ts_Repeated, Watchdog_Timer);
   HW_TS_Start(watchdog_timer_id, WATCHDOG_RESET_RATE);
 
+  FS_LED_Init();
   FS_Mode_Init();
   FS_Button_Init();
   FS_VBUS_Init();

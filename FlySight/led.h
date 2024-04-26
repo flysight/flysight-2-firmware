@@ -30,8 +30,11 @@ typedef enum
 	FS_LED_GREEN
 } FS_LED_Colour_t;
 
+void FS_LED_Init(void);
+void FS_LED_DeInit(void);
 void FS_LED_On(void);
 void FS_LED_Off(void);
-void FS_LED_SetColour(FS_LED_Colour_t colour);
+void FS_LED_Pulse(void);
+void FS_LED_SetColour(FS_LED_Colour_t newColour);
 
 #endif /* LED_H_ */
