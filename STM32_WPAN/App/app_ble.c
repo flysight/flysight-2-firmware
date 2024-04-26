@@ -237,6 +237,7 @@ uint8_t a_AdvData[10] =
 };
 
 /* USER CODE BEGIN PV */
+/* Advertising data */
 uint8_t a_ManufData[6] = {sizeof(a_ManufData)-1,
                           AD_TYPE_MANUFACTURER_SPECIFIC_DATA,
 						  0xdb,
@@ -244,6 +245,13 @@ uint8_t a_ManufData[6] = {sizeof(a_ManufData)-1,
 						  0x00,
 						  0x00
                           };
+
+/* Advertising callback */
+void (*Adv_Callback)(void) = 0;
+void (*Next_Adv_Callback)(void) = 0;
+
+/* Advertising flag */
+uint8_t next_adv_flag = 0x00;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -544,7 +552,17 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
           Custom_APP_Notification(&HandleNotification);
           /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
+          /* Stop the timer */
           HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
+
+          /* Call advertising callback */
+          if (Adv_Callback) Adv_Callback();
+
+          /* Update advertising callback */
+          Adv_Callback = Next_Adv_Callback;
+          Next_Adv_Callback = 0;
+
+          /* Configure the link */
           UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_1);
           /* USER CODE END HCI_EVT_LE_CONN_COMPLETE */
           break; /* HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE */
@@ -1198,6 +1216,17 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
     }
   }
 
+  /* Call advertising callback */
+  if (Adv_Callback) Adv_Callback();
+
+  /* Update advertising callback */
+  Adv_Callback = Next_Adv_Callback;
+  Next_Adv_Callback = 0;
+
+  /* Update advertising data */
+  a_ManufData[5] = next_adv_flag;
+  next_adv_flag = 0x00;
+
   BleApplicationContext.Device_Connection_Status = NewStatus;
   /* Start Fast or Low Power Advertising */
   ret = aci_gap_set_discoverable(ADV_IND,
@@ -1263,6 +1292,29 @@ static void Adv_Update_Req(void)
 static void Adv_Update(void)
 {
   Adv_Request(APP_BLE_LP_ADV);
+}
+
+void APP_BLE_RequestPairing(void (*Callback)(void))
+{
+  /* Prepare for pairing request */
+  Next_Adv_Callback = Callback;
+  next_adv_flag = 0x01;
+
+  /* Request fast advertising */
+  Adv_Request(APP_BLE_FAST_ADV);
+}
+
+void APP_BLE_CancelPairing(void)
+{
+  if (BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
+  {
+    /* Prepare for pairing request */
+    Next_Adv_Callback = 0;
+    next_adv_flag = 0x00;
+
+    /* Request low power advertising */
+    Adv_Request(APP_BLE_LP_ADV);
+  }
 }
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
 /*************************************************************
