@@ -1233,6 +1233,17 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   a_ManufData[5] = next_adv_flag;
   next_adv_flag = 0x00;
 
+  /* Set scan response data */
+  ret = hci_le_set_scan_response_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("==>> hci_le_set_scan_response_data - fail, result: 0x%x \n", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("==>> hci_le_set_scan_response_data - Success\n");
+  }
+
   BleApplicationContext.Device_Connection_Status = NewStatus;
   /* Start Fast or Low Power Advertising */
   ret = aci_gap_set_discoverable(ADV_IND,
