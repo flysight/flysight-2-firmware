@@ -32,13 +32,14 @@
 #include "button.h"
 #include "crs.h"
 #include "gnss.h"
+#include "hts221.h"
 #include "hum.h"
 #include "imu.h"
 #include "led.h"
 #include "mag.h"
 #include "mode.h"
 #include "sensor.h"
-#include "hts221.h"
+#include "state.h"
 #include "vbat.h"
 #include "vbus.h"
 /* USER CODE END Includes */
@@ -170,6 +171,7 @@ int main(void)
   MX_TIM1_Init();
   MX_RF_Init();
   /* USER CODE BEGIN 2 */
+  FS_State_Init();
   FS_IMU_Init();
   FS_Mag_Init();
   FS_Baro_Init();

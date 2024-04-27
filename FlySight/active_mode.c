@@ -48,7 +48,6 @@ void FS_ActiveMode_Init(void)
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 	/* Read persistent state */
-	FS_State_Init();
 	FS_State_NextSession();
 
 	/* Initialize controller */

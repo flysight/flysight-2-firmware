@@ -21,8 +21,12 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
+#include <ctype.h>
+
 #include "main.h"
+#include "app_ble.h"
 #include "ff.h"
+#include "resource_manager.h"
 #include "shci.h"
 #include "state.h"
 #include "version.h"
@@ -87,7 +91,28 @@ static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
     }
 }
 
-static void FS_State_Read(void)
+static char *trim(char *str) {
+    char *start = str;
+    char *end;
+
+    // Trim leading whitespace by finding the first non-whitespace character
+    while (isspace((unsigned char)*start)) start++;
+
+    if (*start == 0) {  // All spaces?
+        return start;
+    }
+
+    // Find the end of the string and step back to the last non-whitespace character
+    end = start + strlen(start) - 1;
+    while (end > start && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator character
+    *(end + 1) = '\0';
+
+    return start;
+}
+
+void FS_State_Read(void)
 {
 	char    buffer[100];
 	size_t  len;
@@ -95,6 +120,12 @@ static void FS_State_Read(void)
 	char    *name;
 	char    *result;
 	int32_t val;
+
+	/* Initialize persistent state */
+	state.config_filename[0] = 0;
+	state.temp_folder = -1;
+	state.charge_current = 2;
+	strcpy(state.device_name, "FlySight");
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -106,11 +137,11 @@ static void FS_State_Read(void)
 		len = strcspn(buffer, ";");
 		buffer[len] = '\0';
 
-		name = strtok(buffer, " \r\n\t:");
-		if (name == 0) continue ;
+		len = strcspn(buffer, ":");
+		buffer[len] = '\0';
 
-		result = strtok(0, " \r\n\t:");
-		if (result == 0) continue ;
+		name = trim(buffer);
+		result = trim(buffer + len + 1);
 
 		val = atol(result);
 
@@ -122,7 +153,13 @@ static void FS_State_Read(void)
 		if (!strcmp(name, "Config_File"))
 		{
 			result[12] = '\0';
-			strncpy(state.config_filename, result, sizeof(state.config_filename));
+			strncpy(state.config_filename, result, sizeof(state.config_filename) - 1);
+		}
+
+		if (!strcmp(name, "Device_Name"))
+		{
+			result[30] = '\0';
+			strncpy(state.device_name, result, sizeof(state.device_name) - 1);
 		}
 
 		#define HANDLE_VALUE(s,w,r,t) \
@@ -135,6 +172,14 @@ static void FS_State_Read(void)
 	}
 
 	f_close(&stateFile);
+
+	/* Get device ID */
+	state.device_id[0] = HAL_GetUIDw0();
+	state.device_id[1] = HAL_GetUIDw1();
+	state.device_id[2] = HAL_GetUIDw2();
+
+	/* Update BLE advertising */
+	APP_BLE_UpdateAdvertisement();
 }
 
 static void FS_State_Write(void)
@@ -181,12 +226,16 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
 	f_printf(&stateFile, "Temp_Folder:  %04lu\n\n", state.temp_folder);
 
-	f_printf(&stateFile, "; System configuration\n\n");
+	f_printf(&stateFile, "; Charging\n\n");
 
 	f_printf(&stateFile, "Charging:     %u ; 0 = No charging\n", state.charge_current);
 	f_printf(&stateFile, "                ; 1 = 100 mA\n");
 	f_printf(&stateFile, "                ; 2 = 200 mA (recommended)\n");
 	f_printf(&stateFile, "                ; 3 = 300 mA\n\n");
+
+	f_printf(&stateFile, "; Bluetooth\n\n");
+
+	f_printf(&stateFile, "Device_Name:  %s\n\n", state.device_name);
 
 	f_printf(&stateFile, "; Bootloader public key\n\n");
 
@@ -204,18 +253,17 @@ static void FS_State_Write(void)
 
 void FS_State_Init(void)
 {
-	/* Initialize persistent state */
-	state.config_filename[0] = 0;
-	state.temp_folder = -1;
-	state.charge_current = 2;
+	/* Initialize microSD */
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
-	/* Read current state */
+	/* Read persistent state */
 	FS_State_Read();
 
-	/* Get device ID */
-	state.device_id[0] = HAL_GetUIDw0();
-	state.device_id[1] = HAL_GetUIDw1();
-	state.device_id[2] = HAL_GetUIDw2();
+	/* Write persistent state */
+	FS_State_Write();
+
+	/* De-initialize microSD */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 }
 
 const FS_State_Data_t *FS_State_Get(void)

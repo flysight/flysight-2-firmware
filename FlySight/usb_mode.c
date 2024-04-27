@@ -38,7 +38,7 @@ void FS_USBMode_Init(void)
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 	// Read persistent state
-	FS_State_Init();
+	FS_State_Read();
 
 	/* Initialize controller */
 	FS_USBControl_Init();
@@ -79,6 +79,9 @@ void FS_USBMode_DeInit(void)
 
 	/* Release HSI48 semaphore */
 	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
+
+	// Read persistent state
+	FS_State_Read();
 
 	/* De-initialize microSD */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
