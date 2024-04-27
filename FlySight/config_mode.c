@@ -27,6 +27,7 @@
 #include "config.h"
 #include "led.h"
 #include "mode.h"
+#include "resource_manager.h"
 #include "state.h"
 #include "stm32_seq.h"
 
@@ -36,9 +37,8 @@
 #define WAIT_TIMER_MSEC    500
 #define WAIT_TIMER_TICKS   (WAIT_TIMER_MSEC*1000/CFG_TS_TICK_VAL)
 
-static FATFS fs;
-static DIR   dir;
-static FIL   file;
+static DIR dir;
+static FIL file;
 
 static uint8_t timer_id;
 
@@ -148,44 +148,22 @@ static void updateTask(void)
 
 	if (state == STATE_DONE)
 	{
+		// Update current config file
+		config_filename[0] = 0;
+
+		// Exit config mode
 		FS_Mode_PushQueue(FS_MODE_EVENT_FORCE_UPDATE);
 	}
 }
 
 void FS_ConfigMode_Init(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	/* Initialize FatFS */
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
 	// Turn on green LED
 	FS_LED_SetColour(FS_LED_GREEN);
 	FS_LED_On();
-
-	// Enable VCC
-	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_SET);
-
-	// Configure MMC_NCS pin
-	HAL_GPIO_WritePin(MMC_NCS_GPIO_Port, MMC_NCS_Pin, GPIO_PIN_SET);
-
-	GPIO_InitStruct.Pin = MMC_NCS_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
-
-	// Initialize FatFS
-	if (MX_FATFS_Init() != APP_OK)
-	{
-		Error_Handler();
-	}
-
-	// Enable microSD card
-	if (f_mount(&fs, "0:/", 1) != FR_OK)
-	{
-		Error_Handler();
-	}
-
-	/* Read persistent state */
-	FS_State_Init();
 
 	// Initialize configuration
 	FS_Config_Init();
@@ -208,7 +186,10 @@ void FS_ConfigMode_Init(void)
 	}
 	else
 	{
-		// Config folder is not present
+		// Update current config file
+		config_filename[0] = 0;
+
+		// Exit config mode
 		FS_Mode_PushQueue(FS_MODE_EVENT_FORCE_UPDATE);
 	}
 }
@@ -227,32 +208,12 @@ void FS_ConfigMode_DeInit(void)
 	// Disable audio
 	FS_Audio_DeInit();
 
-	// Disable microSD card
-	if (f_mount(0, "0:/", 0) != FR_OK)
-	{
-		Error_Handler();
-	}
+	// Update configuration filename
+	FS_State_SetConfigFilename(config_filename);
 
-	// Disable FatFS
-	if (MX_FATFS_DeInit() != APP_OK)
-	{
-		Error_Handler();
-	}
-
-	// Disable SPI
-	HAL_SPI_DeInit(&hspi2);
-
-	// Disable MMC_NCS pin
-	HAL_GPIO_DeInit(MMC_NCS_GPIO_Port, MMC_NCS_Pin);
-
-	// Disable VCC
-	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
+	/* De-initialize FatFS */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 
 	// Reset state
 	state = STATE_IDLE;
-}
-
-const char *FS_ConfigMode_GetConfigFilename(void)
-{
-	return config_filename;
 }

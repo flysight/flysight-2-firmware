@@ -42,7 +42,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "state.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -230,22 +230,12 @@ uint8_t index_con_int, mutex;
 /**
  * Advertising Data
  */
-uint8_t a_AdvData[10] =
+uint8_t a_AdvData[6] =
 {
-  9, AD_TYPE_COMPLETE_LOCAL_NAME, 'F', 'l', 'y', 'S', 'i', 'g', 'h', 't',  /* Complete name */
-
+  5, AD_TYPE_MANUFACTURER_SPECIFIC_DATA, 0xDB, 0x09, 0x00 /* Structure version */, 0x00 /* Advertised flags */,
 };
 
 /* USER CODE BEGIN PV */
-/* Advertising data */
-uint8_t a_ManufData[6] = {sizeof(a_ManufData)-1,
-                          AD_TYPE_MANUFACTURER_SPECIFIC_DATA,
-						  0xdb,
-						  0x09,
-						  0x00,
-						  0x00
-                          };
-
 /* Advertising callback */
 void (*Adv_Callback)(void) = 0;
 void (*Next_Adv_Callback)(void) = 0;
@@ -1190,6 +1180,10 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   uint16_t Min_Inter, Max_Inter;
 
+  const char *device_name;
+  uint8_t scan_resp[31];
+  uint8_t scan_resp_len;
+
   if (NewStatus == APP_BLE_FAST_ADV)
   {
     Min_Inter = CFG_FAST_CONN_ADV_INTERVAL_MIN;
@@ -1230,11 +1224,18 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   Next_Adv_Callback = 0;
 
   /* Update advertising data */
-  a_ManufData[5] = next_adv_flag;
+  a_AdvData[5] = next_adv_flag;
   next_adv_flag = 0x00;
 
+  /* Generate scan response data */
+  device_name = FS_State_Get()->device_name;
+  scan_resp[0] = 1 + strlen(device_name);
+  scan_resp[1] = AD_TYPE_COMPLETE_LOCAL_NAME;
+  memcpy((char *) &scan_resp[2], device_name, strlen(device_name));
+  scan_resp_len = 2 + strlen(device_name);
+
   /* Set scan response data */
-  ret = hci_le_set_scan_response_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+  ret = hci_le_set_scan_response_data(scan_resp_len, scan_resp);
   if (ret != BLE_STATUS_SUCCESS)
   {
     APP_DBG_MSG("==>> hci_le_set_scan_response_data - fail, result: 0x%x \n", ret);
@@ -1267,7 +1268,7 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   }
 
   /* Update Advertising data */
-  ret = aci_gap_update_adv_data(sizeof(a_ManufData), (uint8_t*) a_ManufData);
+  ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
   if (ret != BLE_STATUS_SUCCESS)
   {
     if (NewStatus == APP_BLE_FAST_ADV)
@@ -1331,6 +1332,52 @@ void APP_BLE_CancelPairing(void)
 
     /* Request low power advertising */
     Adv_Request(APP_BLE_LP_ADV);
+  }
+}
+
+void APP_BLE_UpdateAdvertisement(void)
+{
+  tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
+
+  const char *device_name;
+  uint8_t scan_resp[31];
+  uint8_t scan_resp_len;
+
+  if ((BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
+	  || (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_ADV))
+  {
+    /* Update advertising data */
+    a_AdvData[5] = next_adv_flag;
+    next_adv_flag = 0x00;
+
+    /* Update Advertising data */
+    ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - Success\n");
+    }
+
+    /* Generate scan response data */
+    device_name = FS_State_Get()->device_name;
+    scan_resp[0] = 1 + strlen(device_name);
+    scan_resp[1] = AD_TYPE_COMPLETE_LOCAL_NAME;
+    memcpy((char *) &scan_resp[2], device_name, strlen(device_name));
+    scan_resp_len = 2 + strlen(device_name);
+
+    /* Update scan response data */
+    ret = hci_le_set_scan_response_data(scan_resp_len, scan_resp);
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> hci_le_set_scan_response_data - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> hci_le_set_scan_response_data - Success\n");
+    }
   }
 }
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
