@@ -864,7 +864,8 @@ void FS_GNSS_DeInit(void)
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
 	FS_Log_WriteEvent("%lu/%lu slots used in GNSS buffer", bufferUsed, GNSS_RX_BUF_LEN);
-	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task",
+			(updateCount > 0) ? (updateTotalTime / updateCount) : 0);
 	FS_Log_WriteEvent("%lu ms maximum time spent in GNSS update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to GNSS update task", updateMaxInterval);
 }

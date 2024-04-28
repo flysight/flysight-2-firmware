@@ -286,7 +286,8 @@ void FS_Audio_DeInit(void)
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
 	FS_Log_WriteEvent("%lu/%lu slots used in audio buffer", bufferUsed, AUDIO_FRAME_LEN);
-	FS_Log_WriteEvent("%lu ms average time spent in audio update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms average time spent in audio update task",
+			(updateCount > 0) ? (updateTotalTime / updateCount) : 0);
 	FS_Log_WriteEvent("%lu ms maximum time spent in audio update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to audio update task", updateMaxInterval);
 }
