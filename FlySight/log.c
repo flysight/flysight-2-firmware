@@ -688,12 +688,14 @@ void FS_Log_DeInit(uint32_t temp_folder)
 
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
-	FS_Log_WriteEvent("%lu ms average time spent in log update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms average time spent in log update task",
+			(updateCount > 0) ? (updateTotalTime / updateCount) : 0);
 	FS_Log_WriteEvent("%lu ms maximum time spent in log update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to log update task", updateMaxInterval);
 
 	FS_Log_WriteEvent("----------");
-	FS_Log_WriteEvent("%lu ms average time spent in log sync task", syncTotalTime / syncCount);
+	FS_Log_WriteEvent("%lu ms average time spent in log sync task",
+			(syncCount > 0) ? (syncTotalTime / syncCount) : 0);
 	FS_Log_WriteEvent("%lu ms maximum time spent in log sync task", syncMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to log sync task", syncMaxInterval);
 
