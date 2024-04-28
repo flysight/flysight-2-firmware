@@ -34,6 +34,7 @@ typedef struct
 	uint32_t temp_folder;
 	FS_Charge_Current_t charge_current;
 	char     device_name[30];
+	uint8_t  enable_ble;
 } FS_State_Data_t;
 
 void FS_State_Init(void);
