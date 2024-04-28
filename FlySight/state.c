@@ -126,6 +126,7 @@ void FS_State_Read(void)
 	state.temp_folder = -1;
 	state.charge_current = 2;
 	strcpy(state.device_name, "FlySight");
+	state.enable_ble = 1;
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -167,6 +168,7 @@ void FS_State_Read(void)
 
 		HANDLE_VALUE("Temp_Folder", state.temp_folder,    val, val >= 0);
 		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
+		HANDLE_VALUE("Enable_BLE",  state.enable_ble,     val, val == 0 || val == 1);
 
 		#undef HANDLE_VALUE
 	}
@@ -235,6 +237,7 @@ static void FS_State_Write(void)
 
 	f_printf(&stateFile, "; Bluetooth\n\n");
 
+	f_printf(&stateFile, "Enable_BLE:   %u\n", state.enable_ble);
 	f_printf(&stateFile, "Device_Name:  %s\n\n", state.device_name);
 
 	f_printf(&stateFile, "; Bootloader public key\n\n");

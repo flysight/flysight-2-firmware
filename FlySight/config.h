@@ -139,7 +139,6 @@ typedef struct
 	uint8_t  enable_baro;
 	uint8_t  enable_hum;
 	uint8_t  enable_mag;
-	uint8_t  enable_ble;
 	uint8_t  ble_tx_power;
 	uint8_t  enable_raw;
 	uint8_t  cold_start;

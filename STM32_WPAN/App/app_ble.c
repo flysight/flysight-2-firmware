@@ -407,10 +407,13 @@ void APP_BLE_Init(void)
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
-  /**
-   * Start to Advertise to be connected by a Client
-   */
-  Adv_Request(APP_BLE_FAST_ADV);
+  if (FS_State_Get()->enable_ble)
+  {
+    /**
+     * Start to Advertise to be connected by a Client
+     */
+    Adv_Request(APP_BLE_FAST_ADV);
+  }
 
   /* USER CODE BEGIN APP_BLE_Init_2 */
 
@@ -465,8 +468,11 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
 
       /* USER CODE END EVT_DISCONN_COMPLETE_1 */
 
-      /* restart advertising */
-      Adv_Request(APP_BLE_FAST_ADV);
+      if (FS_State_Get()->enable_ble)
+      {
+        /* restart advertising */
+        Adv_Request(APP_BLE_FAST_ADV);
+      }
 
       /**
        * SPECIFIC to Custom Template APP

@@ -134,8 +134,11 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{
-			FS_PairingMode_Init();
-			next_mode = FS_MODE_STATE_PAIRING;
+			if (FS_State_Get()->enable_ble)
+			{
+				FS_PairingMode_Init();
+				next_mode = FS_MODE_STATE_PAIRING;
+			}
 		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
