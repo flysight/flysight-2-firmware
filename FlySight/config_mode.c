@@ -28,12 +28,13 @@ static uint8_t timer_id;
 
 typedef enum
 {
+	STATE_IDLE,
 	STATE_PLAY,
 	STATE_WAIT,
 	STATE_DONE
 } State_t;
 
-static State_t state;
+static State_t state = STATE_IDLE;
 
 static char config_filename[13];
 
@@ -230,6 +231,9 @@ void FS_ConfigMode_DeInit(void)
 
 	// Disable VCC
 	HAL_GPIO_WritePin(VCC_EN_GPIO_Port, VCC_EN_Pin, GPIO_PIN_RESET);
+
+	// Reset state
+	state = STATE_IDLE;
 }
 
 const char *FS_ConfigMode_GetConfigFilename(void)
