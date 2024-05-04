@@ -230,7 +230,7 @@ void FS_State_NextSession(void)
 	uint32_t tickstart;
 
 	/* Increment temporary folder number */
-	++state.temp_folder;
+	state.temp_folder = (state.temp_folder + 1) % 10000;
 
 	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
 
