@@ -111,6 +111,8 @@ static uint32_t syncMaxTime;
 static uint32_t syncLastCall;
 static uint32_t syncMaxInterval;
 
+static TCHAR path[256];
+
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
@@ -523,9 +525,50 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 	f_printf(file, "\n");
 }
 
+static FRESULT delete_node (
+		TCHAR* path,    /* Path name buffer with the sub-directory to delete */
+		UINT sz_buff,   /* Size of path name buffer (items) */
+		FILINFO* fno    /* Name read buffer */
+		)
+{
+	UINT i, j;
+	FRESULT fr;
+	DIR dir;
+
+	fr = f_opendir(&dir, path); /* Open the sub-directory to make it empty */
+	if (fr != FR_OK) return fr;
+
+	for (i = 0; path[i]; i++) ; /* Get current path length */
+	path[i++] = _T('/');
+
+	for (;;) {
+		fr = f_readdir(&dir, fno);  /* Get a directory item */
+		if (fr != FR_OK || !fno->fname[0]) break;   /* End of directory? */
+		j = 0;
+		do {    /* Make a path name */
+			if (i + j >= sz_buff) { /* Buffer over flow? */
+				fr = 100; break;    /* Fails with 100 when buffer overflow */
+			}
+			path[i + j] = fno->fname[j];
+		} while (fno->fname[j++]);
+		if (fno->fattrib & AM_DIR) {    /* Item is a sub-directory */
+			fr = delete_node(path, sz_buff, fno);
+		} else {                        /* Item is a file */
+			fr = f_unlink(path);
+		}
+		if (fr != FR_OK) break;
+	}
+
+	path[--i] = 0;  /* Restore the path name */
+	f_closedir(&dir);
+
+	if (fr == FR_OK) fr = f_unlink(path);  /* Delete the empty sub-directory */
+	return fr;
+}
+
 void FS_Log_Init(uint32_t temp_folder)
 {
-	char filename[50];
+	FILINFO fno;
 
 	// Reset state
 	baroRdI = 0;
@@ -576,12 +619,17 @@ void FS_Log_Init(uint32_t temp_folder)
 
 	// Create temporary folder
 	f_mkdir("/temp");
-	sprintf(filename, "/temp/%04lu", temp_folder);
-	f_mkdir(filename);
+	sprintf(path, "/temp/%04lu", temp_folder);
+
+	// Delete temporary folder if it exists
+	delete_node(path, sizeof(path) / sizeof(path[0]), &fno);
+
+	// Create temporary folder
+	f_mkdir(path);
 
 	// Open GNSS log file
-	sprintf(filename, "/temp/%04lu/track.csv", temp_folder);
-	if (f_open(&gnssFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	sprintf(path, "/temp/%04lu/track.csv", temp_folder);
+	if (f_open(&gnssFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
 	}
@@ -595,8 +643,8 @@ void FS_Log_Init(uint32_t temp_folder)
 	if (FS_Config_Get()->enable_raw)
 	{
 		// Open raw GNSS file
-		sprintf(filename, "/temp/%04lu/raw.ubx", temp_folder);
-		if (f_open(&rawFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+		sprintf(path, "/temp/%04lu/raw.ubx", temp_folder);
+		if (f_open(&rawFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
 			Error_Handler();
 		}
@@ -604,8 +652,8 @@ void FS_Log_Init(uint32_t temp_folder)
 	}
 
 	// Open sensor log file
-	sprintf(filename, "/temp/%04lu/sensor.csv", temp_folder);
-	if (f_open(&sensorFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	sprintf(path, "/temp/%04lu/sensor.csv", temp_folder);
+	if (f_open(&sensorFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
 	}
@@ -627,8 +675,8 @@ void FS_Log_Init(uint32_t temp_folder)
 	f_sync(&sensorFile);
 
 	// Open event log file
-	sprintf(filename, "/temp/%04lu/event.csv", temp_folder);
-	if (f_open(&eventFile, filename, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
+	sprintf(path, "/temp/%04lu/event.csv", temp_folder);
+	if (f_open(&eventFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 	{
 		Error_Handler();
 	}
@@ -669,7 +717,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	uint8_t  sec;
 
 	char date[15], time[15];
-	char oldPath[50], newPath[50];
+	char oldPath[50];
     FILINFO fno;
 
 	// Delete timer
@@ -746,20 +794,25 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		sprintf(date, "%02d-%02d-%02d", year % 100, month, day);
 		sprintf(time, "%02d-%02d-%02d", hour, min, sec);
 
-		sprintf(newPath, "/%s", date);
-		if (f_stat(newPath, 0) != FR_OK)
+		sprintf(path, "/%s", date);
+		if (f_stat(path, 0) != FR_OK)
 		{
 			// Create new folder
-			f_mkdir(newPath);
+			f_mkdir(path);
 
 			// Update timestamp
-			f_utime(newPath, &fno);
+			f_utime(path, &fno);
 		}
 
 		// Move temporary folder
 		sprintf(oldPath, "/temp/%04lu", temp_folder);
-		sprintf(newPath, "/%s/%s", date, time);
-		f_rename(oldPath, newPath);
+		sprintf(path, "/%s/%s", date, time);
+
+		// Delete date/time folder if it exists
+		delete_node(path, sizeof(path) / sizeof(path[0]), &fno);
+
+		// Rename temporary folder
+		f_rename(oldPath, path);
 	}
 }
 
