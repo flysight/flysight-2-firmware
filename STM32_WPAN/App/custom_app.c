@@ -39,6 +39,7 @@ typedef struct
   uint8_t               Crs_tx_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
+  /* System */
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
   uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -96,6 +97,7 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
+/* System */
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
@@ -160,6 +162,37 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       Custom_App_Context.Gnss_pv_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      break;
+
+    /* System */
+    case CUSTOM_STM_TOKEN_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_TOKEN_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_TOKEN_READ_EVT */
+      break;
+
+    case CUSTOM_STM_TOKEN_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_TOKEN_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_TOKEN_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_DESCRIPTION_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DESCRIPTION_READ_EVT */
+
+      /* USER CODE END CUSTOM_STM_DESCRIPTION_READ_EVT */
+      break;
+
+    case CUSTOM_STM_DESCRIPTION_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DESCRIPTION_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_DESCRIPTION_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_CONTROL_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CONTROL_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_CONTROL_WRITE_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -328,6 +361,8 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
   return;
 }
 
+/* System */
+
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(void)
 {
@@ -337,6 +372,12 @@ static void Custom_CRS_OnConnect(void)
 
   rx_read_index = 0;
   rx_write_index = 0;
+
+  // Reset security details
+  memset(UpdateCharData, 0, sizeof(UpdateCharData));
+  Custom_STM_App_Update_Char(CUSTOM_STM_TOKEN, (uint8_t *)UpdateCharData);
+  Custom_STM_App_Update_Char(CUSTOM_STM_DESCRIPTION, (uint8_t *)UpdateCharData);
+  Custom_STM_App_Update_Char(CUSTOM_STM_CONTROL, (uint8_t *)UpdateCharData);
 
   // Update state
   connected_flag = 1;
