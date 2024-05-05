@@ -25,18 +25,15 @@
 
 #include "main.h"
 #include "app_ble.h"
+#include "common.h"
 #include "ff.h"
 #include "resource_manager.h"
 #include "shci.h"
 #include "state.h"
 #include "version.h"
 
-#define TIMEOUT_VALUE 100
-
 static FS_State_Data_t state;
 static FIL stateFile;
-
-extern RNG_HandleTypeDef hrng;
 
 static void FS_State_WriteHex_8(FIL *file, const uint8_t *data, uint32_t count)
 {
@@ -276,46 +273,11 @@ const FS_State_Data_t *FS_State_Get(void)
 
 void FS_State_NextSession(void)
 {
-	HAL_StatusTypeDef res;
-	uint32_t counter;
-	uint32_t tickstart;
-
 	/* Increment temporary folder number */
 	++state.temp_folder;
 
-	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
-
-	/* Poll Sem0 until granted */
-	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
-
-	/* Configure and switch on RNG clock*/
-	MX_RNG_Init();
-
-	/* Generate random session ID */
-	for (counter = 0; counter < 3; ++counter)
-	{
-	    tickstart = HAL_GetTick();
-
-	    res = HAL_ERROR;
-		while ((res != HAL_OK) && (HAL_GetTick() - tickstart < TIMEOUT_VALUE))
-		{
-			res = HAL_RNG_GenerateRandomNumber(&hrng, &state.session_id[counter]);
-		}
-
-		if (res != HAL_OK)
-		{
-			Error_Handler();
-		}
-	}
-
-	/* Switch off RNG IP and clock */
-	HAL_RNG_DeInit(&hrng);
-
-	/* Set RNGSEL = CLK48 */
-    LL_RCC_SetRNGClockSource(RCC_RNGCLKSOURCE_CLK48);
-
-	/* Release Sem0 */
-	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
+	/* Get random session ID */
+	FS_Common_GetRandomBytes(state.session_id, 3);
 
 	/* Write updated state */
 	FS_State_Write();
