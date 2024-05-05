@@ -40,6 +40,7 @@
 #include "mode.h"
 #include "sensor.h"
 #include "state.h"
+#include "system.h"
 #include "vbat.h"
 #include "vbus.h"
 /* USER CODE END Includes */
@@ -195,6 +196,7 @@ int main(void)
   FS_Button_Init();
   FS_VBUS_Init();
   FS_CRS_Init();
+  FS_System_Init();
 
   while (1)
   {

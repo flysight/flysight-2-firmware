@@ -88,6 +88,8 @@ static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
+
+static Custom_System_Packet_t system_packet;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,6 +107,7 @@ static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
+static void Custom_System_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -173,7 +176,8 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_TOKEN_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_TOKEN_WRITE_EVT */
-
+      memcpy(system_packet.token, pNotification->DataTransfered.pPayload,
+          pNotification->DataTransfered.Length);
       /* USER CODE END CUSTOM_STM_TOKEN_WRITE_EVT */
       break;
 
@@ -185,13 +189,14 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_DESCRIPTION_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_DESCRIPTION_WRITE_EVT */
-
+      memcpy(system_packet.description, pNotification->DataTransfered.pPayload,
+          pNotification->DataTransfered.Length);
       /* USER CODE END CUSTOM_STM_DESCRIPTION_WRITE_EVT */
       break;
 
     case CUSTOM_STM_CONTROL_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CONTROL_WRITE_EVT */
-
+      Custom_System_OnControlWrite(pNotification);
       /* USER CODE END CUSTOM_STM_CONTROL_WRITE_EVT */
       break;
 
@@ -498,5 +503,20 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   memcpy(&gnss_pv_packet[24], &(current->velD), sizeof(current->velD));
 
   UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+}
+
+static void Custom_System_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification)
+{
+  // Copy command
+  memcpy(&system_packet.command, pNotification->DataTransfered.pPayload,
+      pNotification->DataTransfered.Length);
+
+  // Call update task
+  UTIL_SEQ_SetTask(1<<CFG_TASK_FS_SYSTEM_UPDATE_ID, CFG_SCH_PRIO_1);
+}
+
+Custom_System_Packet_t *Custom_System_GetNextPacket(void)
+{
+	return &system_packet;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
