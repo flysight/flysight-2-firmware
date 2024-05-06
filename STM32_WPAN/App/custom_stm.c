@@ -73,7 +73,7 @@ typedef struct{
 uint8_t SizeCrs_Tx = 244;
 uint8_t SizeCrs_Rx = 244;
 uint8_t SizeGnss_Pv = 28;
-uint8_t SizeToken = 16;
+uint8_t SizeToken = 32;
 uint8_t SizeDescription = 20;
 uint8_t SizeControl = 1;
 
@@ -259,6 +259,51 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
             }
           }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomGnss_PvHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomControlHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3 */
+
+            /* USER CODE END CUSTOM_STM_Service_3_Char_3 */
+
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_3_Char_3_attribute_modified */
+
+              /* Disabled Indication management */
+              case (!(COMSVC_Indication)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_3_Char_3_attribute_modified */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_CONTROL_INDICATE_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_3_Char_3_Disabled_END */
+                break;
+
+                /* Enabled Indication management */
+              case COMSVC_Indication:
+              /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_COMSVC_Indication_BEGIN */
+
+              /* USER CODE END CUSTOM_STM_Service_3_Char_3_COMSVC_Indication_BEGIN */
+              Notification.Custom_Evt_Opcode = CUSTOM_STM_CONTROL_INDICATE_ENABLED_EVT;
+              Custom_STM_App_Notification(&Notification);
+              /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_COMSVC_Indication_END */
+
+              /* USER CODE END CUSTOM_STM_Service_3_Char_3_COMSVC_Indication_END */
+              break;
+
+              default:
+              /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_3_default */
+
+              /* USER CODE END CUSTOM_STM_Service_3_Char_3_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomControlHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomCrs_RxHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
@@ -273,10 +318,7 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
           {
             return_value = SVCCTL_EvtAckFlowEnable;
             /* USER CODE BEGIN CUSTOM_STM_Service_3_Char_1_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
-            Notification.Custom_Evt_Opcode = CUSTOM_STM_TOKEN_WRITE_EVT;
-            Notification.DataTransfered.Length = attribute_modified->Attr_Data_Length;
-            Notification.DataTransfered.pPayload = attribute_modified->Attr_Data;
-            Custom_STM_App_Notification(&Notification);
+
             /* USER CODE END CUSTOM_STM_Service_3_Char_1_ACI_GATT_ATTRIBUTE_MODIFIED_VSEVT_CODE */
           } /* if (attribute_modified->Attr_Handle == (CustomContext.CustomTokenHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomDescriptionHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
@@ -549,12 +591,13 @@ void SVCCTL_InitCustomSvc(void)
    *                                2 for Token +
    *                                2 for Description +
    *                                2 for Control +
-   *                              = 7
+   *                                1 for Control configuration descriptor +
+   *                              = 8
    *
    * This value doesn't take into account number of descriptors manually added
    * In case of descriptors added, please update the max_attr_record value accordingly in the next SVCCTL_InitService User Section
    */
-  max_attr_record = 7;
+  max_attr_record = 8;
 
   /* USER CODE BEGIN SVCCTL_InitService */
   /* max_attr_record to be updated if descriptors have been added */
@@ -609,7 +652,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomSystemHdle,
                           UUID_TYPE_128, &uuid,
                           SizeDescription,
-                          CHAR_PROP_READ | CHAR_PROP_WRITE,
+                          CHAR_PROP_WRITE,
                           ATTR_PERMISSION_NONE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
@@ -635,7 +678,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomSystemHdle,
                           UUID_TYPE_128, &uuid,
                           SizeControl,
-                          CHAR_PROP_WRITE,
+                          CHAR_PROP_WRITE | CHAR_PROP_INDICATE,
                           ATTR_PERMISSION_NONE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,

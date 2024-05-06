@@ -23,14 +23,17 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "common.h"
 #include "custom_app.h"
+#include "mode.h"
 #include "stm32_seq.h"
 
 typedef enum
 {
-	FS_SYSTEM_COMMAND_RESET        = 0x00,
-	FS_SYSTEM_COMMAND_CREATE_TOKEN = 0x10,
-	FS_SYSTEM_COMMAND_CHECK_TOKEN  = 0x11
+	FS_SYSTEM_COMMAND_CREATE_TOKEN = 0x00,
+	FS_SYSTEM_COMMAND_CHECK_TOKEN  = 0x01,
+	FS_SYSTEM_COMMAND_NAK          = 0xf0,
+	FS_SYSTEM_COMMAND_ACK          = 0xf1
 } FS_System_Command_t;
 
 typedef enum
@@ -62,11 +65,29 @@ static FS_System_State_t FS_System_State_Idle(void)
 		// Handle commands
 		switch (packet->command)
 		{
-		case FS_SYSTEM_COMMAND_RESET:
-			// TODO: Reset system
-			break;
 		case FS_SYSTEM_COMMAND_CREATE_TOKEN:
-			// TODO: Add token to accepted list if in pairing state
+			// Initialize response packet
+			memset(packet, 0, sizeof(*packet));
+
+			if (Custom_System_GetConnectMode() == FS_MODE_STATE_PAIRING)
+			{
+				// Get random token
+				FS_Common_GetRandomBytes((uint32_t *)packet->token,
+						sizeof(packet->token) / 4);
+				packet->command = FS_SYSTEM_COMMAND_ACK;
+
+				// TODO: Save token and description
+
+				// TODO: Check token against accepted list
+			}
+			else
+			{
+				// Not in pairing mode
+				packet->command = FS_SYSTEM_COMMAND_NAK;
+			}
+
+			// Call update task
+			UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_SYSTEM_UPDATE_ID, CFG_SCH_PRIO_1);
 			break;
 		case FS_SYSTEM_COMMAND_CHECK_TOKEN:
 			// TODO: Check token against accepted list

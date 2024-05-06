@@ -31,6 +31,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "gnss.h"
+#include "mode.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -55,7 +56,7 @@ typedef struct
 typedef struct
 {
   uint8_t token[32];
-  char description[20];
+  uint8_t description[20];
   uint8_t command;
 } Custom_System_Packet_t;
 /* USER CODE END ET */
@@ -89,6 +90,7 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current);
 
 Custom_System_Packet_t *Custom_System_GetNextPacket(void);
+FS_Mode_State_t Custom_System_GetConnectMode(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

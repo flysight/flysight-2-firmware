@@ -40,6 +40,7 @@ typedef struct
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
   /* System */
+  uint8_t               Control_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
   uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -90,6 +91,8 @@ extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
 
 static Custom_System_Packet_t system_packet;
+
+static FS_Mode_State_t connect_mode;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,6 +103,8 @@ static void Custom_Crs_tx_Send_Notification(void);
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
 /* System */
+static void Custom_Control_Update_Char(void);
+static void Custom_Control_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
@@ -108,6 +113,7 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
 static void Custom_System_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
+static void Custom_System_Update(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -181,12 +187,6 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_TOKEN_WRITE_EVT */
       break;
 
-    case CUSTOM_STM_DESCRIPTION_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_DESCRIPTION_READ_EVT */
-
-      /* USER CODE END CUSTOM_STM_DESCRIPTION_READ_EVT */
-      break;
-
     case CUSTOM_STM_DESCRIPTION_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_DESCRIPTION_WRITE_EVT */
       memcpy(system_packet.description, pNotification->DataTransfered.pPayload,
@@ -198,6 +198,18 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_CONTROL_WRITE_EVT */
       Custom_System_OnControlWrite(pNotification);
       /* USER CODE END CUSTOM_STM_CONTROL_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_CONTROL_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CONTROL_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Control_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_CONTROL_INDICATE_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_CONTROL_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_CONTROL_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Control_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_CONTROL_INDICATE_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -260,9 +272,12 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_SYSTEM_UPDATE_ID, UTIL_SEQ_RFU, Custom_System_Update);
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
   Custom_App_Context.Crs_tx_Flow_Status = 1;
+  Custom_App_Context.Gnss_pv_Notification_Status = 0;
+  Custom_App_Context.Control_Indication_Status = 0;
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -367,6 +382,44 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
 }
 
 /* System */
+void Custom_Control_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Control_UC_1*/
+
+  /* USER CODE END Control_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_CONTROL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Control_UC_Last*/
+
+  /* USER CODE END Control_UC_Last*/
+  return;
+}
+
+void Custom_Control_Send_Indication(void) /* Property Indication */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Control_IS_1*/
+
+  /* USER CODE END Control_IS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_CONTROL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Control_IS_Last*/
+
+  /* USER CODE END Control_IS_Last*/
+
+  return;
+}
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(void)
@@ -379,10 +432,11 @@ static void Custom_CRS_OnConnect(void)
   rx_write_index = 0;
 
   // Reset security details
-  memset(UpdateCharData, 0, sizeof(UpdateCharData));
-  Custom_STM_App_Update_Char(CUSTOM_STM_TOKEN, (uint8_t *)UpdateCharData);
-  Custom_STM_App_Update_Char(CUSTOM_STM_DESCRIPTION, (uint8_t *)UpdateCharData);
-  Custom_STM_App_Update_Char(CUSTOM_STM_CONTROL, (uint8_t *)UpdateCharData);
+  memset(&system_packet, 0, sizeof(system_packet));
+  Custom_System_Update();
+
+  // Save device mode during connection
+  connect_mode = FS_Mode_State();
 
   // Update state
   connected_flag = 1;
@@ -517,6 +571,18 @@ static void Custom_System_OnControlWrite(Custom_STM_App_Notification_evt_t *pNot
 
 Custom_System_Packet_t *Custom_System_GetNextPacket(void)
 {
-	return &system_packet;
+  return &system_packet;
+}
+
+static void Custom_System_Update(void)
+{
+  Custom_STM_App_Update_Char(CUSTOM_STM_TOKEN, system_packet.token);
+  Custom_STM_App_Update_Char(CUSTOM_STM_DESCRIPTION, system_packet.description);
+  Custom_STM_App_Update_Char(CUSTOM_STM_CONTROL, &system_packet.command);
+}
+
+FS_Mode_State_t Custom_System_GetConnectMode(void)
+{
+  return connect_mode;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
