@@ -33,14 +33,17 @@ RX_TIMEOUT = 1
 
 async def mkdir(address, directory_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
+        await client.pair(protection_level=2)
         await client.write_gatt_char(CRS_RX_UUID, b'\x04' + directory_name.encode(), response=False)
 
 async def create_file(address, file_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
+        await client.pair(protection_level=2)
         await client.write_gatt_char(CRS_RX_UUID, b'\x00' + file_name.encode(), response=False)
 
 async def delete_file(address, file_name):
     async with BleakClient(address, adapter=ble_adapter) as client:
+        await client.pair(protection_level=2)
         await client.write_gatt_char(CRS_RX_UUID, b'\x01' + file_name.encode(), response=False)
 
 async def write_file(address, local_filename, remote_filename):
@@ -64,6 +67,7 @@ async def write_file(address, local_filename, remote_filename):
                         ack_received.set()
                         pbar.update(next_ack_bytes)  # Update progress bar based on acknowledged bytes
 
+            await client.pair(protection_level=2)
             await client.start_notify(CRS_TX_UUID, file_notification_handler)
             await client.write_gatt_char(CRS_RX_UUID, b'\x03' + remote_filename.encode())
 
@@ -115,6 +119,7 @@ async def read_file(address, offset, stride, remote_filename, local_filename, te
                         await client.write_gatt_char(CRS_RX_UUID, ack_packet, response=False)
                         packet_received.set()
 
+            await client.pair(protection_level=2)
             await client.start_notify(CRS_TX_UUID, file_notification_handler)
             offset_bytes = offset.to_bytes(4, byteorder='little')
             stride_bytes = stride.to_bytes(4, byteorder='little')
@@ -185,6 +190,7 @@ async def list_directory(address, directory):
                     print(f"Error: Dropped packet.")
                     return
 
+        await client.pair(protection_level=2)
         await client.start_notify(CRS_TX_UUID, dir_notification_handler)
         await client.write_gatt_char(CRS_RX_UUID, b'\x05' + directory.encode(), response=False)
         await asyncio.sleep(5)  # Wait for notifications
@@ -198,6 +204,7 @@ async def display_gnss(address):
                   f'{lon/1e7:.7f}, {lat/1e7:.7f}, {hMSL/1e3:.3f}, '
                   f'{velN/1e3:.3f}, {velE/1e3:.3f}, {velD/1e3:.3f}')
 
+        await client.pair(protection_level=2)
         await client.start_notify(GNSS_PV_UUID, gnss_notification_handler)
 
         try:
