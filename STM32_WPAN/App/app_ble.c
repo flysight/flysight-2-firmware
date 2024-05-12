@@ -990,7 +990,10 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   BleApplicationContext.BleApplicationContext_legacy.bleSecurityParam.Fixed_Pin = CFG_FIXED_PIN;
   BleApplicationContext.BleApplicationContext_legacy.bleSecurityParam.bonding_mode = CFG_BONDING_MODE;
   /* USER CODE BEGIN Ble_Hci_Gap_Gatt_Init_1*/
-
+  BleApplicationContext.BleApplicationContext_legacy.gapServiceHandle = gap_service_handle;
+  BleApplicationContext.BleApplicationContext_legacy.devNameCharHandle = gap_dev_name_char_handle;
+  BleApplicationContext.BleApplicationContext_legacy.appearanceCharHandle = gap_appearance_char_handle;
+  APP_BLE_UpdateDeviceName();
   /* USER CODE END Ble_Hci_Gap_Gatt_Init_1*/
 
   ret = aci_gap_set_authentication_requirement(BleApplicationContext.BleApplicationContext_legacy.bleSecurityParam.bonding_mode,
@@ -1186,10 +1189,6 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   uint16_t Min_Inter, Max_Inter;
 
-  const char *device_name;
-  uint8_t scan_resp[31];
-  uint8_t scan_resp_len;
-
   if (NewStatus == APP_BLE_FAST_ADV)
   {
     Min_Inter = CFG_FAST_CONN_ADV_INTERVAL_MIN;
@@ -1232,24 +1231,6 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   /* Update advertising data */
   a_AdvData[5] = next_adv_flag;
   next_adv_flag = 0x00;
-
-  /* Generate scan response data */
-  device_name = FS_State_Get()->device_name;
-  scan_resp[0] = 1 + strlen(device_name);
-  scan_resp[1] = AD_TYPE_COMPLETE_LOCAL_NAME;
-  memcpy((char *) &scan_resp[2], device_name, strlen(device_name));
-  scan_resp_len = 2 + strlen(device_name);
-
-  /* Set scan response data */
-  ret = hci_le_set_scan_response_data(scan_resp_len, scan_resp);
-  if (ret != BLE_STATUS_SUCCESS)
-  {
-    APP_DBG_MSG("==>> hci_le_set_scan_response_data - fail, result: 0x%x \n", ret);
-  }
-  else
-  {
-    APP_DBG_MSG("==>> hci_le_set_scan_response_data - Success\n");
-  }
 
   BleApplicationContext.Device_Connection_Status = NewStatus;
   /* Start Fast or Low Power Advertising */
@@ -1341,48 +1322,25 @@ void APP_BLE_CancelPairing(void)
   }
 }
 
-void APP_BLE_UpdateAdvertisement(void)
+void APP_BLE_UpdateDeviceName(void)
 {
-  tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
+  const char *name = FS_State_Get()->device_name;
+  tBleStatus ret;
 
-  const char *device_name;
-  uint8_t scan_resp[31];
-  uint8_t scan_resp_len;
-
-  if ((BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
-	  || (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_ADV))
+  if (BleApplicationContext.BleApplicationContext_legacy.gapServiceHandle)
   {
-    /* Update advertising data */
-    a_AdvData[5] = next_adv_flag;
-    next_adv_flag = 0x00;
-
-    /* Update Advertising data */
-    ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+    ret = aci_gatt_update_char_value(
+        BleApplicationContext.BleApplicationContext_legacy.gapServiceHandle,
+        BleApplicationContext.BleApplicationContext_legacy.devNameCharHandle,
+        0,
+        strlen(name), (uint8_t *) name);
     if (ret != BLE_STATUS_SUCCESS)
     {
-      APP_DBG_MSG("==>> aci_gap_update_adv_data - fail, result: 0x%x \n", ret);
+      BLE_DBG_SVCCTL_MSG("  Fail   : aci_gatt_update_char_value - Device Name\n");
     }
     else
     {
-      APP_DBG_MSG("==>> aci_gap_update_adv_data - Success\n");
-    }
-
-    /* Generate scan response data */
-    device_name = FS_State_Get()->device_name;
-    scan_resp[0] = 1 + strlen(device_name);
-    scan_resp[1] = AD_TYPE_COMPLETE_LOCAL_NAME;
-    memcpy((char *) &scan_resp[2], device_name, strlen(device_name));
-    scan_resp_len = 2 + strlen(device_name);
-
-    /* Update scan response data */
-    ret = hci_le_set_scan_response_data(scan_resp_len, scan_resp);
-    if (ret != BLE_STATUS_SUCCESS)
-    {
-      APP_DBG_MSG("==>> hci_le_set_scan_response_data - fail, result: 0x%x \n", ret);
-    }
-    else
-    {
-      APP_DBG_MSG("==>> hci_le_set_scan_response_data - Success\n");
+      BLE_DBG_SVCCTL_MSG("  Success: aci_gatt_update_char_value - Device Name\n");
     }
   }
 }
