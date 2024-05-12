@@ -230,9 +230,9 @@ uint8_t index_con_int, mutex;
 /**
  * Advertising Data
  */
-uint8_t a_AdvData[6] =
+uint8_t a_AdvData[5] =
 {
-  5, AD_TYPE_MANUFACTURER_SPECIFIC_DATA, 0xDB, 0x09, 0x00 /* Structure version */, 0x00 /* Advertised flags */,
+  4, AD_TYPE_MANUFACTURER_SPECIFIC_DATA, 0xDB, 0x09, 0x00 /* Structure version */,
 };
 
 /* USER CODE BEGIN PV */
@@ -240,8 +240,8 @@ uint8_t a_AdvData[6] =
 void (*Adv_Callback)(void) = 0;
 void (*Next_Adv_Callback)(void) = 0;
 
-/* Advertising flag */
-uint8_t next_adv_flag = 0x00;
+/* Pairing request flag */
+uint8_t request_pairing = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -1228,23 +1228,31 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   Adv_Callback = Next_Adv_Callback;
   Next_Adv_Callback = 0;
 
-  /* Update advertising data */
-  a_AdvData[5] = next_adv_flag;
-  next_adv_flag = 0x00;
-
   BleApplicationContext.Device_Connection_Status = NewStatus;
-  /* Start Fast or Low Power Advertising */
-  ret = aci_gap_set_discoverable(ADV_IND,
-                                 Min_Inter,
-                                 Max_Inter,
-                                 CFG_BLE_ADDRESS_TYPE,
-								 ADV_FILTER,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0);
+
+  if (request_pairing)
+  {
+    /* Start Fast or Low Power Advertising */
+    ret = aci_gap_set_limited_discoverable(ADV_IND,
+                                           Min_Inter,
+                                           Max_Inter,
+                                           CFG_BLE_ADDRESS_TYPE,
+                                           ADV_FILTER,
+                                           0,
+                                           0,
+                                           0,
+                                           0,
+                                           0,
+                                           0);
+  }
+  else
+  {
+    /* Start Fast or Low Power Advertising */
+    ret = aci_gap_set_undirected_connectable(Min_Inter,
+                                             Max_Inter,
+                                             CFG_BLE_ADDRESS_TYPE,
+                                             ADV_FILTER);
+  }
   if (ret != BLE_STATUS_SUCCESS)
   {
     APP_DBG_MSG("==>> aci_gap_set_discoverable - fail, result: 0x%x \n", ret);
@@ -1303,7 +1311,7 @@ void APP_BLE_RequestPairing(void (*Callback)(void))
 {
   /* Prepare for pairing request */
   Next_Adv_Callback = Callback;
-  next_adv_flag = 0x01;
+  request_pairing = 1;
 
   /* Request fast advertising */
   Adv_Request(APP_BLE_FAST_ADV);
@@ -1315,7 +1323,7 @@ void APP_BLE_CancelPairing(void)
   {
     /* Prepare for pairing request */
     Next_Adv_Callback = 0;
-    next_adv_flag = 0x00;
+    request_pairing = 0;
 
     /* Request low power advertising */
     Adv_Request(APP_BLE_LP_ADV);
