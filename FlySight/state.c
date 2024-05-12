@@ -177,8 +177,8 @@ void FS_State_Read(void)
 	state.device_id[1] = HAL_GetUIDw1();
 	state.device_id[2] = HAL_GetUIDw2();
 
-	/* Update BLE advertising */
-	APP_BLE_UpdateAdvertisement();
+	/* Update device name */
+	APP_BLE_UpdateDeviceName();
 }
 
 static void FS_State_Write(void)
