@@ -1244,6 +1244,25 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
                                            0,
                                            0,
                                            0);
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> aci_gap_set_limited_discoverable - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> aci_gap_set_limited_discoverable - Success\n");
+    }
+
+    /* Update Advertising data */
+    ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - Success\n");
+    }
   }
   else
   {
@@ -1252,41 +1271,19 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
                                              Max_Inter,
                                              CFG_BLE_ADDRESS_TYPE,
                                              ADV_FILTER);
-  }
-  if (ret != BLE_STATUS_SUCCESS)
-  {
-    APP_DBG_MSG("==>> aci_gap_set_discoverable - fail, result: 0x%x \n", ret);
-  }
-  else
-  {
-    APP_DBG_MSG("==>> aci_gap_set_discoverable - Success\n");
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> aci_gap_set_undirected_connectable - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> aci_gap_set_undirected_connectable - Success\n");
+    }
   }
 
-  /* Update Advertising data */
-  ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
-  if (ret != BLE_STATUS_SUCCESS)
+  if (NewStatus == APP_BLE_FAST_ADV)
   {
-    if (NewStatus == APP_BLE_FAST_ADV)
-    {
-      APP_DBG_MSG("==>> Start Fast Advertising Failed , result: %d \n\r", ret);
-    }
-    else
-    {
-      APP_DBG_MSG("==>> Start Low Power Advertising Failed , result: %d \n\r", ret);
-    }
-  }
-  else
-  {
-    if (NewStatus == APP_BLE_FAST_ADV)
-    {
-      APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
-      /* Start Timer to STOP ADV - TIMEOUT - and next Restart Low Power Advertising */
-      HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
-    }
-    else
-    {
-      APP_DBG_MSG("==>> Success: Start Low Power Advertising \n\r");
-    }
+    HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
   }
 
   return;
@@ -1319,12 +1316,12 @@ void APP_BLE_RequestPairing(void (*Callback)(void))
 
 void APP_BLE_CancelPairing(void)
 {
+  /* Prepare for pairing request */
+  Next_Adv_Callback = 0;
+  request_pairing = 0;
+
   if (BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
   {
-    /* Prepare for pairing request */
-    Next_Adv_Callback = 0;
-    request_pairing = 0;
-
     /* Request low power advertising */
     Adv_Request(APP_BLE_LP_ADV);
   }
