@@ -187,18 +187,6 @@ typedef struct
 /* Private variables ---------------------------------------------------------*/
 PLACE_IN_SECTION("MB_MEM1") ALIGN(4) static TL_CmdPacket_t BleCmdBuffer;
 
-static const uint8_t a_MBdAddr[BD_ADDR_SIZE_LOCAL] =
-{
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x0000000000FF)),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x00000000FF00) >> 8),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x000000FF0000) >> 16),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x0000FF000000) >> 24),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x00FF00000000) >> 32),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0xFF0000000000) >> 40)
-};
-
-static uint8_t a_BdAddrUdn[BD_ADDR_SIZE_LOCAL];
-
 /**
  *   Identity root key used to derive IRK and DHK(Legacy)
  */
@@ -249,7 +237,6 @@ static void BLE_UserEvtRx(void *p_Payload);
 static void BLE_StatusNot(HCI_TL_CmdStatus_t Status);
 static void Ble_Tl_Init(void);
 static void Ble_Hci_Gap_Gatt_Init(void);
-static const uint8_t* BleGetBdAddress(void);
 static void Adv_Request(APP_BLE_ConnStatus_t NewStatus);
 static void Adv_Cancel(void);
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0)
@@ -259,12 +246,12 @@ static void Connection_Interval_Update_Req(void);
 
 /* USER CODE BEGIN PFP */
 static void LinkConfiguration(void);
+static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus);
 static void Adv_Update_Req(void);
 static void Adv_Update(void);
 /* USER CODE END PFP */
 
 /* External variables --------------------------------------------------------*/
-extern RNG_HandleTypeDef hrng;
 
 /* USER CODE BEGIN EV */
 
@@ -399,8 +386,22 @@ void APP_BLE_Init(void)
   /* USER CODE BEGIN APP_BLE_Init_3 */
   /* Create timer to handle the connection state machine */
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &(BleApplicationContext.Advertising_mgr_timer_Id), hw_ts_SingleShot, Adv_Update_Req);
+#if 0
   /* USER CODE END APP_BLE_Init_3 */
 
+  /**
+   * Make device discoverable
+   */
+  BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
+  BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
+
+  /**
+   * Start to Advertise to be connected by a Client
+   */
+  Adv_Request(APP_BLE_FAST_ADV);
+
+  /* USER CODE BEGIN APP_BLE_Init_2 */
+#endif
   /**
    * Make device discoverable
    */
@@ -412,11 +413,8 @@ void APP_BLE_Init(void)
     /**
      * Start to Advertise to be connected by a Client
      */
-    Adv_Request(APP_BLE_FAST_ADV);
+    FS_Adv_Request(APP_BLE_FAST_ADV);
   }
-
-  /* USER CODE BEGIN APP_BLE_Init_2 */
-
   /* USER CODE END APP_BLE_Init_2 */
 
   return;
@@ -428,7 +426,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
   evt_le_meta_event *p_meta_evt;
   evt_blecore_aci   *p_blecore_evt;
   tBleStatus        ret = BLE_STATUS_INVALID_PARAMS;
-  hci_le_connection_complete_event_rp0        *p_connection_complete_event;
+  hci_le_enhanced_connection_complete_event_rp0 *p_enhanced_connection_complete_event;
   hci_disconnection_complete_event_rp0        *p_disconnection_complete_event;
 #if (CFG_DEBUG_APP_TRACE != 0)
   hci_le_connection_update_complete_event_rp0 *p_connection_update_complete_event;
@@ -465,14 +463,11 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       }
 
       /* USER CODE BEGIN EVT_DISCONN_COMPLETE_1 */
-
+#if 0
       /* USER CODE END EVT_DISCONN_COMPLETE_1 */
 
-      if (FS_State_Get()->enable_ble)
-      {
-        /* restart advertising */
-        Adv_Request(APP_BLE_FAST_ADV);
-      }
+      /* restart advertising */
+      Adv_Request(APP_BLE_FAST_ADV);
 
       /**
        * SPECIFIC to Custom Template APP
@@ -481,7 +476,19 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
       Custom_APP_Notification(&HandleNotification);
       /* USER CODE BEGIN EVT_DISCONN_COMPLETE */
+#endif
+      if (FS_State_Get()->enable_ble)
+      {
+        /* restart advertising */
+        FS_Adv_Request(APP_BLE_FAST_ADV);
+      }
 
+      /**
+       * SPECIFIC to Custom Template APP
+       */
+      HandleNotification.Custom_Evt_Opcode = CUSTOM_DISCON_HANDLE_EVT;
+      HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
+      Custom_APP_Notification(&HandleNotification);
       /* USER CODE END EVT_DISCONN_COMPLETE */
       break; /* HCI_DISCONNECTION_COMPLETE_EVT_CODE */
     }
@@ -509,25 +516,25 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           /* USER CODE END EVT_LE_CONN_UPDATE_COMPLETE */
           break;
 
-        case HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE:
+        case HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE:
         {
-          p_connection_complete_event = (hci_le_connection_complete_event_rp0 *) p_meta_evt->data;
+          p_enhanced_connection_complete_event = (hci_le_enhanced_connection_complete_event_rp0 *) p_meta_evt->data;
           /**
            * The connection is done, there is no need anymore to schedule the LP ADV
            */
 
-          APP_DBG_MSG(">>== HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE - Connection handle: 0x%x\n", p_connection_complete_event->Connection_Handle);
+          APP_DBG_MSG(">>== HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE - Connection handle: 0x%x\n", p_enhanced_connection_complete_event->Connection_Handle);
           APP_DBG_MSG("     - Connection established with Central: @:%02x:%02x:%02x:%02x:%02x:%02x\n",
-                      p_connection_complete_event->Peer_Address[5],
-                      p_connection_complete_event->Peer_Address[4],
-                      p_connection_complete_event->Peer_Address[3],
-                      p_connection_complete_event->Peer_Address[2],
-                      p_connection_complete_event->Peer_Address[1],
-                      p_connection_complete_event->Peer_Address[0]);
+                      p_enhanced_connection_complete_event->Peer_Address[5],
+                      p_enhanced_connection_complete_event->Peer_Address[4],
+                      p_enhanced_connection_complete_event->Peer_Address[3],
+                      p_enhanced_connection_complete_event->Peer_Address[2],
+                      p_enhanced_connection_complete_event->Peer_Address[1],
+                      p_enhanced_connection_complete_event->Peer_Address[0]);
           APP_DBG_MSG("     - Connection Interval:   %.2f ms\n     - Connection latency:    %d\n     - Supervision Timeout: %d ms\n\r",
-                      p_connection_complete_event->Conn_Interval*1.25,
-                      p_connection_complete_event->Conn_Latency,
-                      p_connection_complete_event->Supervision_Timeout*10
+                      p_enhanced_connection_complete_event->Conn_Interval*1.25,
+                      p_enhanced_connection_complete_event->Conn_Latency,
+                      p_enhanced_connection_complete_event->Supervision_Timeout*10
                      );
 
           if (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_CONNECTING)
@@ -540,14 +547,14 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
             /* Connection as server */
             BleApplicationContext.Device_Connection_Status = APP_BLE_CONNECTED_SERVER;
           }
-          BleApplicationContext.BleApplicationContext_legacy.connectionHandle = p_connection_complete_event->Connection_Handle;
+          BleApplicationContext.BleApplicationContext_legacy.connectionHandle = p_enhanced_connection_complete_event->Connection_Handle;
           /**
            * SPECIFIC to Custom Template APP
            */
           HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_HANDLE_EVT;
           HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
           Custom_APP_Notification(&HandleNotification);
-          /* USER CODE BEGIN HCI_EVT_LE_CONN_COMPLETE */
+          /* USER CODE BEGIN HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
           /* Stop the timer */
           HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
 
@@ -560,8 +567,8 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
 
           /* Configure the link */
           UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_1);
-          /* USER CODE END HCI_EVT_LE_CONN_COMPLETE */
-          break; /* HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE */
+          /* USER CODE END HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
+          break; /* HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
         }
 
         default:
@@ -737,7 +744,7 @@ static void Ble_Hci_Gap_Gatt_Init(void)
 {
   uint8_t role;
   uint16_t gap_service_handle, gap_dev_name_char_handle, gap_appearance_char_handle;
-  const uint8_t *p_bd_addr;
+  uint32_t a_srd_bd_addr[2] = {0,0};
   uint16_t a_appearance[1] = {BLE_CFG_GAP_APPEARANCE};
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   /* USER CODE BEGIN Ble_Hci_Gap_Gatt_Init*/
@@ -758,21 +765,6 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   else
   {
     APP_DBG_MSG("  Success: hci_reset command\n");
-  }
-
-  /**
-   * Write the BD Address
-   */
-  p_bd_addr = BleGetBdAddress();
-  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, CONFIG_DATA_PUBADDR_LEN, (uint8_t*) p_bd_addr);
-  if (ret != BLE_STATUS_SUCCESS)
-  {
-    APP_DBG_MSG("  Fail   : aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET, result: 0x%x \n", ret);
-  }
-  else
-  {
-    APP_DBG_MSG("  Success: aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET\n");
-    APP_DBG_MSG("  Public Bluetooth Address: %02x:%02x:%02x:%02x:%02x:%02x\n",p_bd_addr[5],p_bd_addr[4],p_bd_addr[3],p_bd_addr[2],p_bd_addr[1],p_bd_addr[0]);
   }
 
   /**
@@ -821,8 +813,10 @@ static void Ble_Hci_Gap_Gatt_Init(void)
 #endif /* CFG_STATIC_RANDOM_ADDRESS */
 #endif
 
-#if (CFG_BLE_ADDRESS_TYPE != GAP_PUBLIC_ADDR)
+#if (CFG_BLE_ADDRESS_TYPE == GAP_STATIC_RANDOM_ADDR)
+#endif
 
+#if (CFG_BLE_ADDRESS_TYPE != PUBLIC_ADDR)
   ret = aci_hal_write_config_data(CONFIG_DATA_RANDOM_ADDRESS_OFFSET, CONFIG_DATA_RANDOM_ADDRESS_LEN, (uint8_t*)a_srd_bd_addr);
   if (ret != BLE_STATUS_SUCCESS)
   {
@@ -1032,52 +1026,48 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   APP_DBG_MSG("==>> End Ble_Hci_Gap_Gatt_Init function\n\r");
 }
 
-const uint8_t* BleGetBdAddress(void)
+static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 {
-  uint8_t *p_otp_addr;
-  const uint8_t *p_bd_addr;
-  uint32_t udn;
-  uint32_t company_id;
-  uint32_t device_id;
+  tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
 
-  udn = LL_FLASH_GetUDN();
-
-  if (udn != 0xFFFFFFFF)
+  BleApplicationContext.Device_Connection_Status = NewStatus;
+  /* Start Fast or Low Power Advertising */
+  ret = aci_gap_set_discoverable(ADV_TYPE,
+                                 CFG_FAST_CONN_ADV_INTERVAL_MIN,
+                                 CFG_FAST_CONN_ADV_INTERVAL_MAX,
+                                 CFG_BLE_ADDRESS_TYPE,
+                                 ADV_FILTER,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0);
+  if (ret != BLE_STATUS_SUCCESS)
   {
-    company_id = LL_FLASH_GetSTCompanyID();
-    device_id = LL_FLASH_GetDeviceID();
-
-    /**
-     * Public Address with the ST company ID
-     * bit[47:24] : 24bits (OUI) equal to the company ID
-     * bit[23:16] : Device ID.
-     * bit[15:0] : The last 16bits from the UDN
-     * Note: In order to use the Public Address in a final product, a dedicated
-     * 24bits company ID (OUI) shall be bought.
-     */
-    a_BdAddrUdn[0] = (uint8_t)(udn & 0x000000FF);
-    a_BdAddrUdn[1] = (uint8_t)((udn & 0x0000FF00) >> 8);
-    a_BdAddrUdn[2] = (uint8_t)device_id;
-    a_BdAddrUdn[3] = (uint8_t)(company_id & 0x000000FF);
-    a_BdAddrUdn[4] = (uint8_t)((company_id & 0x0000FF00) >> 8);
-    a_BdAddrUdn[5] = (uint8_t)((company_id & 0x00FF0000) >> 16);
-
-    p_bd_addr = (const uint8_t *)a_BdAddrUdn;
+    APP_DBG_MSG("==>> aci_gap_set_discoverable - fail, result: 0x%x \n", ret);
   }
   else
   {
-    p_otp_addr = OTP_Read(0);
-    if (p_otp_addr)
-    {
-      p_bd_addr = ((OTP_ID0_t*)p_otp_addr)->bd_address;
-    }
-    else
-    {
-      p_bd_addr = a_MBdAddr;
-    }
+    APP_DBG_MSG("==>> aci_gap_set_discoverable - Success\n");
   }
 
-  return p_bd_addr;
+/* USER CODE BEGIN Adv_Request_1*/
+
+/* USER CODE END Adv_Request_1*/
+
+  /* Update Advertising data */
+  ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+      APP_DBG_MSG("==>> Start Fast Advertising Failed , result: %d \n\r", ret);
+  }
+  else
+  {
+      APP_DBG_MSG("==>> Success: Start Fast Advertising \n\r");
+  }
+
+  return;
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTION */
@@ -1184,7 +1174,7 @@ static void LinkConfiguration(void)
   }
 }
 
-static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
+static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   uint16_t Min_Inter, Max_Inter;
@@ -1301,7 +1291,7 @@ static void Adv_Update_Req(void)
 
 static void Adv_Update(void)
 {
-  Adv_Request(APP_BLE_LP_ADV);
+  FS_Adv_Request(APP_BLE_LP_ADV);
 }
 
 void APP_BLE_RequestPairing(void (*Callback)(void))
@@ -1311,7 +1301,7 @@ void APP_BLE_RequestPairing(void (*Callback)(void))
   request_pairing = 1;
 
   /* Request fast advertising */
-  Adv_Request(APP_BLE_FAST_ADV);
+  FS_Adv_Request(APP_BLE_FAST_ADV);
 }
 
 void APP_BLE_CancelPairing(void)
@@ -1323,7 +1313,7 @@ void APP_BLE_CancelPairing(void)
   if (BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
   {
     /* Request low power advertising */
-    Adv_Request(APP_BLE_LP_ADV);
+    FS_Adv_Request(APP_BLE_LP_ADV);
   }
 }
 

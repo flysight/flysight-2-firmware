@@ -50,12 +50,17 @@
 /**
  * Define BD_ADDR type: define proper address. Can only be GAP_PUBLIC_ADDR (0x00) or GAP_STATIC_RANDOM_ADDR (0x01)
  */
-#define CFG_IDENTITY_ADDRESS              GAP_PUBLIC_ADDR
+#define CFG_IDENTITY_ADDRESS              GAP_STATIC_RANDOM_ADDR
+
+/**
+ * Define Static Random Address fixed for lifetime of the device
+ */
+#define CFG_STATIC_RANDOM_ADDRESS         (0xccaabbccddee)
 
 /**
  * Define privacy: PRIVACY_DISABLED or PRIVACY_ENABLED
  */
-#define CFG_PRIVACY                       PRIVACY_DISABLED
+#define CFG_PRIVACY                       PRIVACY_ENABLED
 
 /**
  * Define BLE Address Type
@@ -63,14 +68,14 @@
  * if CFG_PRIVACY equals PRIVACY_DISABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_PUBLIC_ADDR or GAP_STATIC_RANDOM_ADDR
  * if CFG_PRIVACY equals PRIVACY_ENABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_RESOLVABLE_PRIVATE_ADDR or GAP_NON_RESOLVABLE_PRIVATE_ADDR
  */
-#define CFG_BLE_ADDRESS_TYPE              GAP_PUBLIC_ADDR
+#define CFG_BLE_ADDRESS_TYPE              GAP_RESOLVABLE_PRIVATE_ADDR
 
 #define CFG_FAST_CONN_ADV_INTERVAL_MIN    (0x0080)      /**< 80ms */
 #define CFG_FAST_CONN_ADV_INTERVAL_MAX    (0x00A0)      /**< 100ms */
 #define CFG_LP_CONN_ADV_INTERVAL_MIN      (0x640)     /**< 1s */
 #define CFG_LP_CONN_ADV_INTERVAL_MAX      (0xFA0)     /**< 2.5s */
 #define ADV_TYPE                          ADV_IND
-#define BLE_ADDR_TYPE                     GAP_PUBLIC_ADDR
+#define BLE_ADDR_TYPE                     GAP_RESOLVABLE_PRIVATE_ADDR
 #define ADV_FILTER                        NO_WHITE_LIST_USE
 /**
  * Define IO Authentication
