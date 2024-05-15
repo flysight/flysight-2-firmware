@@ -1254,6 +1254,9 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   }
 #endif
 
+  /**
+   * Prepare white list as described in PM0271 5.3.1
+   */
   ble_count_bonded_devices();
 
   if (request_pairing)
