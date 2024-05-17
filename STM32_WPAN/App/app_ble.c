@@ -263,6 +263,7 @@ static void LinkConfiguration(void);
 static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus);
 static void Adv_Update_Req(void);
 static void Adv_Update(void);
+static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus);
 static int8_t ble_count_bonded_devices(void);
 /* USER CODE END PFP */
 
@@ -1282,16 +1283,8 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
       APP_DBG_MSG("==>> aci_gap_set_limited_discoverable - Success\n");
     }
 
-    /* Update Advertising data */
-    ret = aci_gap_update_adv_data(sizeof(a_AdvData), (uint8_t*) a_AdvData);
-    if (ret != BLE_STATUS_SUCCESS)
-    {
-      APP_DBG_MSG("==>> aci_gap_update_adv_data - fail, result: 0x%x \n", ret);
-    }
-    else
-    {
-      APP_DBG_MSG("==>> aci_gap_update_adv_data - Success\n");
-    }
+    /* Update advertising data */
+    APP_BLE_UpdateAdvertisingData(NewStatus);
   }
   else
   {
@@ -1308,6 +1301,9 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
     {
       APP_DBG_MSG("==>> aci_gap_set_undirected_connectable - Success\n");
     }
+
+    /* Update advertising data */
+    APP_BLE_UpdateAdvertisingData(NewStatus);
   }
 
   if (NewStatus == APP_BLE_FAST_ADV)
@@ -1358,16 +1354,27 @@ void APP_BLE_CancelPairing(void)
 
 void APP_BLE_UpdateDeviceName(void)
 {
+  /**
+   * For details of Bluetooth device name characteristic, see:
+   * https://www.bluetooth.com/specifications/css-11/
+   */
+
   const char *name = FS_State_Get()->device_name;
+  const size_t name_len = strlen(name);
+  uint8_t char_length;
   tBleStatus ret;
 
   if (BleApplicationContext.BleApplicationContext_legacy.gapServiceHandle)
   {
+    /* Get device name length */
+    char_length = MIN(name_len, 30);
+
+    /* Update device name characteristic */
     ret = aci_gatt_update_char_value(
         BleApplicationContext.BleApplicationContext_legacy.gapServiceHandle,
         BleApplicationContext.BleApplicationContext_legacy.devNameCharHandle,
         0,
-        strlen(name), (uint8_t *) name);
+        char_length, (uint8_t *) name);
     if (ret != BLE_STATUS_SUCCESS)
     {
       BLE_DBG_SVCCTL_MSG("  Fail   : aci_gatt_update_char_value - Device Name\n");
@@ -1375,6 +1382,62 @@ void APP_BLE_UpdateDeviceName(void)
     else
     {
       BLE_DBG_SVCCTL_MSG("  Success: aci_gatt_update_char_value - Device Name\n");
+    }
+  }
+
+  /* Update advertising data */
+  APP_BLE_UpdateAdvertisingData(BleApplicationContext.Device_Connection_Status);
+}
+
+static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
+{
+  /**
+   * For details of Bluetooth advertised local name, see:
+   * https://www.bluetooth.com/specifications/css-11/
+   */
+
+  const char *name = FS_State_Get()->device_name;
+  const size_t name_len = strlen(name);
+  uint8_t mfg_data[] = { 4, AD_TYPE_MANUFACTURER_SPECIFIC_DATA, 0xDB, 0x09, 0x00 };
+  uint8_t adv_data[31];
+  uint8_t k = 0;
+  uint8_t ad_length;
+  uint8_t ad_type;
+  tBleStatus ret;
+
+  if ((NewStatus == APP_BLE_FAST_ADV) || (NewStatus == APP_BLE_LP_ADV))
+  {
+    /* Copy manufacturer specific data */
+    memcpy(&(adv_data[k]), mfg_data, sizeof(mfg_data));
+    k += sizeof(mfg_data);
+
+    /* Get short local name if needed */
+    if (name_len > sizeof(adv_data) - k - 2)
+    {
+      ad_length = sizeof(adv_data) - k - 2;
+      ad_type = AD_TYPE_SHORTENED_LOCAL_NAME;
+    }
+    else
+    {
+      ad_length = name_len;
+      ad_type = AD_TYPE_COMPLETE_LOCAL_NAME;
+    }
+
+    /* Copy local name */
+    adv_data[k++] = 1 + ad_length;
+    adv_data[k++] = ad_type;
+    memcpy(&(adv_data[k]), name, ad_length);
+    k += ad_length;
+
+    /* Update advertising data */
+    ret = aci_gap_update_adv_data(k, adv_data);
+    if (ret != BLE_STATUS_SUCCESS)
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - fail, result: 0x%x \n", ret);
+    }
+    else
+    {
+      APP_DBG_MSG("==>> aci_gap_update_adv_data - Success\n");
     }
   }
 }
