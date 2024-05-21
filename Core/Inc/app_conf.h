@@ -50,7 +50,7 @@
 /**
  * Define BD_ADDR type: define proper address. Can only be GAP_PUBLIC_ADDR (0x00) or GAP_STATIC_RANDOM_ADDR (0x01)
  */
-#define CFG_IDENTITY_ADDRESS              GAP_PUBLIC_ADDR
+#define CFG_IDENTITY_ADDRESS              GAP_STATIC_RANDOM_ADDR
 
 /**
  * Define privacy: PRIVACY_DISABLED or PRIVACY_ENABLED

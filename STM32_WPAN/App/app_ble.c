@@ -42,6 +42,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "common.h"
 #include "state.h"
 /* USER CODE END Includes */
 
@@ -187,18 +188,6 @@ typedef struct
 /* Private variables ---------------------------------------------------------*/
 PLACE_IN_SECTION("MB_MEM1") ALIGN(4) static TL_CmdPacket_t BleCmdBuffer;
 
-static const uint8_t a_MBdAddr[BD_ADDR_SIZE_LOCAL] =
-{
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x0000000000FF)),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x00000000FF00) >> 8),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x000000FF0000) >> 16),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x0000FF000000) >> 24),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0x00FF00000000) >> 32),
-  (uint8_t)((CFG_ADV_BD_ADDRESS & 0xFF0000000000) >> 40)
-};
-
-static uint8_t a_BdAddrUdn[BD_ADDR_SIZE_LOCAL];
-
 /**
  *   Identity root key used to derive IRK and DHK(Legacy)
  */
@@ -250,7 +239,6 @@ static void BLE_UserEvtRx(void *p_Payload);
 static void BLE_StatusNot(HCI_TL_CmdStatus_t Status);
 static void Ble_Tl_Init(void);
 static void Ble_Hci_Gap_Gatt_Init(void);
-static const uint8_t* BleGetBdAddress(void);
 static void Adv_Request(APP_BLE_ConnStatus_t NewStatus);
 static void Adv_Cancel(void);
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0)
@@ -761,7 +749,7 @@ static void Ble_Hci_Gap_Gatt_Init(void)
 {
   uint8_t role;
   uint16_t gap_service_handle, gap_dev_name_char_handle, gap_appearance_char_handle;
-  const uint8_t *p_bd_addr;
+  uint32_t a_srd_bd_addr[2] = {0,0};
   uint16_t a_appearance[1] = {BLE_CFG_GAP_APPEARANCE};
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   /* USER CODE BEGIN Ble_Hci_Gap_Gatt_Init*/
@@ -785,26 +773,42 @@ static void Ble_Hci_Gap_Gatt_Init(void)
   }
 
   /**
-   * Write the BD Address
-   */
-  p_bd_addr = BleGetBdAddress();
-  ret = aci_hal_write_config_data(CONFIG_DATA_PUBADDR_OFFSET, CONFIG_DATA_PUBADDR_LEN, (uint8_t*) p_bd_addr);
-  if (ret != BLE_STATUS_SUCCESS)
-  {
-    APP_DBG_MSG("  Fail   : aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET, result: 0x%x \n", ret);
-  }
-  else
-  {
-    APP_DBG_MSG("  Success: aci_hal_write_config_data command - CONFIG_DATA_PUBADDR_OFFSET\n");
-    APP_DBG_MSG("  Public Bluetooth Address: %02x:%02x:%02x:%02x:%02x:%02x\n",p_bd_addr[5],p_bd_addr[4],p_bd_addr[3],p_bd_addr[2],p_bd_addr[1],p_bd_addr[0]);
-  }
-
-  /**
    * Static random Address
    * The two upper bits shall be set to 1
    * The lowest 32bits is read from the UDN to differentiate between devices
    * The RNG may be used to provide a random number on each power on
    */
+#if (CFG_IDENTITY_ADDRESS == GAP_STATIC_RANDOM_ADDR)
+#if defined(CFG_STATIC_RANDOM_ADDRESS)
+  a_srd_bd_addr[0] = CFG_STATIC_RANDOM_ADDRESS & 0xFFFFFFFF;
+  a_srd_bd_addr[1] = (uint32_t)((uint64_t)CFG_STATIC_RANDOM_ADDRESS >> 32);
+  a_srd_bd_addr[1] |= 0xC000; /* The two upper bits shall be set to 1 */
+#else
+  FS_Common_GetRandomBytes(a_srd_bd_addr, 2);
+  a_srd_bd_addr[1] |= 0xC000; /* The two upper bits shall be set to 1 */
+#endif /* CFG_STATIC_RANDOM_ADDRESS */
+#endif
+
+#if (CFG_BLE_ADDRESS_TYPE == GAP_STATIC_RANDOM_ADDR)
+#endif
+
+#if (CFG_BLE_ADDRESS_TYPE != PUBLIC_ADDR)
+  ret = aci_hal_write_config_data(CONFIG_DATA_RANDOM_ADDRESS_OFFSET, CONFIG_DATA_RANDOM_ADDRESS_LEN, (uint8_t*)a_srd_bd_addr);
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_hal_write_config_data command - CONFIG_DATA_RANDOM_ADDRESS_OFFSET, result: 0x%x \n", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_hal_write_config_data command - CONFIG_DATA_RANDOM_ADDRESS_OFFSET\n");
+    APP_DBG_MSG("  Random Bluetooth Address: %02x:%02x:%02x:%02x:%02x:%02x\n", (uint8_t)(a_srd_bd_addr[1] >> 8),
+                                                                               (uint8_t)(a_srd_bd_addr[1]),
+                                                                               (uint8_t)(a_srd_bd_addr[0] >> 24),
+                                                                               (uint8_t)(a_srd_bd_addr[0] >> 16),
+                                                                               (uint8_t)(a_srd_bd_addr[0] >> 8),
+                                                                               (uint8_t)(a_srd_bd_addr[0]));
+  }
+#endif /* CFG_BLE_ADDRESS_TYPE != GAP_PUBLIC_ADDR */
 
   /**
    * Write Identity root key used to derive IRK and DHK(Legacy)
@@ -1040,54 +1044,6 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   }
 
   return;
-}
-
-const uint8_t* BleGetBdAddress(void)
-{
-  uint8_t *p_otp_addr;
-  const uint8_t *p_bd_addr;
-  uint32_t udn;
-  uint32_t company_id;
-  uint32_t device_id;
-
-  udn = LL_FLASH_GetUDN();
-
-  if (udn != 0xFFFFFFFF)
-  {
-    company_id = LL_FLASH_GetSTCompanyID();
-    device_id = LL_FLASH_GetDeviceID();
-
-    /**
-     * Public Address with the ST company ID
-     * bit[47:24] : 24bits (OUI) equal to the company ID
-     * bit[23:16] : Device ID.
-     * bit[15:0] : The last 16bits from the UDN
-     * Note: In order to use the Public Address in a final product, a dedicated
-     * 24bits company ID (OUI) shall be bought.
-     */
-    a_BdAddrUdn[0] = (uint8_t)(udn & 0x000000FF);
-    a_BdAddrUdn[1] = (uint8_t)((udn & 0x0000FF00) >> 8);
-    a_BdAddrUdn[2] = (uint8_t)device_id;
-    a_BdAddrUdn[3] = (uint8_t)(company_id & 0x000000FF);
-    a_BdAddrUdn[4] = (uint8_t)((company_id & 0x0000FF00) >> 8);
-    a_BdAddrUdn[5] = (uint8_t)((company_id & 0x00FF0000) >> 16);
-
-    p_bd_addr = (const uint8_t *)a_BdAddrUdn;
-  }
-  else
-  {
-    p_otp_addr = OTP_Read(0);
-    if (p_otp_addr)
-    {
-      p_bd_addr = ((OTP_ID0_t*)p_otp_addr)->bd_address;
-    }
-    else
-    {
-      p_bd_addr = a_MBdAddr;
-    }
-  }
-
-  return p_bd_addr;
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTION */
