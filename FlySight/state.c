@@ -35,6 +35,8 @@
 static FS_State_Data_t state;
 static FIL stateFile;
 
+static void FS_State_Write(void);
+
 static void FS_State_WriteHex_8(FIL *file, const uint8_t *data, uint32_t count)
 {
 	uint32_t i;
@@ -118,6 +120,8 @@ void FS_State_Read(void)
 	char    *result;
 	int32_t val;
 
+	uint8_t reset_ble = 1;
+
 	/* Initialize persistent state */
 	state.config_filename[0] = 0;
 	state.temp_folder = -1;
@@ -166,6 +170,7 @@ void FS_State_Read(void)
 		HANDLE_VALUE("Temp_Folder", state.temp_folder,    val, val >= 0);
 		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Enable_BLE",  state.enable_ble,     val, val == 0 || val == 1);
+		HANDLE_VALUE("Reset_BLE",   reset_ble,            val, val == 0 || val == 1);
 
 		#undef HANDLE_VALUE
 	}
@@ -176,6 +181,15 @@ void FS_State_Read(void)
 	state.device_id[0] = HAL_GetUIDw0();
 	state.device_id[1] = HAL_GetUIDw1();
 	state.device_id[2] = HAL_GetUIDw2();
+
+	/* Update persistent state */
+	FS_State_Write();
+
+	if (reset_ble)
+	{
+		/* Clear list of bonded devices */
+		APP_BLE_Reset();
+	}
 
 	/* Update device name */
 	APP_BLE_UpdateDeviceName();
@@ -235,6 +249,7 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "; Bluetooth\n\n");
 
 	f_printf(&stateFile, "Enable_BLE:   %u\n", state.enable_ble);
+	f_printf(&stateFile, "Reset_BLE:    0\n");
 	f_printf(&stateFile, "Device_Name:  %s\n\n", state.device_name);
 
 	f_printf(&stateFile, "; Bootloader public key\n\n");
@@ -258,9 +273,6 @@ void FS_State_Init(void)
 
 	/* Read persistent state */
 	FS_State_Read();
-
-	/* Write persistent state */
-	FS_State_Write();
 
 	/* De-initialize microSD */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);

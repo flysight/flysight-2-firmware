@@ -1196,21 +1196,6 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 
   BleApplicationContext.Device_Connection_Status = NewStatus;
 
-#if 0
-  /**
-   * Clear list of bonded devices
-   */
-  ret = aci_gap_clear_security_db();
-  if (ret != BLE_STATUS_SUCCESS)
-  {
-    APP_DBG_MSG("  Fail   : aci_gap_clear_security_db command, result: 0x%x \n", ret);
-  }
-  else
-  {
-    APP_DBG_MSG("  Success: aci_gap_clear_security_db command\n");
-  }
-#endif
-
   /**
    * Prepare white list as described in PM0271 5.3.1
    */
@@ -1345,6 +1330,21 @@ void APP_BLE_UpdateDeviceName(void)
   APP_BLE_UpdateAdvertisingData(BleApplicationContext.Device_Connection_Status);
 }
 
+void APP_BLE_Reset(void)
+{
+  tBleStatus ret;
+
+  /* Clear list of bonded devices */
+  ret = aci_gap_clear_security_db();
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gap_clear_security_db command, result: 0x%x \n", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gap_clear_security_db command\n");
+  }
+}
 static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
 {
   /**

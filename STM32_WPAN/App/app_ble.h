@@ -79,6 +79,7 @@ APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
 void APP_BLE_RequestPairing(void (*Callback)(void));
 void APP_BLE_CancelPairing(void);
 void APP_BLE_UpdateDeviceName(void);
+void APP_BLE_Reset(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

@@ -37,9 +37,6 @@ void FS_USBMode_Init(void)
 	/* Initialize microSD */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
-	// Read persistent state
-	FS_State_Read();
-
 	/* Initialize controller */
 	FS_USBControl_Init();
 
