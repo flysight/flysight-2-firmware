@@ -1344,6 +1344,9 @@ void APP_BLE_Reset(void)
   {
     APP_DBG_MSG("  Success: aci_gap_clear_security_db command\n");
   }
+
+  /* Re-initialize advertising */
+  FS_Adv_Request(BleApplicationContext.Device_Connection_Status);
 }
 static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
 {
