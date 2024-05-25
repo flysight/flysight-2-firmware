@@ -25,5 +25,6 @@
 #define COMMON_H_
 
 char *writeInt32ToBuf(char *ptr, int32_t val, int8_t dec, int8_t dot, char delimiter);
+void FS_Common_GetRandomBytes(uint32_t *buf, uint32_t count);
 
 #endif /* COMMON_H_ */

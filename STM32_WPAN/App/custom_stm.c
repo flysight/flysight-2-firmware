@@ -104,15 +104,14 @@ do {\
     uuid_struct[8] = uuid_8; uuid_struct[9] = uuid_9; uuid_struct[10] = uuid_10; uuid_struct[11] = uuid_11; \
     uuid_struct[12] = uuid_12; uuid_struct[13] = uuid_13; uuid_struct[14] = uuid_14; uuid_struct[15] = uuid_15; \
 }while(0)
+#define COPY_UUID_128(uuid_struct, uuid_15, uuid_14, uuid_13, uuid_12, uuid_11, uuid_10, uuid_9, uuid_8, uuid_7, uuid_6, uuid_5, uuid_4, uuid_3, uuid_2, uuid_1, uuid_0) \
+do {\
+    uuid_struct[0] = uuid_0; uuid_struct[1] = uuid_1; uuid_struct[2] = uuid_2; uuid_struct[3] = uuid_3; \
+    uuid_struct[4] = uuid_4; uuid_struct[5] = uuid_5; uuid_struct[6] = uuid_6; uuid_struct[7] = uuid_7; \
+    uuid_struct[8] = uuid_8; uuid_struct[9] = uuid_9; uuid_struct[10] = uuid_10; uuid_struct[11] = uuid_11; \
+    uuid_struct[12] = uuid_12; uuid_struct[13] = uuid_13; uuid_struct[14] = uuid_14; uuid_struct[15] = uuid_15; \
+}while(0)
 
-/* Hardware Characteristics Service */
-/*
- The following 128bits UUIDs have been generated from the random UUID
- generator:
- D973F2E0-B19E-11E2-9E96-0800200C9A66: Service 128bits UUID
- D973F2E1-B19E-11E2-9E96-0800200C9A66: Characteristic_1 128bits UUID
- D973F2E2-B19E-11E2-9E96-0800200C9A66: Characteristic_2 128bits UUID
- */
 #define COPY_CRS_UUID(uuid_struct)          COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x00,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
 #define COPY_CRS_TX_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x01,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 #define COPY_CRS_RX_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x02,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
@@ -134,6 +133,7 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
   hci_event_pckt *event_pckt;
   evt_blecore_aci *blecore_evt;
   aci_gatt_attribute_modified_event_rp0 *attribute_modified;
+  aci_gatt_notification_complete_event_rp0    *notification_complete;
   Custom_STM_App_Notification_evt_t     Notification;
   /* USER CODE BEGIN Custom_STM_Event_Handler_1 */
 
@@ -273,6 +273,22 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
 
           /* USER CODE END EVT_BLUE_GATT_WRITE_PERMIT_REQ_END */
           break;
+
+		case ACI_GATT_NOTIFICATION_COMPLETE_VSEVT_CODE:
+        {
+          /* USER CODE BEGIN EVT_BLUE_GATT_NOTIFICATION_COMPLETE_BEGIN */
+
+          /* USER CODE END EVT_BLUE_GATT_NOTIFICATION_COMPLETE_BEGIN */
+          notification_complete = (aci_gatt_notification_complete_event_rp0*)blecore_evt->data;
+          Notification.Custom_Evt_Opcode = CUSTOM_STM_NOTIFICATION_COMPLETE_EVT;
+          Notification.AttrHandle = notification_complete->Attr_Handle;
+          Custom_STM_App_Notification(&Notification);
+          /* USER CODE BEGIN EVT_BLUE_GATT_NOTIFICATION_COMPLETE_END */
+
+          /* USER CODE END EVT_BLUE_GATT_NOTIFICATION_COMPLETE_END */
+          break;
+        }
+
         /* USER CODE BEGIN BLECORE_EVT */
 
         /* USER CODE END BLECORE_EVT */
@@ -371,7 +387,7 @@ void SVCCTL_InitCustomSvc(void)
                           UUID_TYPE_128, &uuid,
                           SizeCrs_Tx,
                           CHAR_PROP_NOTIFY,
-                          ATTR_PERMISSION_NONE,
+                          ATTR_PERMISSION_ENCRY_READ,
                           GATT_DONT_NOTIFY_EVENTS,
                           0x10,
                           CHAR_VALUE_LEN_VARIABLE,
@@ -397,7 +413,7 @@ void SVCCTL_InitCustomSvc(void)
                           UUID_TYPE_128, &uuid,
                           SizeCrs_Rx,
                           CHAR_PROP_READ | CHAR_PROP_WRITE_WITHOUT_RESP,
-                          ATTR_PERMISSION_NONE,
+                          ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
                           CHAR_VALUE_LEN_VARIABLE,
@@ -458,7 +474,7 @@ void SVCCTL_InitCustomSvc(void)
                           UUID_TYPE_128, &uuid,
                           SizeGnss_Pv,
                           CHAR_PROP_READ | CHAR_PROP_NOTIFY,
-                          ATTR_PERMISSION_NONE,
+                          ATTR_PERMISSION_ENCRY_READ,
                           GATT_DONT_NOTIFY_EVENTS,
                           0x10,
                           CHAR_VALUE_LEN_CONSTANT,

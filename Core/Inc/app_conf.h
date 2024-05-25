@@ -35,7 +35,6 @@
 /******************************************************************************
  * Application Config
  ******************************************************************************/
-
 /**< generic parameters ******************************************************/
 
 /**
@@ -51,12 +50,12 @@
 /**
  * Define BD_ADDR type: define proper address. Can only be GAP_PUBLIC_ADDR (0x00) or GAP_STATIC_RANDOM_ADDR (0x01)
  */
-#define CFG_IDENTITY_ADDRESS              GAP_PUBLIC_ADDR
+#define CFG_IDENTITY_ADDRESS              GAP_STATIC_RANDOM_ADDR
 
 /**
  * Define privacy: PRIVACY_DISABLED or PRIVACY_ENABLED
  */
-#define CFG_PRIVACY                       PRIVACY_DISABLED
+#define CFG_PRIVACY                       PRIVACY_ENABLED
 
 /**
  * Define BLE Address Type
@@ -64,20 +63,19 @@
  * if CFG_PRIVACY equals PRIVACY_DISABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_PUBLIC_ADDR or GAP_STATIC_RANDOM_ADDR
  * if CFG_PRIVACY equals PRIVACY_ENABLED, CFG_BLE_ADDRESS_TYPE has 2 allowed values: GAP_RESOLVABLE_PRIVATE_ADDR or GAP_NON_RESOLVABLE_PRIVATE_ADDR
  */
-#define CFG_BLE_ADDRESS_TYPE              GAP_PUBLIC_ADDR
+#define CFG_BLE_ADDRESS_TYPE              GAP_RESOLVABLE_PRIVATE_ADDR
 
 #define CFG_FAST_CONN_ADV_INTERVAL_MIN    (0x0080)      /**< 80ms */
 #define CFG_FAST_CONN_ADV_INTERVAL_MAX    (0x00A0)      /**< 100ms */
 #define CFG_LP_CONN_ADV_INTERVAL_MIN      (0x640)     /**< 1s */
 #define CFG_LP_CONN_ADV_INTERVAL_MAX      (0xFA0)     /**< 2.5s */
 #define ADV_TYPE                          ADV_IND
-#define BLE_ADDR_TYPE                     GAP_PUBLIC_ADDR
+#define BLE_ADDR_TYPE                     GAP_RESOLVABLE_PRIVATE_ADDR
 #define ADV_FILTER                        NO_WHITE_LIST_USE
-
 /**
  * Define IO Authentication
  */
-#define CFG_BONDING_MODE                 (0)
+#define CFG_BONDING_MODE                 (1)
 #define CFG_FIXED_PIN                    (111111)
 #define CFG_USED_FIXED_PIN               (0)
 #define CFG_ENCRYPTION_KEY_SIZE_MAX      (16)
@@ -92,7 +90,7 @@
 #define CFG_IO_CAPABILITY_NO_INPUT_NO_OUTPUT  (0x03)
 #define CFG_IO_CAPABILITY_KEYBOARD_DISPLAY    (0x04)
 
-#define CFG_IO_CAPABILITY                     CFG_IO_CAPABILITY_DISPLAY_YES_NO
+#define CFG_IO_CAPABILITY                      CFG_IO_CAPABILITY_NO_INPUT_NO_OUTPUT
 
 /**
  * Define MITM modes
@@ -100,7 +98,7 @@
 #define CFG_MITM_PROTECTION_NOT_REQUIRED      (0x00)
 #define CFG_MITM_PROTECTION_REQUIRED          (0x01)
 
-#define CFG_MITM_PROTECTION                   CFG_MITM_PROTECTION_REQUIRED
+#define CFG_MITM_PROTECTION                   CFG_MITM_PROTECTION_NOT_REQUIRED
 
 /**
  * Define Secure Connections Support
@@ -128,8 +126,8 @@
 /**
  * Device name configuration for Generic Access Service
  */
-#define CFG_GAP_DEVICE_NAME             "FlySight"
-#define CFG_GAP_DEVICE_NAME_LENGTH      (8)
+#define CFG_GAP_DEVICE_NAME             "123456789012345678901234567890"
+#define CFG_GAP_DEVICE_NAME_LENGTH      (30)
 
 /**
  * Define PHY
@@ -199,7 +197,7 @@
  * Maximum number of simultaneous connections that the device will support.
  * Valid values are from 1 to 8
  */
-#define CFG_BLE_NUM_LINK            2
+#define CFG_BLE_NUM_LINK            1
 
 /**
  * Maximum number of Services that can be stored in the GATT database.
@@ -337,7 +335,7 @@
  *          0: LE Power Class 2-3
  * other bits: complete with Options_extension flag
  */
-#define CFG_BLE_OPTIONS  (SHCI_C2_BLE_INIT_OPTIONS_LL_HOST | SHCI_C2_BLE_INIT_OPTIONS_WITH_SVC_CHANGE_DESC | SHCI_C2_BLE_INIT_OPTIONS_DEVICE_NAME_RW | SHCI_C2_BLE_INIT_OPTIONS_NO_EXT_ADV | SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2 | SHCI_C2_BLE_INIT_OPTIONS_FULL_GATTDB_NVM | SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_NOTUSED | SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3)
+#define CFG_BLE_OPTIONS  (SHCI_C2_BLE_INIT_OPTIONS_LL_HOST | SHCI_C2_BLE_INIT_OPTIONS_WITH_SVC_CHANGE_DESC | SHCI_C2_BLE_INIT_OPTIONS_DEVICE_NAME_RO | SHCI_C2_BLE_INIT_OPTIONS_NO_EXT_ADV | SHCI_C2_BLE_INIT_OPTIONS_NO_CS_ALGO2 | SHCI_C2_BLE_INIT_OPTIONS_FULL_GATTDB_NVM | SHCI_C2_BLE_INIT_OPTIONS_GATT_CACHING_NOTUSED | SHCI_C2_BLE_INIT_OPTIONS_POWER_CLASS_2_3)
 
 /**
  * BLE stack Options_extension flags to be configured with:
@@ -669,9 +667,7 @@ typedef enum
 /**< Add in that list all tasks that may send a ACI/HCI command */
 typedef enum
 {
-#ifndef DISABLE_BLE_ADV
   CFG_TASK_ADV_CANCEL_ID,
-#endif
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0 )
   CFG_TASK_CONN_UPDATE_REG_ID,
 #endif
@@ -756,4 +752,3 @@ typedef enum
 #define CFG_OTP_END_ADRESS      OTP_AREA_END_ADDR
 
 #endif /*APP_CONF_H */
-

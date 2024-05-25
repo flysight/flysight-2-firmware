@@ -30,6 +30,7 @@
 #include "button.h"
 #include "config_mode.h"
 #include "mode.h"
+#include "pairing_mode.h"
 #include "state.h"
 #include "stm32_seq.h"
 #include "usb_mode.h"
@@ -44,13 +45,15 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_Active(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_Config(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_USB(FS_Mode_Event_t event);
+static FS_Mode_State_t FS_Mode_State_Pairing(FS_Mode_Event_t event);
 
 static FS_Mode_StateFunc_t *const mode_state_table[FS_MODE_STATE_COUNT] =
 {
 	FS_Mode_State_Sleep,
 	FS_Mode_State_Active,
 	FS_Mode_State_Config,
-	FS_Mode_State_USB
+	FS_Mode_State_USB,
+	FS_Mode_State_Pairing
 };
 
 static FS_Mode_State_t mode_state = FS_MODE_STATE_SLEEP;
@@ -118,14 +121,24 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 	}
 	else if (event == FS_MODE_EVENT_BUTTON_RELEASED)
 	{
+		// Save button state
+		prev_state = button_state;
+
 		// Update button state
-		if (button_state == BUTTON_FIRST_PRESS)
+		button_state = BUTTON_IDLE;
+
+		// Update button state
+		if (prev_state == BUTTON_FIRST_PRESS)
 		{
 			button_state = BUTTON_RELEASED;
 		}
-		else if (button_state == BUTTON_SECOND_PRESS)
+		else if (prev_state == BUTTON_SECOND_PRESS)
 		{
-			button_state = BUTTON_IDLE;
+			if (FS_State_Get()->enable_ble)
+			{
+				FS_PairingMode_Init();
+				next_mode = FS_MODE_STATE_PAIRING;
+			}
 		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
@@ -140,13 +153,6 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		{
 			FS_ActiveMode_Init();
 			next_mode = FS_MODE_STATE_ACTIVE;
-		}
-		else if (prev_state == BUTTON_RELEASED)
-		{
-#ifndef DISABLE_BLE_ADV
-			// Start fast advertising
-			APP_BLE_Adv_Set(APP_BLE_FAST_ADV);
-#endif
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{
@@ -190,13 +196,11 @@ static FS_Mode_State_t FS_Mode_State_Config(FS_Mode_Event_t event)
 
 	if (event == FS_MODE_EVENT_BUTTON_PRESSED)
 	{
-		FS_State_SetConfigFilename(FS_ConfigMode_GetConfigFilename());
 		FS_ConfigMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
 	}
 	else if (event == FS_MODE_EVENT_FORCE_UPDATE)
 	{
-		FS_State_SetConfigFilename("");
 		FS_ConfigMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
 	}
@@ -211,6 +215,24 @@ static FS_Mode_State_t FS_Mode_State_USB(FS_Mode_Event_t event)
 	if (event == FS_MODE_EVENT_VBUS_LOW)
 	{
 		FS_USBMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+
+	return next_mode;
+}
+
+static FS_Mode_State_t FS_Mode_State_Pairing(FS_Mode_Event_t event)
+{
+	FS_Mode_State_t next_mode = FS_MODE_STATE_PAIRING;
+
+	if (event == FS_MODE_EVENT_BUTTON_PRESSED)
+	{
+		FS_PairingMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+	else if (event == FS_MODE_EVENT_FORCE_UPDATE)
+	{
+		FS_PairingMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
 	}
 

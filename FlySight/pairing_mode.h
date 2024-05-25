@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,20 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef LED_H_
-#define LED_H_
+#ifndef PAIRING_MODE_H_
+#define PAIRING_MODE_H_
 
-typedef enum
-{
-	FS_LED_RED,
-	FS_LED_GREEN
-} FS_LED_Colour_t;
+void FS_PairingMode_Init(void);
+void FS_PairingMode_DeInit(void);
 
-void FS_LED_Init(void);
-void FS_LED_DeInit(void);
-void FS_LED_On(void);
-void FS_LED_Off(void);
-void FS_LED_Pulse(void);
-void FS_LED_SetColour(FS_LED_Colour_t newColour);
-
-#endif /* LED_H_ */
+#endif /* PAIRING_MODE_H_ */
