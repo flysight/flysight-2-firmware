@@ -74,6 +74,23 @@ static uint32_t hexCharToUint(char c)
     return 0; // Optionally handle invalid character error
 }
 
+static void FS_State_ReadHex_8(const char *str, uint8_t *data, uint32_t count)
+{
+    uint32_t i, j;
+    uint8_t value;
+
+    for (i = 0; i < count; ++i)
+    {
+        value = 0;
+        for (j = 0; j < 2; ++j)
+        {
+            value = value << 4;
+            value |= hexCharToUint(str[i * 2 + j]);
+        }
+        data[i] = value;
+    }
+}
+
 static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
 {
     uint32_t i, j, value;
@@ -111,6 +128,17 @@ static char *trim(char *str) {
     return start;
 }
 
+uint8_t is_all_zeros(const void *buffer, size_t size) {
+    const unsigned char *byte_buffer = (const unsigned char *)buffer;
+
+    for (size_t i = 0; i < size; i++) {
+        if (byte_buffer[i] != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void FS_State_Read(void)
 {
 	char    buffer[100];
@@ -120,14 +148,16 @@ void FS_State_Read(void)
 	char    *result;
 	int32_t val;
 
-	uint8_t reset_ble = 1;
-
 	/* Initialize persistent state */
 	state.config_filename[0] = 0;
 	state.temp_folder = -1;
 	state.charge_current = 2;
 	strcpy(state.device_name, "FlySight");
 	state.enable_ble = 1;
+	state.reset_ble = 1;
+	memset(state.session_id, 0, 4 * 3);
+	memset(state.ble_irk, 0, CONFIG_DATA_IR_LEN);
+	memset(state.ble_erk, 0, CONFIG_DATA_ER_LEN);
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -147,7 +177,7 @@ void FS_State_Read(void)
 
 		val = atol(result);
 
-		if (!strcmp(name, "Session_ID"))
+		if (!strcmp(name, "Session_ID") && (strlen(result) == 8 * 3))
 		{
 			FS_State_ReadHex_32(result, state.session_id, 3);
 		}
@@ -170,7 +200,17 @@ void FS_State_Read(void)
 		HANDLE_VALUE("Temp_Folder", state.temp_folder,    val, val >= 0);
 		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Enable_BLE",  state.enable_ble,     val, val == 0 || val == 1);
-		HANDLE_VALUE("Reset_BLE",   reset_ble,            val, val == 0 || val == 1);
+		HANDLE_VALUE("Reset_BLE",   state.reset_ble,      val, val == 0 || val == 1);
+
+		if (!strcmp(name, "BLE_IRK") && (strlen(result) == 2 * CONFIG_DATA_IR_LEN))
+		{
+			FS_State_ReadHex_8(result, state.ble_irk, CONFIG_DATA_IR_LEN);
+		}
+
+		if (!strcmp(name, "BLE_ERK") && (strlen(result) == 2 * CONFIG_DATA_ER_LEN))
+		{
+			FS_State_ReadHex_8(result, state.ble_erk, CONFIG_DATA_ER_LEN);
+		}
 
 		#undef HANDLE_VALUE
 	}
@@ -182,10 +222,22 @@ void FS_State_Read(void)
 	state.device_id[1] = HAL_GetUIDw1();
 	state.device_id[2] = HAL_GetUIDw2();
 
+	/* Initialize IRK if needed */
+	while (is_all_zeros(state.ble_irk, CONFIG_DATA_IR_LEN))
+	{
+		FS_Common_GetRandomBytes((uint32_t *) state.ble_irk, CONFIG_DATA_IR_LEN / 4);
+	}
+
+	/* Initialize ERK if needed */
+	while (is_all_zeros(state.ble_erk, CONFIG_DATA_ER_LEN))
+	{
+		FS_Common_GetRandomBytes((uint32_t *) state.ble_erk, CONFIG_DATA_ER_LEN / 4);
+	}
+
 	/* Update persistent state */
 	FS_State_Write();
 
-	if (reset_ble)
+	if (state.reset_ble)
 	{
 		/* Clear list of bonded devices */
 		APP_BLE_Reset();
@@ -252,6 +304,14 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "Reset_BLE:    0\n");
 	f_printf(&stateFile, "Device_Name:  %s\n\n", state.device_name);
 
+	f_printf(&stateFile, "BLE_IRK:      ");
+	FS_State_WriteHex_8(&stateFile, state.ble_irk, 16);
+	f_printf(&stateFile, "\n");
+
+	f_printf(&stateFile, "BLE_ERK:      ");
+	FS_State_WriteHex_8(&stateFile, state.ble_erk, 16);
+	f_printf(&stateFile, "\n\n");
+
 	f_printf(&stateFile, "; Bootloader public key\n\n");
 
 	f_printf(&stateFile, "Pubkey_X:     ");
@@ -289,7 +349,11 @@ void FS_State_NextSession(void)
 	state.temp_folder = (state.temp_folder + 1) % 10000;
 
 	/* Get random session ID */
-	FS_Common_GetRandomBytes(state.session_id, 3);
+	do
+	{
+		FS_Common_GetRandomBytes(state.session_id, 3);
+	}
+	while (is_all_zeros(state.session_id, 4 * 3));
 
 	/* Write updated state */
 	FS_State_Write();

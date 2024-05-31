@@ -24,6 +24,7 @@
 #ifndef STATE_H_
 #define STATE_H_
 
+#include "ble.h"
 #include "charge.h"
 
 typedef struct
@@ -35,6 +36,9 @@ typedef struct
 	FS_Charge_Current_t charge_current;
 	char     device_name[30];
 	uint8_t  enable_ble;
+	uint8_t  reset_ble;
+	uint8_t  ble_irk[CONFIG_DATA_IR_LEN];
+	uint8_t  ble_erk[CONFIG_DATA_ER_LEN];
 } FS_State_Data_t;
 
 void FS_State_Init(void);
