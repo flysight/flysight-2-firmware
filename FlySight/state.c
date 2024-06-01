@@ -322,6 +322,9 @@ void FS_State_Init(void)
 	/* Read persistent state */
 	FS_State_Read();
 
+	/* Write updated state */
+	FS_State_Write();
+
 	/* De-initialize microSD */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
 }
