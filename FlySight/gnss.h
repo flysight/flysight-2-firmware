@@ -81,13 +81,14 @@ void FS_GNSS_Start(void);
 void FS_GNSS_Stop(void);
 
 const FS_GNSS_Data_t *FS_GNSS_GetData(void);
-void FS_GNSS_DataReady_Callback(void);
+void FS_GNSS_DataReady_SetCallback(void (*callback)(void));
 
 void FS_GNSS_Timepulse(void);
 const FS_GNSS_Time_t *FS_GNSS_GetTime(void);
-void FS_GNSS_TimeReady_Callback(bool validTime);
+void FS_GNSS_TimeReady_SetCallback(void (*callback)(bool));
 
 const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void);
-void FS_GNSS_RawReady_Callback(void);
+void FS_GNSS_RawReady_SetCallback(void (*callback)(void));
+
 
 #endif /* GNSS_H_ */

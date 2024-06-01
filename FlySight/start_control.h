@@ -21,59 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#include "main.h"
-#include "app_common.h"
-#include "app_fatfs.h"
-#include "config.h"
-#include "gnss.h"
-#include "resource_manager.h"
-#include "start_control.h"
-#include "state.h"
+#ifndef START_CONTROL_H_
+#define START_CONTROL_H_
 
-extern UART_HandleTypeDef huart1;
+void FS_StartControl_Init(void);
+void FS_StartControl_DeInit(void);
 
-void FS_StartMode_Init(void)
-{
-	/* Initialize FatFS */
-	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
-
-	/* Initialize controller */
-	FS_StartControl_Init();
-
-	/* Initialize configuration */
-	FS_Config_Init();
-	if (FS_Config_Read("/config.txt") != FS_CONFIG_OK)
-	{
-		FS_Config_Write("/config.txt");
-	}
-
-	/* Read selectable config */
-	if (f_chdir("/config") == FR_OK)
-	{
-		FS_Config_Read(FS_State_Get()->config_filename);
-	}
-
-	/* Enable USART */
-	MX_USART1_UART_Init();
-
-	/* Initialize GNSS */
-	FS_GNSS_Init();
-
-	/* Start GNSS */
-	FS_GNSS_Start();
-}
-
-void FS_StartMode_DeInit(void)
-{
-	/* Disable controller */
-	FS_StartControl_DeInit();
-
-	/* Disable GNSS */
-	FS_GNSS_DeInit();
-
-	/* Disable USART */
-	HAL_UART_DeInit(&huart1);
-
-	/* De-initialize FatFS */
-	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
-}
+#endif /* START_CONTROL_H_ */

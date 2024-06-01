@@ -405,6 +405,10 @@ extern UART_HandleTypeDef huart1;
 static void FS_GNSS_Timer(void);
 static void FS_GNSS_Update(void);
 
+static void (*data_ready_callback)(void) = NULL;
+static void (*time_ready_callback)(bool validTime) = NULL;
+static void (*raw_ready_callback)(void) = NULL;
+
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	if (huart->ErrorCode & HAL_UART_ERROR_ORE)
@@ -594,7 +598,10 @@ static void FS_GNSS_ReceiveMessage(uint8_t msgReceived, uint32_t timeOfWeek)
 	if (gnssMsgReceived == UBX_MSG_ALL)
 	{
 		gnssData.iTOW = timeOfWeek;
-		FS_GNSS_DataReady_Callback();
+		if (data_ready_callback)
+		{
+			data_ready_callback();
+		}
 		gnssMsgReceived = 0;
 	}
 }
@@ -940,7 +947,10 @@ static void FS_GNSS_Update(void)
 	{
 		while (writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex)
 		{
-			FS_GNSS_RawReady_Callback();
+			if (raw_ready_callback)
+			{
+				raw_ready_callback();
+			}
 			gnssRawIndex = (gnssRawIndex + 1) % (GNSS_RX_BUF_LEN / GNSS_RAW_BUF_LEN);
 		}
 	}
@@ -957,18 +967,14 @@ const FS_GNSS_Data_t *FS_GNSS_GetData(void)
 	return &gnssData;
 }
 
-__weak void FS_GNSS_DataReady_Callback(void)
-{
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_DataReady_Callback could be implemented in the user file
-   */
-}
-
 void FS_GNSS_Timepulse(void)
 {
 	gnssTime.time = HAL_GetTick();
 
-	FS_GNSS_TimeReady_Callback(validTime);
+	if (time_ready_callback)
+	{
+		time_ready_callback(validTime);
+	}
 
 	validTime = false;
 }
@@ -978,21 +984,22 @@ const FS_GNSS_Time_t *FS_GNSS_GetTime(void)
 	return &gnssTime;
 }
 
-__weak void FS_GNSS_TimeReady_Callback(bool validTime)
-{
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_TimeReady_Callback could be implemented in the user file
-   */
-}
-
 const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void)
 {
 	return &gnssRxData.split[gnssRawIndex];
 }
 
-__weak void FS_GNSS_RawReady_Callback(void)
+void FS_GNSS_DataReady_SetCallback(void (*callback)(void))
 {
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_RawReady_Callback could be implemented in the user file
-   */
+	data_ready_callback = callback;
+}
+
+void FS_GNSS_TimeReady_SetCallback(void (*callback)(bool))
+{
+	time_ready_callback = callback;
+}
+
+void FS_GNSS_RawReady_SetCallback(void (*callback)(void))
+{
+	raw_ready_callback = callback;
 }
