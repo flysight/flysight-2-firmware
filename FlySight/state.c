@@ -233,18 +233,6 @@ void FS_State_Read(void)
 	{
 		FS_Common_GetRandomBytes((uint32_t *) state.ble_erk, CONFIG_DATA_ER_LEN / 4);
 	}
-
-	/* Update persistent state */
-	FS_State_Write();
-
-	if (state.reset_ble)
-	{
-		/* Clear list of bonded devices */
-		APP_BLE_Reset();
-	}
-
-	/* Update device name */
-	APP_BLE_UpdateDeviceName();
 }
 
 static void FS_State_Write(void)
@@ -336,6 +324,30 @@ void FS_State_Init(void)
 
 	/* De-initialize microSD */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+}
+
+void FS_State_Update(void)
+{
+	/* Initialize microSD */
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+	/* Read persistent state */
+	FS_State_Read();
+
+	/* Write updated state */
+	FS_State_Write();
+
+	/* De-initialize microSD */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+
+	if (state.reset_ble)
+	{
+		/* Clear list of bonded devices */
+		APP_BLE_Reset();
+	}
+
+	/* Update device name */
+	APP_BLE_UpdateDeviceName();
 }
 
 const FS_State_Data_t *FS_State_Get(void)

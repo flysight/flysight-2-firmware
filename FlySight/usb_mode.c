@@ -35,7 +35,7 @@ extern UART_HandleTypeDef huart1;
 void FS_USBMode_Init(void)
 {
 	/* Initialize microSD */
-	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+	FS_ResourceManager_RequestResource(FS_RESOURCE_MICROSD);
 
 	/* Initialize controller */
 	FS_USBControl_Init();
@@ -77,9 +77,9 @@ void FS_USBMode_DeInit(void)
 	/* Release HSI48 semaphore */
 	LL_HSEM_ReleaseLock(HSEM, CFG_HW_CLK48_CONFIG_SEMID, 0);
 
-	// Read persistent state
-	FS_State_Read();
-
 	/* De-initialize microSD */
-	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+
+	/* Update persistent state */
+	FS_State_Update();
 }

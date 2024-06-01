@@ -42,7 +42,7 @@ typedef struct
 } FS_State_Data_t;
 
 void FS_State_Init(void);
-void FS_State_Read(void);
+void FS_State_Update(void);
 const FS_State_Data_t *FS_State_Get(void);
 void FS_State_NextSession(void);
 void FS_State_SetConfigFilename(const char *filename);
