@@ -31,6 +31,7 @@
 #include "config_mode.h"
 #include "mode.h"
 #include "pairing_mode.h"
+#include "start_mode.h"
 #include "state.h"
 #include "stm32_seq.h"
 #include "usb_mode.h"
@@ -46,6 +47,7 @@ static FS_Mode_State_t FS_Mode_State_Active(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_Config(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_USB(FS_Mode_Event_t event);
 static FS_Mode_State_t FS_Mode_State_Pairing(FS_Mode_Event_t event);
+static FS_Mode_State_t FS_Mode_State_Start(FS_Mode_Event_t event);
 
 static FS_Mode_StateFunc_t *const mode_state_table[FS_MODE_STATE_COUNT] =
 {
@@ -53,7 +55,8 @@ static FS_Mode_StateFunc_t *const mode_state_table[FS_MODE_STATE_COUNT] =
 	FS_Mode_State_Active,
 	FS_Mode_State_Config,
 	FS_Mode_State_USB,
-	FS_Mode_State_Pairing
+	FS_Mode_State_Pairing,
+	FS_Mode_State_Start
 };
 
 static FS_Mode_State_t mode_state = FS_MODE_STATE_SLEEP;
@@ -151,8 +154,20 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 
 		if (prev_state == BUTTON_FIRST_PRESS)
 		{
-			FS_ActiveMode_Init();
-			next_mode = FS_MODE_STATE_ACTIVE;
+			if (FS_State_Get()->active_mode == FS_ACTIVE_MODE_DEFAULT)
+			{
+				FS_ActiveMode_Init();
+				next_mode = FS_MODE_STATE_ACTIVE;
+			}
+			else if (FS_State_Get()->active_mode == FS_ACTIVE_MODE_START)
+			{
+				FS_StartMode_Init();
+				next_mode = FS_MODE_STATE_START;
+			}
+			else
+			{
+				Error_Handler();
+			}
 		}
 		else if (prev_state == BUTTON_SECOND_PRESS)
 		{
@@ -233,6 +248,27 @@ static FS_Mode_State_t FS_Mode_State_Pairing(FS_Mode_Event_t event)
 	else if (event == FS_MODE_EVENT_FORCE_UPDATE)
 	{
 		FS_PairingMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+
+	return next_mode;
+}
+
+static FS_Mode_State_t FS_Mode_State_Start(FS_Mode_Event_t event)
+{
+	FS_Mode_State_t next_mode = FS_MODE_STATE_START;
+
+	if (event == FS_MODE_EVENT_BUTTON_PRESSED)
+	{
+		HW_TS_Start(timer_id, HOLD_TIMEOUT);
+	}
+	else if (event == FS_MODE_EVENT_BUTTON_RELEASED)
+	{
+		HW_TS_Stop(timer_id);
+	}
+	else if (event == FS_MODE_EVENT_TIMER)
+	{
+		FS_StartMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
 	}
 

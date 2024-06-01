@@ -158,6 +158,7 @@ void FS_State_Read(void)
 	memset(state.session_id, 0, 4 * 3);
 	memset(state.ble_irk, 0, CONFIG_DATA_IR_LEN);
 	memset(state.ble_erk, 0, CONFIG_DATA_ER_LEN);
+	state.active_mode = FS_ACTIVE_MODE_DEFAULT;
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -201,6 +202,7 @@ void FS_State_Read(void)
 		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Enable_BLE",  state.enable_ble,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Reset_BLE",   state.reset_ble,      val, val == 0 || val == 1);
+		HANDLE_VALUE("Active_Mode", state.active_mode,    val, val >= 0 && val < FS_NUM_ACTIVE_MODES);
 
 		if (!strcmp(name, "BLE_IRK") && (strlen(result) == 2 * CONFIG_DATA_IR_LEN))
 		{
@@ -299,6 +301,11 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "BLE_ERK:      ");
 	FS_State_WriteHex_8(&stateFile, state.ble_erk, 16);
 	f_printf(&stateFile, "\n\n");
+
+	f_printf(&stateFile, "; Active mode\n\n");
+
+	f_printf(&stateFile, "Active_Mode:  %u ; 0 = Default\n", state.active_mode);
+	f_printf(&stateFile, "                ; 1 = Starter pistol\n\n");
 
 	f_printf(&stateFile, "; Bootloader public key\n\n");
 

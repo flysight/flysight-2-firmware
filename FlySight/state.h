@@ -27,6 +27,13 @@
 #include "ble.h"
 #include "charge.h"
 
+typedef enum
+{
+	FS_ACTIVE_MODE_DEFAULT,
+	FS_ACTIVE_MODE_START,
+	FS_NUM_ACTIVE_MODES
+} FS_State_ActiveMode_t;
+
 typedef struct
 {
 	uint32_t device_id[3];
@@ -39,6 +46,7 @@ typedef struct
 	uint8_t  reset_ble;
 	uint8_t  ble_irk[CONFIG_DATA_IR_LEN];
 	uint8_t  ble_erk[CONFIG_DATA_ER_LEN];
+	FS_State_ActiveMode_t active_mode;
 } FS_State_Data_t;
 
 void FS_State_Init(void);

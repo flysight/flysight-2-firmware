@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,34 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef MODE_H_
-#define MODE_H_
+#ifndef START_MODE_H_
+#define START_MODE_H_
 
-typedef enum
-{
-	FS_MODE_EVENT_BUTTON_PRESSED,
-	FS_MODE_EVENT_BUTTON_RELEASED,
-	FS_MODE_EVENT_TIMER,
-	FS_MODE_EVENT_VBUS_HIGH,
-	FS_MODE_EVENT_VBUS_LOW,
-	FS_MODE_EVENT_FORCE_UPDATE
-} FS_Mode_Event_t;
+void FS_StartMode_Init(void);
+void FS_StartMode_DeInit(void);
 
-typedef enum
-{
-	FS_MODE_STATE_SLEEP,
-	FS_MODE_STATE_ACTIVE,
-	FS_MODE_STATE_CONFIG,
-	FS_MODE_STATE_USB,
-	FS_MODE_STATE_PAIRING,
-	FS_MODE_STATE_START,
-
-	// Number of modes
-	FS_MODE_STATE_COUNT
-} FS_Mode_State_t;
-
-void FS_Mode_Init(void);
-void FS_Mode_PushQueue(FS_Mode_Event_t event);
-FS_Mode_State_t FS_Mode_State(void);
-
-#endif /* MODE_H_ */
+#endif /* START_MODE_H_ */
