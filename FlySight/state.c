@@ -150,7 +150,7 @@ void FS_State_Read(void)
 
 	/* Initialize persistent state */
 	state.config_filename[0] = 0;
-	state.temp_folder = -1;
+	state.temp_folder = 0;
 	state.charge_current = 2;
 	strcpy(state.device_name, "FlySight");
 	state.enable_ble = 1;
