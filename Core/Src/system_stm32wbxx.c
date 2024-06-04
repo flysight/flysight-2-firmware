@@ -101,7 +101,7 @@
 #endif /* LSI_VALUE */ 
 
 #if !defined  (LSE_VALUE)
-  #define LSE_VALUE    (32768UL)    /*!< Value of LSE in Hz*/
+  #define LSE_VALUE    (32774U)    /*!< Value of LSE in Hz*/
 #endif /* LSE_VALUE */
 
 /**

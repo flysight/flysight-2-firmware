@@ -67,10 +67,10 @@
   * @{
   */
 
-#define USBD_VID     0x16D0
+#define USBD_VID     5840
 #define USBD_LANGID_STRING     1033
 #define USBD_MANUFACTURER_STRING     "Bionic Avionics"
-#define USBD_PID     0x0569
+#define USBD_PID     1385
 #define USBD_PRODUCT_STRING     "FlySight GPS"
 #define USBD_CONFIGURATION_STRING     "MSC Config"
 #define USBD_INTERFACE_STRING     "MSC Interface"
