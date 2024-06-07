@@ -36,11 +36,12 @@
 
 typedef enum
 {
-	FS_BUTTON_RELEASED = 0,
+	FS_BUTTON_INIT = 0,
+	FS_BUTTON_RELEASED,
 	FS_BUTTON_PRESSED
 } FS_Button_State_t;
 
-static FS_Button_State_t state;
+static FS_Button_State_t state = FS_BUTTON_INIT;
 static volatile uint8_t count;
 static uint8_t timer_id;
 static volatile bool busy;
@@ -95,6 +96,7 @@ static void FS_Button_Timer(void)
 
 void FS_Button_Triggered(void)
 {
+	if (state == FS_BUTTON_INIT) return;
 	if (busy) return;
 
 	// Disable external interrupt
