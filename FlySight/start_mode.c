@@ -24,6 +24,7 @@
 #include "main.h"
 #include "app_common.h"
 #include "app_fatfs.h"
+#include "audio.h"
 #include "config.h"
 #include "gnss.h"
 #include "resource_manager.h"
@@ -53,6 +54,9 @@ void FS_StartMode_Init(void)
 		FS_Config_Read(FS_State_Get()->config_filename);
 	}
 
+	/* Initialize audio */
+	FS_Audio_Init();
+
 	/* Enable USART */
 	MX_USART1_UART_Init();
 
@@ -73,6 +77,9 @@ void FS_StartMode_DeInit(void)
 
 	/* Disable USART */
 	HAL_UART_DeInit(&huart1);
+
+	// Disable audio
+	FS_Audio_DeInit();
 
 	/* De-initialize FatFS */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);

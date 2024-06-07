@@ -25,7 +25,9 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "audio.h"
 #include "charge.h"
+#include "config.h"
 #include "custom_app.h"
 #include "gnss.h"
 #include "led.h"
@@ -35,8 +37,10 @@
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
 
-#define COUNT_MSEC          3000
+#define COUNT_MSEC          1000
 #define COUNT_TICKS         (COUNT_MSEC*1000/CFG_TS_TICK_VAL)
+
+#define TONE_MAX_PITCH 1760
 
 typedef enum
 {
@@ -54,6 +58,8 @@ static volatile enum {
 	FS_CONTROL_IDLE,
 	FS_CONTROL_COUNTING
 } state = FS_CONTROL_INACTIVE;
+
+static uint8_t countdown;
 
 void FS_StartControl_DataReady_Callback(void);
 void FS_StartControl_TimeReady_Callback(bool validTime);
@@ -87,7 +93,7 @@ void FS_StartControl_Init(void)
 
 	// Initialize timers
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_StartControl_LED_Timer);
-	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &count_timer_id, hw_ts_SingleShot, FS_StartControl_Count_Timer);
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &count_timer_id, hw_ts_Repeated, FS_StartControl_Count_Timer);
 
 	// Initialize state
 	hasFix = false;
@@ -142,10 +148,29 @@ void FS_StartControl_TimeReady_Callback(bool validTime)
 
 static void FS_StartControl_Count_Timer(void)
 {
+	const FS_Config_Data_t *config = FS_Config_Get();
+	char filename[13];
+
 	if (state != FS_CONTROL_COUNTING) return;
 
-	state = FS_CONTROL_IDLE;
-	FS_LED_SetColour(FS_LED_GREEN);
+	if (--countdown == 0)
+	{
+		FS_Audio_Beep(TONE_MAX_PITCH, TONE_MAX_PITCH, 500, config->volume * 5);
+
+		HW_TS_Stop(count_timer_id);
+		state = FS_CONTROL_IDLE;
+	}
+	else
+	{
+		filename[0] = '0' + countdown;
+		filename[1] = '.';
+		filename[2] = 'w';
+		filename[3] = 'a';
+		filename[4] = 'v';
+		filename[5] = '\0';
+
+		FS_Audio_Play(filename, config->sp_volume * 5);
+	}
 }
 
 void FS_StartControl_Update(void)
@@ -164,7 +189,7 @@ void FS_StartControl_Update(void)
 			case FS_START_COMMAND_START:
 				if (state == FS_CONTROL_IDLE)
 				{
-					FS_LED_SetColour(FS_LED_RED);
+					countdown = 6;
 					state = FS_CONTROL_COUNTING;
 					HW_TS_Start(count_timer_id, COUNT_TICKS);
 				}
@@ -174,7 +199,6 @@ void FS_StartControl_Update(void)
 				{
 					HW_TS_Stop(count_timer_id);
 					state = FS_CONTROL_IDLE;
-					FS_LED_SetColour(FS_LED_GREEN);
 				}
 				break;
 			}
