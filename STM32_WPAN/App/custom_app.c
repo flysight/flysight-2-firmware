@@ -39,6 +39,8 @@ typedef struct
   uint8_t               Crs_tx_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
+  /* Start */
+  uint8_t               Start_control_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
   uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -96,6 +98,9 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
+/* Start */
+static void Custom_Start_control_Update_Char(void);
+static void Custom_Start_control_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
@@ -160,6 +165,25 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       Custom_App_Context.Gnss_pv_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      break;
+
+    /* Start */
+    case CUSTOM_STM_START_CONTROL_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_START_CONTROL_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -324,6 +348,46 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
   /* USER CODE BEGIN Gnss_pv_NS_Last*/
 
   /* USER CODE END Gnss_pv_NS_Last*/
+
+  return;
+}
+
+/* Start */
+void Custom_Start_control_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_control_UC_1*/
+
+  /* USER CODE END Start_control_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Start_control_UC_Last*/
+
+  /* USER CODE END Start_control_UC_Last*/
+  return;
+}
+
+void Custom_Start_control_Send_Indication(void) /* Property Indication */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_control_IS_1*/
+
+  /* USER CODE END Start_control_IS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Start_control_IS_Last*/
+
+  /* USER CODE END Start_control_IS_Last*/
 
   return;
 }
