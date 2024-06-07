@@ -327,6 +327,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 					FS_CRS_SendNak(FS_CRS_COMMAND_READ_DIR);
 				}
 				break;
+			default:
+				FS_CRS_SendNak(packet->data[0]);
 			}
 		}
 	}
