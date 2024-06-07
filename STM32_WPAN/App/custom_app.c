@@ -30,6 +30,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "crs.h"
+#include "start_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -85,6 +86,9 @@ static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t gnss_pv_packet[28];
 
+static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
+static uint32_t start_read_index, start_write_index;
+
 static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
@@ -108,6 +112,7 @@ static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
+static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -170,19 +175,19 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* Start */
     case CUSTOM_STM_START_CONTROL_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_WRITE_EVT */
-
+      Custom_Start_OnControlWrite(pNotification);
       /* USER CODE END CUSTOM_STM_START_CONTROL_WRITE_EVT */
       break;
 
     case CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
-
+      Custom_App_Context.Start_control_Indication_Status = 1;
       /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
       break;
 
     case CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
-
+        Custom_App_Context.Start_control_Indication_Status = 0;
       /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
       break;
 
@@ -249,6 +254,8 @@ void Custom_APP_Init(void)
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
   Custom_App_Context.Crs_tx_Flow_Status = 1;
+  Custom_App_Context.Gnss_pv_Notification_Status = 0;
+  Custom_App_Context.Start_control_Indication_Status = 0;
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -402,6 +409,9 @@ static void Custom_CRS_OnConnect(void)
   rx_read_index = 0;
   rx_write_index = 0;
 
+  start_read_index = 0;
+  start_write_index = 0;
+
   // Update state
   connected_flag = 1;
 }
@@ -521,5 +531,36 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   memcpy(&gnss_pv_packet[24], &(current->velD), sizeof(current->velD));
 
   UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+}
+
+static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification)
+{
+  Custom_Start_Packet_t *packet;
+
+  if (start_write_index < start_read_index + FS_START_WINDOW_LENGTH)
+  {
+	packet = &start_buffer[(start_write_index++) % FS_START_WINDOW_LENGTH];
+	packet->length = pNotification->DataTransfered.Length;
+    memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
+
+	// Call update task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_START_UPDATE_ID, CFG_SCH_PRIO_1);
+  }
+  else
+  {
+    APP_DBG_MSG("Custom_Start_OnControlWrite: buffer overflow\n");
+  }
+}
+
+Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void)
+{
+  Custom_Start_Packet_t *ret = 0;
+
+  if (start_read_index < start_write_index)
+  {
+	ret = &start_buffer[(start_read_index++) % FS_START_WINDOW_LENGTH];
+  }
+
+  return ret;
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

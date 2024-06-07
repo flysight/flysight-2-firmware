@@ -30,26 +30,46 @@
 #include "gnss.h"
 #include "led.h"
 #include "state.h"
+#include "stm32_seq.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
 
+#define COUNT_MSEC          3000
+#define COUNT_TICKS         (COUNT_MSEC*1000/CFG_TS_TICK_VAL)
+
+typedef enum
+{
+	FS_START_COMMAND_START  = 0x00,
+	FS_START_COMMAND_CANCEL = 0x01
+} FS_Start_Command_t;
+
 static uint8_t led_timer_id;
+static uint8_t count_timer_id;
 
 static volatile bool hasFix = false;
 
 static volatile enum {
 	FS_CONTROL_INACTIVE = 0,
-	FS_CONTROL_ACTIVE
+	FS_CONTROL_IDLE,
+	FS_CONTROL_COUNTING
 } state = FS_CONTROL_INACTIVE;
 
 void FS_StartControl_DataReady_Callback(void);
 void FS_StartControl_TimeReady_Callback(bool validTime);
+void FS_StartControl_Update(void);
+static void FS_StartControl_Count_Timer(void);
 
 static void FS_StartControl_LED_Timer(void)
 {
 	// Turn on LED
 	FS_LED_On();
+}
+
+void FS_StartControl_RegisterTasks(void)
+{
+	// Register update task
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_START_UPDATE_ID, UTIL_SEQ_RFU, FS_StartControl_Update);
 }
 
 void FS_StartControl_Init(void)
@@ -65,12 +85,13 @@ void FS_StartControl_Init(void)
 	// Enable charging
 	FS_Charge_SetCurrent(FS_State_Get()->charge_current);
 
-	// Initialize LED timer
+	// Initialize timers
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &led_timer_id, hw_ts_SingleShot, FS_StartControl_LED_Timer);
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &count_timer_id, hw_ts_SingleShot, FS_StartControl_Count_Timer);
 
 	// Initialize state
 	hasFix = false;
-	state = FS_CONTROL_ACTIVE;
+	state = FS_CONTROL_IDLE;
 }
 
 void FS_StartControl_DeInit(void)
@@ -96,7 +117,7 @@ void FS_StartControl_DataReady_Callback(void)
 {
 	const FS_GNSS_Data_t *data = FS_GNSS_GetData();
 
-	if (state != FS_CONTROL_ACTIVE) return;
+	if (state == FS_CONTROL_INACTIVE) return;
 
 	if (Custom_APP_IsConnected())
 	{
@@ -109,12 +130,54 @@ void FS_StartControl_DataReady_Callback(void)
 
 void FS_StartControl_TimeReady_Callback(bool validTime)
 {
-	if (state != FS_CONTROL_ACTIVE) return;
+	if (state == FS_CONTROL_INACTIVE) return;
 
 	if (hasFix)
 	{
 		// Turn off LED
 		FS_LED_Off();
 		HW_TS_Start(led_timer_id, LED_BLINK_TICKS);
+	}
+}
+
+static void FS_StartControl_Count_Timer(void)
+{
+	if (state != FS_CONTROL_COUNTING) return;
+
+	state = FS_CONTROL_IDLE;
+	FS_LED_SetColour(FS_LED_GREEN);
+}
+
+void FS_StartControl_Update(void)
+{
+	Custom_Start_Packet_t *packet;
+
+	if (state == FS_CONTROL_INACTIVE) return;
+
+	while ((packet = Custom_Start_GetNextControlPacket()))
+	{
+		if (packet->length > 0)
+		{
+			// Handle commands
+			switch (packet->data[0])
+			{
+			case FS_START_COMMAND_START:
+				if (state == FS_CONTROL_IDLE)
+				{
+					FS_LED_SetColour(FS_LED_RED);
+					state = FS_CONTROL_COUNTING;
+					HW_TS_Start(count_timer_id, COUNT_TICKS);
+				}
+				break;
+			case FS_START_COMMAND_CANCEL:
+				if (state == FS_CONTROL_COUNTING)
+				{
+					HW_TS_Stop(count_timer_id);
+					state = FS_CONTROL_IDLE;
+					FS_LED_SetColour(FS_LED_GREEN);
+				}
+				break;
+			}
+		}
 	}
 }

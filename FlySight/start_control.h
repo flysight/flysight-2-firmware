@@ -24,6 +24,9 @@
 #ifndef START_CONTROL_H_
 #define START_CONTROL_H_
 
+#define FS_START_WINDOW_LENGTH 2
+
+void FS_StartControl_RegisterTasks(void);
 void FS_StartControl_Init(void);
 void FS_StartControl_DeInit(void);
 

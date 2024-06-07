@@ -39,6 +39,7 @@
 #include "mag.h"
 #include "mode.h"
 #include "sensor.h"
+#include "start_control.h"
 #include "state.h"
 #include "vbat.h"
 #include "vbus.h"
@@ -176,6 +177,7 @@ int main(void)
   FS_Mag_Init();
   FS_Baro_Init();
   FS_Hum_Init();
+  FS_StartControl_RegisterTasks();
   /* USER CODE END 2 */
 
   /* Init code for STM32_WPAN */

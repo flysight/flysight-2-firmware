@@ -51,6 +51,12 @@ typedef struct
   uint8_t data[244];
   uint8_t length;
 } Custom_CRS_Packet_t;
+
+typedef struct
+{
+  uint8_t data[1];
+  uint8_t length;
+} Custom_Start_Packet_t;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -80,6 +86,8 @@ void Custom_CRS_SendNextTxPacket(void);
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
 
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current);
+
+Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void);
 /* USER CODE END EF */
 
 #ifdef __cplusplus
