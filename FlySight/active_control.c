@@ -67,6 +67,7 @@ void FS_ActiveControl_Init(void)
 	FS_GNSS_DataReady_SetCallback(FS_ActiveControl_DataReady_Callback);
 	FS_GNSS_TimeReady_SetCallback(FS_ActiveControl_TimeReady_Callback);
 	FS_GNSS_RawReady_SetCallback(FS_ActiveControl_RawReady_Callback);
+	FS_GNSS_IntReady_SetCallback(NULL);
 
 	// Initialize LEDs
 	FS_LED_SetColour(FS_LED_GREEN);
@@ -101,6 +102,7 @@ void FS_ActiveControl_DeInit(void)
 	FS_GNSS_DataReady_SetCallback(NULL);
 	FS_GNSS_TimeReady_SetCallback(NULL);
 	FS_GNSS_RawReady_SetCallback(NULL);
+	FS_GNSS_IntReady_SetCallback(NULL);
 }
 
 void FS_Baro_DataReady_Callback(void)

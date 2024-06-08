@@ -77,6 +77,7 @@
 
 #define UBX_TIM             0x0d
 #define UBX_TIM_TP          0x01
+#define UBX_TIM_TM2         0x03
 
 #define UBX_NMEA            0xf0
 #define UBX_NMEA_GPGGA      0x00
@@ -319,6 +320,21 @@ ubxTimTp_t;             // 16 bytes total
 
 typedef struct
 {
+	uint8_t  ch;        // Channel
+	uint8_t  flags;     // Bitmask
+	uint16_t count;     // Rising edge counter
+	uint16_t wnR;       // Week number of last rising edge
+	uint16_t wnF;       // Week number of last falling edge
+	uint32_t towMsR;    // TOW of rising edge            (ms)
+	uint32_t towSubMsR; // Submillisecond part of towMsR (ns)
+	uint32_t towMsF;    // TOW of falling edge           (ms)
+	uint32_t towSubMsF; // Submillisecond part of towMsR (ns)
+	uint32_t accEst;    // Accuracy estimate             (ns)
+}
+ubxTimTm2_t;            // 28 bytes total
+
+typedef struct
+{
 	uint16_t pending[6];   // Bytes pending in transmit buffer
 	uint8_t  usage[6];     // Maximum usage in last period each target (%)
 	uint8_t  peakUsage[6]; // Maximum usage each target (%)
@@ -367,6 +383,7 @@ static union
 	ubxNavTimeUtc_t navTimeUtc;
 	ubxNavSat_t     navSat;
 	ubxTimTp_t      timTp;
+	ubxTimTm2_t     timTm2;
 } gnssPayload;
 
 // Saved GNSS messages
@@ -376,6 +393,7 @@ static bool validTime;
 
 static FS_GNSS_Data_t gnssData;
 static FS_GNSS_Time_t gnssTime;
+static FS_GNSS_Int_t  gnssInt;
 
 static uint8_t timer_id;
 
@@ -408,6 +426,7 @@ static void FS_GNSS_Update(void);
 static void (*data_ready_callback)(void) = NULL;
 static void (*time_ready_callback)(bool validTime) = NULL;
 static void (*raw_ready_callback)(void) = NULL;
+static void (*int_ready_callback)(void) = NULL;
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
@@ -647,6 +666,17 @@ static void FS_GNSS_HandleTp(void)
 	validTime = true;
 }
 
+static void FS_GNSS_HandleTm2(void)
+{
+	gnssInt.towMS = gnssPayload.timTm2.towMsR;
+	gnssInt.week = gnssPayload.timTm2.wnR;
+
+	if (int_ready_callback)
+	{
+		int_ready_callback();
+	}
+}
+
 static void FS_GNSS_HandleMessage(void)
 {
 	switch (gnssMsgClass)
@@ -667,6 +697,9 @@ static void FS_GNSS_HandleMessage(void)
 		{
 		case UBX_TIM_TP:
 			FS_GNSS_HandleTp();
+			break;
+		case UBX_TIM_TM2:
+			FS_GNSS_HandleTm2();
 			break;
 		}
 		break;
@@ -689,6 +722,7 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
 		{UBX_TIM,  UBX_TIM_TP,      1},
+		{UBX_TIM,  UBX_TIM_TM2,     1},
 		{UBX_SEC,  UBX_SEC_ECSIGN,  10}
 	};
 
@@ -989,6 +1023,11 @@ const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void)
 	return &gnssRxData.split[gnssRawIndex];
 }
 
+const FS_GNSS_Int_t *FS_GNSS_GetInt(void)
+{
+	return &gnssInt;
+}
+
 void FS_GNSS_DataReady_SetCallback(void (*callback)(void))
 {
 	data_ready_callback = callback;
@@ -1002,4 +1041,9 @@ void FS_GNSS_TimeReady_SetCallback(void (*callback)(bool))
 void FS_GNSS_RawReady_SetCallback(void (*callback)(void))
 {
 	raw_ready_callback = callback;
+}
+
+void FS_GNSS_IntReady_SetCallback(void (*callback)(void))
+{
+	int_ready_callback = callback;
 }

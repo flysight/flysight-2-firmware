@@ -33,6 +33,7 @@
 #include "led.h"
 #include "state.h"
 #include "stm32_seq.h"
+#include "time.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
@@ -56,13 +57,17 @@ static volatile bool hasFix = false;
 static volatile enum {
 	FS_CONTROL_INACTIVE = 0,
 	FS_CONTROL_IDLE,
-	FS_CONTROL_COUNTING
+	FS_CONTROL_COUNTING,
+	FS_CONTROL_UPDATE
 } state = FS_CONTROL_INACTIVE;
 
 static uint8_t countdown;
+static FS_GNSS_Int_t gnss_int;
 
 void FS_StartControl_DataReady_Callback(void);
 void FS_StartControl_TimeReady_Callback(bool validTime);
+void FS_StartControl_IntReady_Callback(void);
+
 void FS_StartControl_Update(void);
 static void FS_StartControl_Count_Timer(void);
 
@@ -83,6 +88,7 @@ void FS_StartControl_Init(void)
 	// Set callback functions
 	FS_GNSS_DataReady_SetCallback(FS_StartControl_DataReady_Callback);
 	FS_GNSS_TimeReady_SetCallback(FS_StartControl_TimeReady_Callback);
+	FS_GNSS_IntReady_SetCallback(FS_StartControl_IntReady_Callback);
 
 	// Initialize LEDs
 	FS_LED_SetColour(FS_LED_GREEN);
@@ -117,6 +123,10 @@ void FS_StartControl_DeInit(void)
 	// Clear callback functions
 	FS_GNSS_DataReady_SetCallback(NULL);
 	FS_GNSS_TimeReady_SetCallback(NULL);
+	FS_GNSS_IntReady_SetCallback(NULL);
+
+	// Clear EXTINT
+	HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_RESET);
 }
 
 void FS_StartControl_DataReady_Callback(void)
@@ -146,6 +156,22 @@ void FS_StartControl_TimeReady_Callback(bool validTime)
 	}
 }
 
+void FS_StartControl_IntReady_Callback(void)
+{
+	// Clear EXTINT
+	HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_RESET);
+
+	if (state == FS_CONTROL_COUNTING)
+	{
+		// Copy interrupt data locally
+		memcpy(&gnss_int, FS_GNSS_GetInt(), sizeof(FS_GNSS_Int_t));
+
+		// Update state
+		state = FS_CONTROL_UPDATE;
+		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_START_UPDATE_ID, CFG_SCH_PRIO_1);
+	}
+}
+
 static void FS_StartControl_Count_Timer(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
@@ -155,13 +181,18 @@ static void FS_StartControl_Count_Timer(void)
 
 	if (--countdown == 0)
 	{
+		// Set EXTINT
+		HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_SET);
+
+		// Play tone
 		FS_Audio_Beep(TONE_MAX_PITCH, TONE_MAX_PITCH, 500, config->volume * 5);
 
+		// Stop countdown timer
 		HW_TS_Stop(count_timer_id);
-		state = FS_CONTROL_IDLE;
 	}
 	else
 	{
+		// Play countdown value
 		filename[0] = '0' + countdown;
 		filename[1] = '.';
 		filename[2] = 'w';
@@ -175,9 +206,36 @@ static void FS_StartControl_Count_Timer(void)
 
 void FS_StartControl_Update(void)
 {
+	uint32_t epoch, timestamp, timestamp_ms;
+
+	uint16_t year;
+	uint8_t month;
+	uint8_t day;
+	uint8_t hour;
+	uint8_t min;
+	uint8_t sec;
+
 	Custom_Start_Packet_t *packet;
 
 	if (state == FS_CONTROL_INACTIVE) return;
+
+	if (state == FS_CONTROL_UPDATE)
+	{
+		// Start of the year 2000 (gmtime epoch)
+		epoch = 1042 * 7 * 24 * 3600 + 518400;
+
+		// Calculate timestamp at start_time
+		timestamp = gnss_int.week * 7 * 24 * 3600 - epoch;
+		timestamp += gnss_int.towMS / 1000;
+
+		// Calculate millisecond part of timestamp
+		timestamp_ms = gnss_int.towMS % 1000;
+
+		// Convert back to date/time
+		gmtime_r(timestamp, &year, &month, &day, &hour, &min, &sec);
+
+		state = FS_CONTROL_IDLE;
+	}
 
 	while ((packet = Custom_Start_GetNextControlPacket()))
 	{

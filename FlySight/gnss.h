@@ -71,6 +71,12 @@ typedef struct
 
 typedef struct
 {
+	uint32_t towMS;     // Time pulse time of week     (ms)
+	uint16_t week;      // Time pulse week number
+} FS_GNSS_Int_t;
+
+typedef struct
+{
 	unsigned char buf[GNSS_RAW_BUF_LEN];
 } FS_GNSS_Raw_t;
 
@@ -90,5 +96,7 @@ void FS_GNSS_TimeReady_SetCallback(void (*callback)(bool));
 const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void);
 void FS_GNSS_RawReady_SetCallback(void (*callback)(void));
 
+const FS_GNSS_Int_t *FS_GNSS_GetInt(void);
+void FS_GNSS_IntReady_SetCallback(void (*callback)(void));
 
 #endif /* GNSS_H_ */
