@@ -156,11 +156,8 @@ void FS_ActiveControl_DataReady_Callback(void)
 		FS_Log_WriteGNSSData(data);
 	}
 
-	if (Custom_APP_IsConnected())
-	{
-		// Update BLE characteristic
-		Custom_GNSS_Update(data);
-	}
+	// Update BLE characteristic
+	Custom_GNSS_Update(data);
 
 	hasFix = (data->gpsFix == 3);
 }

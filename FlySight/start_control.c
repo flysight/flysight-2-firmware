@@ -33,7 +33,6 @@
 #include "led.h"
 #include "state.h"
 #include "stm32_seq.h"
-#include "time.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
@@ -135,11 +134,8 @@ void FS_StartControl_DataReady_Callback(void)
 
 	if (state == FS_CONTROL_INACTIVE) return;
 
-	if (Custom_APP_IsConnected())
-	{
-		// Update BLE characteristic
-		Custom_GNSS_Update(data);
-	}
+	// Update BLE characteristic
+	Custom_GNSS_Update(data);
 
 	hasFix = (data->gpsFix == 3);
 }
@@ -206,34 +202,13 @@ static void FS_StartControl_Count_Timer(void)
 
 void FS_StartControl_Update(void)
 {
-	uint32_t epoch, timestamp, timestamp_ms;
-
-	uint16_t year;
-	uint8_t month;
-	uint8_t day;
-	uint8_t hour;
-	uint8_t min;
-	uint8_t sec;
-
 	Custom_Start_Packet_t *packet;
 
 	if (state == FS_CONTROL_INACTIVE) return;
 
 	if (state == FS_CONTROL_UPDATE)
 	{
-		// Start of the year 2000 (gmtime epoch)
-		epoch = 1042 * 7 * 24 * 3600 + 518400;
-
-		// Calculate timestamp at start_time
-		timestamp = gnss_int.week * 7 * 24 * 3600 - epoch;
-		timestamp += gnss_int.towMS / 1000;
-
-		// Calculate millisecond part of timestamp
-		timestamp_ms = gnss_int.towMS % 1000;
-
-		// Convert back to date/time
-		gmtime_r(timestamp, &year, &month, &day, &hour, &min, &sec);
-
+		Custom_Start_Update(&gnss_int);
 		state = FS_CONTROL_IDLE;
 	}
 
