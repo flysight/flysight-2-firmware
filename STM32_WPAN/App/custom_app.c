@@ -163,7 +163,10 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* GNSS */
     case CUSTOM_STM_GNSS_PV_READ_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_READ_EVT */
-
+      if (!Custom_App_Context.Gnss_pv_Notification_Status)
+      {
+        Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
+      }
       /* USER CODE END CUSTOM_STM_GNSS_PV_READ_EVT */
       break;
 
@@ -194,13 +197,16 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
-        Custom_App_Context.Start_control_Indication_Status = 0;
+      Custom_App_Context.Start_control_Indication_Status = 0;
       /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_START_RESULT_READ_EVT:
       /* USER CODE BEGIN CUSTOM_STM_START_RESULT_READ_EVT */
-
+      if (!Custom_App_Context.Start_result_Indication_Status)
+      {
+        Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
+      }
       /* USER CODE END CUSTOM_STM_START_RESULT_READ_EVT */
       break;
 
