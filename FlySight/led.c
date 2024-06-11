@@ -60,16 +60,18 @@ static void update(void)
 		norm_brightness = pow(norm_brightness, LED_GAMMA);
 		adj_brightness = norm_brightness * LED_BRIGHTNESS_MAX;
 
-		if (colour == FS_LED_RED)
+		TIM1->CCR1 = 0;
+		TIM1->CCR2 = 0;
+
+		if (colour & FS_LED_RED)
 		{
 			TIM1->CCR1 = adj_brightness;
-			TIM1->CCR2 = 0;
 		}
-		else
+		if (colour & FS_LED_GREEN)
 		{
-			TIM1->CCR1 = 0;
 			TIM1->CCR2 = adj_brightness;
 		}
+
 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	}

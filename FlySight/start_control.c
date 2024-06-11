@@ -90,7 +90,7 @@ void FS_StartControl_Init(void)
 	FS_GNSS_IntReady_SetCallback(FS_StartControl_IntReady_Callback);
 
 	// Initialize LEDs
-	FS_LED_SetColour(FS_LED_GREEN);
+	FS_LED_SetColour(FS_LED_ORANGE);
 	FS_LED_On();
 
 	// Enable charging
