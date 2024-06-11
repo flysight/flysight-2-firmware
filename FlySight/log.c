@@ -246,13 +246,6 @@ void FS_Log_UpdateGNSS(void)
 	// Get current data point
 	FS_GNSS_Data_t *data = &gnssBuf[gnssRdI % GNSS_COUNT];
 
-	if ((data->gpsFix >= 3) && (!validDateTime))
-	{
-		// Remember date and time
-		memcpy(&saved_data, data, sizeof(FS_GNSS_Data_t));
-		validDateTime = true;
-	}
-
 	// Write to disk
 	char *ptr = row + sizeof(row);
 
@@ -902,6 +895,16 @@ void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current)
 			// Update buffer statistics
 			gnssUsed = GNSS_COUNT;
 		}
+	}
+}
+
+void FS_Log_UpdatePath(const FS_GNSS_Data_t *current)
+{
+	if ((current->gpsFix == 3) && (!validDateTime))
+	{
+		// Remember date and time
+		memcpy(&saved_data, current, sizeof(FS_GNSS_Data_t));
+		validDateTime = true;
 	}
 }
 

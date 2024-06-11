@@ -138,8 +138,8 @@ void FS_StartControl_DataReady_Callback(void)
 
 	if (FS_Config_Get()->enable_logging)
 	{
-		// Save to log file
-		FS_Log_WriteGNSSData(data);
+		// Update log path
+		FS_Log_UpdatePath(data);
 	}
 
 	// Update BLE characteristic

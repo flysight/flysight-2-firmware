@@ -154,6 +154,9 @@ void FS_ActiveControl_DataReady_Callback(void)
 	{
 		// Save to log file
 		FS_Log_WriteGNSSData(data);
+
+		// Update log path
+		FS_Log_UpdatePath(data);
 	}
 
 	// Update BLE characteristic
