@@ -82,8 +82,16 @@ void FS_StartMode_Init(void)
 	/* Initialize GNSS */
 	FS_GNSS_Init();
 
-	/* Start GNSS */
-	FS_GNSS_Start();
+	if (FS_Config_Get()->enable_gnss)
+	{
+		/* Start GNSS */
+		FS_GNSS_Start();
+	}
+	else
+	{
+		/* Stop GNSS */
+		FS_GNSS_Stop();
+	}
 }
 
 void FS_StartMode_DeInit(void)
