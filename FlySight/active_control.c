@@ -44,7 +44,7 @@
 
 static uint8_t led_timer_id;
 
-static volatile bool hasFix = false;
+static volatile bool hasFix;
 
 static volatile enum {
 	FS_CONTROL_INACTIVE = 0,

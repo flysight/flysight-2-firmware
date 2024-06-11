@@ -31,7 +31,6 @@
 /* USER CODE BEGIN Includes */
 #include "crs.h"
 #include "start_control.h"
-#include "time.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -644,31 +643,9 @@ static void Custom_Start_Transmit(void)
   Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
 }
 
-void Custom_Start_Update(const FS_GNSS_Int_t *current)
+void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
+                         uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms)
 {
-  uint32_t epoch, timestamp;
-  uint16_t timestamp_ms;
-
-  uint16_t year;
-  uint8_t month;
-  uint8_t day;
-  uint8_t hour;
-  uint8_t min;
-  uint8_t sec;
-
-  // Start of the year 2000 (gmtime epoch)
-  epoch = 1042 * 7 * 24 * 3600 + 518400;
-
-  // Calculate timestamp at start_time
-  timestamp = current->week * 7 * 24 * 3600 - epoch;
-  timestamp += current->towMS / 1000;
-
-  // Calculate millisecond part of timestamp
-  timestamp_ms = current->towMS % 1000;
-
-  // Convert back to date/time
-  gmtime_r(timestamp, &year, &month, &day, &hour, &min, &sec);
-
   // Copy to packet
   memcpy(&start_result_packet[0], &year, sizeof(year));
   memcpy(&start_result_packet[2], &month, sizeof(month));
@@ -676,7 +653,7 @@ void Custom_Start_Update(const FS_GNSS_Int_t *current)
   memcpy(&start_result_packet[4], &hour, sizeof(hour));
   memcpy(&start_result_packet[5], &min, sizeof(min));
   memcpy(&start_result_packet[6], &sec, sizeof(sec));
-  memcpy(&start_result_packet[7], &timestamp_ms, sizeof(timestamp_ms));
+  memcpy(&start_result_packet[7], &ms, sizeof(ms));
 
   if (Custom_App_Context.Start_result_Indication_Status)
   {

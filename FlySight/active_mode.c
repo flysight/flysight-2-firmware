@@ -89,6 +89,7 @@ void FS_ActiveMode_Init(void)
 		//   - FS_Log_Init (1)
 		FS_Log_WriteEvent("%lu/%lu timers used before active mode initialization",
 				HW_TS_CountUsed() - 2, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
+		FS_Log_WriteEvent("----------");
 	}
 
 	if (FS_Config_Get()->enable_audio)

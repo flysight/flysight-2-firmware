@@ -88,7 +88,8 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void);
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current);
 
 Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void);
-void Custom_Start_Update(const FS_GNSS_Int_t *current);
+void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
+                         uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms);
 /* USER CODE END EF */
 
 #ifdef __cplusplus
