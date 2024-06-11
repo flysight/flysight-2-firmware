@@ -27,6 +27,7 @@
 #include "audio.h"
 #include "config.h"
 #include "gnss.h"
+#include "log.h"
 #include "resource_manager.h"
 #include "start_control.h"
 #include "state.h"
@@ -37,6 +38,9 @@ void FS_StartMode_Init(void)
 {
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+	/* Read persistent state */
+	FS_State_NextSession();
 
 	/* Initialize controller */
 	FS_StartControl_Init();
@@ -54,8 +58,23 @@ void FS_StartMode_Init(void)
 		FS_Config_Read(FS_State_Get()->config_filename);
 	}
 
-	/* Initialize audio */
-	FS_Audio_Init();
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Enable logging
+		FS_Log_Init(FS_State_Get()->temp_folder);
+
+		// Log timer usage adjusted for:
+		//   - FS_Control_Init
+		//   - FS_Log_Init
+		FS_Log_WriteEvent("%lu/%lu timers used before active mode initialization",
+				HW_TS_CountUsed() - 2, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
+	}
+
+	if (FS_Config_Get()->enable_audio)
+	{
+		/* Initialize audio */
+		FS_Audio_Init();
+	}
 
 	/* Enable USART */
 	MX_USART1_UART_Init();
@@ -78,8 +97,23 @@ void FS_StartMode_DeInit(void)
 	/* Disable USART */
 	HAL_UART_DeInit(&huart1);
 
-	// Disable audio
-	FS_Audio_DeInit();
+	if (FS_Config_Get()->enable_audio)
+	{
+		// Disable audio
+		FS_Audio_DeInit();
+	}
+
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Log timer usage adjusted for:
+		//   - FS_Log_DeInit
+		FS_Log_WriteEvent("----------");
+		FS_Log_WriteEvent("%lu/%lu timers used after active mode de-initialization",
+				HW_TS_CountUsed() - 1, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
+
+		// Disable logging
+		FS_Log_DeInit(FS_State_Get()->temp_folder);
+	}
 
 	/* De-initialize FatFS */
 	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);

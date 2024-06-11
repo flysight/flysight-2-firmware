@@ -31,6 +31,7 @@
 #include "custom_app.h"
 #include "gnss.h"
 #include "led.h"
+#include "log.h"
 #include "state.h"
 #include "stm32_seq.h"
 
@@ -134,6 +135,12 @@ void FS_StartControl_DataReady_Callback(void)
 	const FS_GNSS_Data_t *data = FS_GNSS_GetData();
 
 	if (state == FS_CONTROL_INACTIVE) return;
+
+	if (FS_Config_Get()->enable_logging)
+	{
+		// Save to log file
+		FS_Log_WriteGNSSData(data);
+	}
 
 	// Update BLE characteristic
 	Custom_GNSS_Update(data);
