@@ -44,6 +44,8 @@ extern ADC_HandleTypeDef hadc1;
 
 void FS_ActiveMode_Init(void)
 {
+	uint8_t enable_flags;
+
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
@@ -68,12 +70,23 @@ void FS_ActiveMode_Init(void)
 
 	if (FS_Config_Get()->enable_logging)
 	{
+		// Initialize enable flags
+		enable_flags = FS_LOG_ENABLE_EVENT;
+		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_GNSS;
+		if (FS_Config_Get()->enable_baro) enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_hum)  enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_imu)  enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_mag)  enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_vbat) enable_flags |= FS_LOG_ENABLE_SENSOR;
+		if (FS_Config_Get()->enable_raw)  enable_flags |= FS_LOG_ENABLE_RAW;
+
 		// Enable logging
-		FS_Log_Init(FS_State_Get()->temp_folder);
+		FS_Log_Init(FS_State_Get()->temp_folder, enable_flags);
 
 		// Log timer usage adjusted for:
-		//   - FS_Control_Init
-		//   - FS_Log_Init
+		//   - FS_ActiveControl_Init (1)
+		//   - FS_Log_Init (1)
 		FS_Log_WriteEvent("%lu/%lu timers used before active mode initialization",
 				HW_TS_CountUsed() - 2, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);
 	}
@@ -234,7 +247,7 @@ void FS_ActiveMode_DeInit(void)
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Log timer usage adjusted for:
-		//   - FS_Log_DeInit
+		//   - FS_Log_DeInit (1)
 		FS_Log_WriteEvent("----------");
 		FS_Log_WriteEvent("%lu/%lu timers used after active mode de-initialization",
 				HW_TS_CountUsed() - 1, CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER);

@@ -32,7 +32,13 @@
 #include "mag.h"
 #include "vbat.h"
 
-void FS_Log_Init(uint32_t sessionId);
+#define FS_LOG_ENABLE_GNSS   0x01
+#define FS_LOG_ENABLE_SENSOR 0x02
+#define FS_LOG_ENABLE_RAW    0x04
+#define FS_LOG_ENABLE_EVENT  0x08
+#define FS_LOG_ENABLE_ALL    0xff
+
+void FS_Log_Init(uint32_t sessionId, uint8_t flags);
 void FS_Log_DeInit(uint32_t sessionId);
 
 void FS_Log_WriteBaroData(const FS_Baro_Data_t *current);
