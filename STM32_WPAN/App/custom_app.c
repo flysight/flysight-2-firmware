@@ -30,6 +30,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "crs.h"
+#include "start_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,6 +40,9 @@ typedef struct
   uint8_t               Crs_tx_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
+  /* Start */
+  uint8_t               Start_control_Indication_Status;
+  uint8_t               Start_result_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
   uint8_t               Crs_tx_Flow_Status;
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -83,6 +87,11 @@ static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t gnss_pv_packet[28];
 
+static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
+static uint32_t start_read_index, start_write_index;
+
+static uint8_t start_result_packet[9];
+
 static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
@@ -96,6 +105,11 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
+/* Start */
+static void Custom_Start_control_Update_Char(void);
+static void Custom_Start_control_Send_Indication(void);
+static void Custom_Start_result_Update_Char(void);
+static void Custom_Start_result_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(void);
@@ -103,6 +117,8 @@ static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
+static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
+static void Custom_Start_Transmit(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -146,7 +162,10 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* GNSS */
     case CUSTOM_STM_GNSS_PV_READ_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_READ_EVT */
-
+      if (!Custom_App_Context.Gnss_pv_Notification_Status)
+      {
+        Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
+      }
       /* USER CODE END CUSTOM_STM_GNSS_PV_READ_EVT */
       break;
 
@@ -160,6 +179,52 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       Custom_App_Context.Gnss_pv_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      break;
+
+    /* Start */
+    case CUSTOM_STM_START_CONTROL_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_WRITE_EVT */
+      Custom_Start_OnControlWrite(pNotification);
+      /* USER CODE END CUSTOM_STM_START_CONTROL_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Start_control_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Start_control_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_START_RESULT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_READ_EVT */
+      if (!Custom_App_Context.Start_result_Indication_Status)
+      {
+        Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
+      }
+      /* USER CODE END CUSTOM_STM_START_RESULT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Start_result_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Start_result_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_NOTIFICATION_COMPLETE_EVT */
+
+      /* USER CODE END CUSTOM_STM_NOTIFICATION_COMPLETE_EVT */
       break;
 
     default:
@@ -216,9 +281,13 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_Start_Transmit);
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
   Custom_App_Context.Crs_tx_Flow_Status = 1;
+  Custom_App_Context.Gnss_pv_Notification_Status = 0;
+  Custom_App_Context.Start_control_Indication_Status = 0;
+  Custom_App_Context.Start_result_Indication_Status = 0;
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -322,6 +391,85 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
   return;
 }
 
+/* Start */
+void Custom_Start_control_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_control_UC_1*/
+
+  /* USER CODE END Start_control_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Start_control_UC_Last*/
+
+  /* USER CODE END Start_control_UC_Last*/
+  return;
+}
+
+void Custom_Start_control_Send_Indication(void) /* Property Indication */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_control_IS_1*/
+
+  /* USER CODE END Start_control_IS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Start_control_IS_Last*/
+
+  /* USER CODE END Start_control_IS_Last*/
+
+  return;
+}
+
+void Custom_Start_result_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_result_UC_1*/
+
+  /* USER CODE END Start_result_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Start_result_UC_Last*/
+
+  /* USER CODE END Start_result_UC_Last*/
+  return;
+}
+
+void Custom_Start_result_Send_Indication(void) /* Property Indication */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Start_result_IS_1*/
+
+  /* USER CODE END Start_result_IS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Start_result_IS_Last*/
+
+  /* USER CODE END Start_result_IS_Last*/
+
+  return;
+}
+
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(void)
 {
@@ -331,6 +479,9 @@ static void Custom_CRS_OnConnect(void)
 
   rx_read_index = 0;
   rx_write_index = 0;
+
+  start_read_index = 0;
+  start_write_index = 0;
 
   // Update state
   connected_flag = 1;
@@ -450,6 +601,63 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   memcpy(&gnss_pv_packet[20], &(current->velE), sizeof(current->velE));
   memcpy(&gnss_pv_packet[24], &(current->velD), sizeof(current->velD));
 
-  UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  if (Custom_App_Context.Gnss_pv_Notification_Status)
+  {
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  }
+}
+
+static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification)
+{
+  Custom_Start_Packet_t *packet;
+
+  if (start_write_index < start_read_index + FS_START_WINDOW_LENGTH)
+  {
+	packet = &start_buffer[(start_write_index++) % FS_START_WINDOW_LENGTH];
+	packet->length = pNotification->DataTransfered.Length;
+    memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
+
+	// Call update task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_START_UPDATE_ID, CFG_SCH_PRIO_1);
+  }
+  else
+  {
+    APP_DBG_MSG("Custom_Start_OnControlWrite: buffer overflow\n");
+  }
+}
+
+Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void)
+{
+  Custom_Start_Packet_t *ret = 0;
+
+  if (start_read_index < start_write_index)
+  {
+	ret = &start_buffer[(start_read_index++) % FS_START_WINDOW_LENGTH];
+  }
+
+  return ret;
+}
+
+static void Custom_Start_Transmit(void)
+{
+  Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
+}
+
+void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
+                         uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms)
+{
+  // Copy to packet
+  memcpy(&start_result_packet[0], &year, sizeof(year));
+  memcpy(&start_result_packet[2], &month, sizeof(month));
+  memcpy(&start_result_packet[3], &day, sizeof(day));
+  memcpy(&start_result_packet[4], &hour, sizeof(hour));
+  memcpy(&start_result_packet[5], &min, sizeof(min));
+  memcpy(&start_result_packet[6], &sec, sizeof(sec));
+  memcpy(&start_result_packet[7], &ms, sizeof(ms));
+
+  if (Custom_App_Context.Start_result_Indication_Status)
+  {
+    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  }
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

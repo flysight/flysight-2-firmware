@@ -196,6 +196,8 @@ static void getValues(
 	int32_t *min,
 	int32_t *max)
 {
+	const int32_t velD = current->velD / 10;
+
 	uint16_t speed_mul = 1024;
 
 	int32_t tVal;
@@ -227,12 +229,12 @@ static void getValues(
 		*val = (current->gSpeed * 1024) / speed_mul;
 		break;
 	case FS_CONFIG_MODE_VERTICAL_SPEED:
-		*val = (current->velD * 1024) / speed_mul;
+		*val = (velD * 1024) / speed_mul;
 		break;
 	case FS_CONFIG_MODE_GLIDE_RATIO:
-		if (current->velD != 0)
+		if (velD != 0)
 		{
-			*val = 10000 * (int32_t) current->gSpeed / current->velD;
+			*val = 10000 * (int32_t) current->gSpeed / velD;
 			*min *= 100;
 			*max *= 100;
 		}
@@ -240,7 +242,7 @@ static void getValues(
 	case FS_CONFIG_MODE_INVERSE_GLIDE_RATIO:
 		if (current->gSpeed != 0)
 		{
-			*val = 10000 * current->velD / (int32_t) current->gSpeed;
+			*val = 10000 * velD / (int32_t) current->gSpeed;
 			*min *= 100;
 			*max *= 100;
 		}
@@ -345,7 +347,7 @@ static void getValues(
 		}
 		break;
 	case FS_CONFIG_MODE_DIVE_ANGLE:
-		*val = atan2(current->velD, current->gSpeed) / M_PI * 180;
+		*val = atan2(velD, current->gSpeed) / M_PI * 180;
 		break;
 	}
 }
@@ -410,6 +412,8 @@ static void speakValue(
 	FS_Config_Data_t *config,
 	FS_GNSS_Data_t *current)
 {
+	const int32_t velD = current->velD / 10;
+
 	uint16_t speed_mul = 1024;
 	int32_t step_size, step;
 
@@ -464,12 +468,12 @@ static void speakValue(
 		speech_ptr = writeInt32ToBuf(speech_ptr, (current->gSpeed * 1024) / speed_mul, 2, 1, 0);
 		break;
 	case FS_CONFIG_MODE_VERTICAL_SPEED:
-		speech_ptr = writeInt32ToBuf(speech_ptr, (current->velD * 1024) / speed_mul, 2, 1, 0);
+		speech_ptr = writeInt32ToBuf(speech_ptr, (velD * 1024) / speed_mul, 2, 1, 0);
 		break;
 	case FS_CONFIG_MODE_GLIDE_RATIO:
-		if (current->velD != 0)
+		if (velD != 0)
 		{
-			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) current->gSpeed / current->velD, 2, 1, 0);
+			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) current->gSpeed / velD, 2, 1, 0);
 		}
 		else
 		{
@@ -479,7 +483,7 @@ static void speakValue(
 	case FS_CONFIG_MODE_INVERSE_GLIDE_RATIO:
 		if (current->gSpeed != 0)
 		{
-			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) current->velD / current->gSpeed, 2, 1, 0);
+			speech_ptr = writeInt32ToBuf(speech_ptr, 100 * (int32_t) velD / current->gSpeed, 2, 1, 0);
 		}
 		else
 		{
@@ -530,7 +534,7 @@ static void speakValue(
 		}
 		break;
 	case FS_CONFIG_MODE_DIVE_ANGLE:
-		speech_ptr = writeInt32ToBuf(speech_ptr, 100 * atan2(current->velD, current->gSpeed) / M_PI * 180, 2, 1, 0);
+		speech_ptr = writeInt32ToBuf(speech_ptr, 100 * atan2(velD, current->gSpeed) / M_PI * 180, 2, 1, 0);
 		break;
 	case FS_CONFIG_MODE_ALTITUDE:
 		if (config->speech[cur_speech].units == FS_CONFIG_UNITS_METERS)
@@ -608,6 +612,8 @@ static void updateAlarms(
 	FS_Config_Data_t *config,
 	FS_GNSS_Data_t *current)
 {
+	const int32_t velD = current->velD / 10;
+
 	uint8_t i, suppress_tone, suppress_alt;
 	int32_t step_size, step, step_elev;
 
@@ -713,7 +719,7 @@ static void updateAlarms(
 		    !suppress_alt)
 		{
 			if ((step_elev >= min && step_elev < max) &&
-			    ABS(current->velD) >= config->threshold &&
+			    ABS(velD) >= config->threshold &&
 			    current->gSpeed >= config->hThreshold)
 			{
 				speech_ptr = speech_buf;
@@ -730,6 +736,8 @@ static void updateTones(
 	FS_Config_Data_t *config,
 	FS_GNSS_Data_t *current)
 {
+	const int32_t velD = current->velD / 10;
+
 	static int32_t x0 = INVALID_VALUE, x1, x2;
 
 	int32_t val_1 = INVALID_VALUE, min_1 = config->min, max_1 = config->max;
@@ -798,7 +806,7 @@ static void updateTones(
 
 	if (!g_suppress_tone)
 	{
-		if (ABS(current->velD) >= config->threshold &&
+		if (ABS(velD) >= config->threshold &&
 			current->gSpeed >= config->hThreshold)
 		{
 			setTone(config, val_1, min_1, max_1, val_2, min_2, max_2);

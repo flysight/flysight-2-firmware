@@ -21,18 +21,21 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
+#include <ctype.h>
+
 #include "main.h"
+#include "app_ble.h"
+#include "common.h"
 #include "ff.h"
+#include "resource_manager.h"
 #include "shci.h"
 #include "state.h"
 #include "version.h"
 
-#define TIMEOUT_VALUE 100
-
 static FS_State_Data_t state;
 static FIL stateFile;
 
-extern RNG_HandleTypeDef hrng;
+static void FS_State_Write(void);
 
 static void FS_State_WriteHex_8(FIL *file, const uint8_t *data, uint32_t count)
 {
@@ -71,6 +74,23 @@ static uint32_t hexCharToUint(char c)
     return 0; // Optionally handle invalid character error
 }
 
+static void FS_State_ReadHex_8(const char *str, uint8_t *data, uint32_t count)
+{
+    uint32_t i, j;
+    uint8_t value;
+
+    for (i = 0; i < count; ++i)
+    {
+        value = 0;
+        for (j = 0; j < 2; ++j)
+        {
+            value = value << 4;
+            value |= hexCharToUint(str[i * 2 + j]);
+        }
+        data[i] = value;
+    }
+}
+
 static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
 {
     uint32_t i, j, value;
@@ -87,7 +107,39 @@ static void FS_State_ReadHex_32(const char *str, uint32_t *data, uint32_t count)
     }
 }
 
-static void FS_State_Read(void)
+static char *trim(char *str) {
+    char *start = str;
+    char *end;
+
+    // Trim leading whitespace by finding the first non-whitespace character
+    while (isspace((unsigned char)*start)) start++;
+
+    if (*start == 0) {  // All spaces?
+        return start;
+    }
+
+    // Find the end of the string and step back to the last non-whitespace character
+    end = start + strlen(start) - 1;
+    while (end > start && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator character
+    *(end + 1) = '\0';
+
+    return start;
+}
+
+uint8_t is_all_zeros(const void *buffer, size_t size) {
+    const unsigned char *byte_buffer = (const unsigned char *)buffer;
+
+    for (size_t i = 0; i < size; i++) {
+        if (byte_buffer[i] != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void FS_State_Read(void)
 {
 	char    buffer[100];
 	size_t  len;
@@ -95,6 +147,18 @@ static void FS_State_Read(void)
 	char    *name;
 	char    *result;
 	int32_t val;
+
+	/* Initialize persistent state */
+	state.config_filename[0] = 0;
+	state.temp_folder = 0;
+	state.charge_current = 2;
+	strcpy(state.device_name, "FlySight");
+	state.enable_ble = 1;
+	state.reset_ble = 1;
+	memset(state.session_id, 0, 4 * 3);
+	memset(state.ble_irk, 0, CONFIG_DATA_IR_LEN);
+	memset(state.ble_erk, 0, CONFIG_DATA_ER_LEN);
+	state.active_mode = FS_ACTIVE_MODE_DEFAULT;
 
 	if (f_open(&stateFile, "/flysight.txt", FA_READ) != FR_OK)
 		return;
@@ -106,15 +170,15 @@ static void FS_State_Read(void)
 		len = strcspn(buffer, ";");
 		buffer[len] = '\0';
 
-		name = strtok(buffer, " \r\n\t:");
-		if (name == 0) continue ;
+		len = strcspn(buffer, ":");
+		buffer[len] = '\0';
 
-		result = strtok(0, " \r\n\t:");
-		if (result == 0) continue ;
+		name = trim(buffer);
+		result = trim(buffer + len + 1);
 
 		val = atol(result);
 
-		if (!strcmp(name, "Session_ID"))
+		if (!strcmp(name, "Session_ID") && (strlen(result) == 8 * 3))
 		{
 			FS_State_ReadHex_32(result, state.session_id, 3);
 		}
@@ -122,7 +186,13 @@ static void FS_State_Read(void)
 		if (!strcmp(name, "Config_File"))
 		{
 			result[12] = '\0';
-			strncpy(state.config_filename, result, sizeof(state.config_filename));
+			strncpy(state.config_filename, result, sizeof(state.config_filename) - 1);
+		}
+
+		if (!strcmp(name, "Device_Name"))
+		{
+			result[30] = '\0';
+			strncpy(state.device_name, result, sizeof(state.device_name) - 1);
 		}
 
 		#define HANDLE_VALUE(s,w,r,t) \
@@ -130,11 +200,41 @@ static void FS_State_Read(void)
 
 		HANDLE_VALUE("Temp_Folder", state.temp_folder,    val, val >= 0);
 		HANDLE_VALUE("Charging",    state.charge_current, val, val >= 0 && val <= 3);
+		HANDLE_VALUE("Enable_BLE",  state.enable_ble,     val, val == 0 || val == 1);
+		HANDLE_VALUE("Reset_BLE",   state.reset_ble,      val, val == 0 || val == 1);
+		HANDLE_VALUE("Active_Mode", state.active_mode,    val, val >= 0 && val < FS_NUM_ACTIVE_MODES);
+
+		if (!strcmp(name, "BLE_IRK") && (strlen(result) == 2 * CONFIG_DATA_IR_LEN))
+		{
+			FS_State_ReadHex_8(result, state.ble_irk, CONFIG_DATA_IR_LEN);
+		}
+
+		if (!strcmp(name, "BLE_ERK") && (strlen(result) == 2 * CONFIG_DATA_ER_LEN))
+		{
+			FS_State_ReadHex_8(result, state.ble_erk, CONFIG_DATA_ER_LEN);
+		}
 
 		#undef HANDLE_VALUE
 	}
 
 	f_close(&stateFile);
+
+	/* Get device ID */
+	state.device_id[0] = HAL_GetUIDw0();
+	state.device_id[1] = HAL_GetUIDw1();
+	state.device_id[2] = HAL_GetUIDw2();
+
+	/* Initialize IRK if needed */
+	while (is_all_zeros(state.ble_irk, CONFIG_DATA_IR_LEN))
+	{
+		FS_Common_GetRandomBytes((uint32_t *) state.ble_irk, CONFIG_DATA_IR_LEN / 4);
+	}
+
+	/* Initialize ERK if needed */
+	while (is_all_zeros(state.ble_erk, CONFIG_DATA_ER_LEN))
+	{
+		FS_Common_GetRandomBytes((uint32_t *) state.ble_erk, CONFIG_DATA_ER_LEN / 4);
+	}
 }
 
 static void FS_State_Write(void)
@@ -181,12 +281,31 @@ static void FS_State_Write(void)
 	f_printf(&stateFile, "Config_File:  %s\n", state.config_filename);
 	f_printf(&stateFile, "Temp_Folder:  %04lu\n\n", state.temp_folder);
 
-	f_printf(&stateFile, "; System configuration\n\n");
+	f_printf(&stateFile, "; Charging\n\n");
 
 	f_printf(&stateFile, "Charging:     %u ; 0 = No charging\n", state.charge_current);
 	f_printf(&stateFile, "                ; 1 = 100 mA\n");
 	f_printf(&stateFile, "                ; 2 = 200 mA (recommended)\n");
 	f_printf(&stateFile, "                ; 3 = 300 mA\n\n");
+
+	f_printf(&stateFile, "; Bluetooth\n\n");
+
+	f_printf(&stateFile, "Enable_BLE:   %u\n", state.enable_ble);
+	f_printf(&stateFile, "Reset_BLE:    0\n");
+	f_printf(&stateFile, "Device_Name:  %s\n\n", state.device_name);
+
+	f_printf(&stateFile, "BLE_IRK:      ");
+	FS_State_WriteHex_8(&stateFile, state.ble_irk, 16);
+	f_printf(&stateFile, "\n");
+
+	f_printf(&stateFile, "BLE_ERK:      ");
+	FS_State_WriteHex_8(&stateFile, state.ble_erk, 16);
+	f_printf(&stateFile, "\n\n");
+
+	f_printf(&stateFile, "; Active mode\n\n");
+
+	f_printf(&stateFile, "Active_Mode:  %u ; 0 = Default\n", state.active_mode);
+	f_printf(&stateFile, "                ; 1 = Starter pistol\n\n");
 
 	f_printf(&stateFile, "; Bootloader public key\n\n");
 
@@ -204,18 +323,41 @@ static void FS_State_Write(void)
 
 void FS_State_Init(void)
 {
-	/* Initialize persistent state */
-	state.config_filename[0] = 0;
-	state.temp_folder = -1;
-	state.charge_current = 2;
+	/* Initialize microSD */
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
 
-	/* Read current state */
+	/* Read persistent state */
 	FS_State_Read();
 
-	/* Get device ID */
-	state.device_id[0] = HAL_GetUIDw0();
-	state.device_id[1] = HAL_GetUIDw1();
-	state.device_id[2] = HAL_GetUIDw2();
+	/* Write updated state */
+	FS_State_Write();
+
+	/* De-initialize microSD */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+}
+
+void FS_State_Update(void)
+{
+	/* Initialize microSD */
+	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
+
+	/* Read persistent state */
+	FS_State_Read();
+
+	/* Write updated state */
+	FS_State_Write();
+
+	/* De-initialize microSD */
+	FS_ResourceManager_ReleaseResource(FS_RESOURCE_FATFS);
+
+	if (state.reset_ble)
+	{
+		/* Clear list of bonded devices */
+		APP_BLE_Reset();
+	}
+
+	/* Update device name */
+	APP_BLE_UpdateDeviceName();
 }
 
 const FS_State_Data_t *FS_State_Get(void)
@@ -225,46 +367,15 @@ const FS_State_Data_t *FS_State_Get(void)
 
 void FS_State_NextSession(void)
 {
-	HAL_StatusTypeDef res;
-	uint32_t counter;
-	uint32_t tickstart;
-
 	/* Increment temporary folder number */
 	state.temp_folder = (state.temp_folder + 1) % 10000;
 
-	/* Algorithm to use RNG on CPU1 comes from AN5289 Figure 8 */
-
-	/* Poll Sem0 until granted */
-	LL_HSEM_1StepLock(HSEM, CFG_HW_RNG_SEMID);
-
-	/* Configure and switch on RNG clock*/
-	MX_RNG_Init();
-
-	/* Generate random session ID */
-	for (counter = 0; counter < 3; ++counter)
+	/* Get random session ID */
+	do
 	{
-	    tickstart = HAL_GetTick();
-
-	    res = HAL_ERROR;
-		while ((res != HAL_OK) && (HAL_GetTick() - tickstart < TIMEOUT_VALUE))
-		{
-			res = HAL_RNG_GenerateRandomNumber(&hrng, &state.session_id[counter]);
-		}
-
-		if (res != HAL_OK)
-		{
-			Error_Handler();
-		}
+		FS_Common_GetRandomBytes(state.session_id, 3);
 	}
-
-	/* Switch off RNG IP and clock */
-	HAL_RNG_DeInit(&hrng);
-
-	/* Set RNGSEL = CLK48 */
-    LL_RCC_SetRNGClockSource(RCC_RNGCLKSOURCE_CLK48);
-
-	/* Release Sem0 */
-	LL_HSEM_ReleaseLock(HSEM, CFG_HW_RNG_SEMID, 0);
+	while (is_all_zeros(state.session_id, 4 * 3));
 
 	/* Write updated state */
 	FS_State_Write();

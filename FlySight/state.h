@@ -24,7 +24,15 @@
 #ifndef STATE_H_
 #define STATE_H_
 
+#include "ble.h"
 #include "charge.h"
+
+typedef enum
+{
+	FS_ACTIVE_MODE_DEFAULT,
+	FS_ACTIVE_MODE_START,
+	FS_NUM_ACTIVE_MODES
+} FS_State_ActiveMode_t;
 
 typedef struct
 {
@@ -33,9 +41,16 @@ typedef struct
 	char     config_filename[13];
 	uint32_t temp_folder;
 	FS_Charge_Current_t charge_current;
+	char     device_name[30];
+	uint8_t  enable_ble;
+	uint8_t  reset_ble;
+	uint8_t  ble_irk[CONFIG_DATA_IR_LEN];
+	uint8_t  ble_erk[CONFIG_DATA_ER_LEN];
+	FS_State_ActiveMode_t active_mode;
 } FS_State_Data_t;
 
 void FS_State_Init(void);
+void FS_State_Update(void);
 const FS_State_Data_t *FS_State_Get(void);
 void FS_State_NextSession(void);
 void FS_State_SetConfigFilename(const char *filename);

@@ -77,6 +77,7 @@
 
 #define UBX_TIM             0x0d
 #define UBX_TIM_TP          0x01
+#define UBX_TIM_TM2         0x03
 
 #define UBX_NMEA            0xf0
 #define UBX_NMEA_GPGGA      0x00
@@ -319,6 +320,21 @@ ubxTimTp_t;             // 16 bytes total
 
 typedef struct
 {
+	uint8_t  ch;        // Channel
+	uint8_t  flags;     // Bitmask
+	uint16_t count;     // Rising edge counter
+	uint16_t wnR;       // Week number of last rising edge
+	uint16_t wnF;       // Week number of last falling edge
+	uint32_t towMsR;    // TOW of rising edge            (ms)
+	uint32_t towSubMsR; // Submillisecond part of towMsR (ns)
+	uint32_t towMsF;    // TOW of falling edge           (ms)
+	uint32_t towSubMsF; // Submillisecond part of towMsR (ns)
+	uint32_t accEst;    // Accuracy estimate             (ns)
+}
+ubxTimTm2_t;            // 28 bytes total
+
+typedef struct
+{
 	uint16_t pending[6];   // Bytes pending in transmit buffer
 	uint8_t  usage[6];     // Maximum usage in last period each target (%)
 	uint8_t  peakUsage[6]; // Maximum usage each target (%)
@@ -367,6 +383,7 @@ static union
 	ubxNavTimeUtc_t navTimeUtc;
 	ubxNavSat_t     navSat;
 	ubxTimTp_t      timTp;
+	ubxTimTm2_t     timTm2;
 } gnssPayload;
 
 // Saved GNSS messages
@@ -376,6 +393,7 @@ static bool validTime;
 
 static FS_GNSS_Data_t gnssData;
 static FS_GNSS_Time_t gnssTime;
+static FS_GNSS_Int_t  gnssInt;
 
 static uint8_t timer_id;
 
@@ -404,6 +422,11 @@ extern UART_HandleTypeDef huart1;
 
 static void FS_GNSS_Timer(void);
 static void FS_GNSS_Update(void);
+
+static void (*data_ready_callback)(void) = NULL;
+static void (*time_ready_callback)(bool validTime) = NULL;
+static void (*raw_ready_callback)(void) = NULL;
+static void (*int_ready_callback)(void) = NULL;
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
@@ -594,7 +617,10 @@ static void FS_GNSS_ReceiveMessage(uint8_t msgReceived, uint32_t timeOfWeek)
 	if (gnssMsgReceived == UBX_MSG_ALL)
 	{
 		gnssData.iTOW = timeOfWeek;
-		FS_GNSS_DataReady_Callback();
+		if (data_ready_callback)
+		{
+			data_ready_callback();
+		}
 		gnssMsgReceived = 0;
 	}
 }
@@ -640,6 +666,17 @@ static void FS_GNSS_HandleTp(void)
 	validTime = true;
 }
 
+static void FS_GNSS_HandleTm2(void)
+{
+	gnssInt.towMS = gnssPayload.timTm2.towMsR;
+	gnssInt.week = gnssPayload.timTm2.wnR;
+
+	if (int_ready_callback)
+	{
+		int_ready_callback();
+	}
+}
+
 static void FS_GNSS_HandleMessage(void)
 {
 	switch (gnssMsgClass)
@@ -660,6 +697,9 @@ static void FS_GNSS_HandleMessage(void)
 		{
 		case UBX_TIM_TP:
 			FS_GNSS_HandleTp();
+			break;
+		case UBX_TIM_TM2:
+			FS_GNSS_HandleTm2();
 			break;
 		}
 		break;
@@ -682,6 +722,7 @@ static void FS_GNSS_InitMessages(void)
 		{UBX_NAV,  UBX_NAV_VELNED,  1},
 		{UBX_NAV,  UBX_NAV_PVT,     1},
 		{UBX_TIM,  UBX_TIM_TP,      1},
+		{UBX_TIM,  UBX_TIM_TM2,     1},
 		{UBX_SEC,  UBX_SEC_ECSIGN,  10}
 	};
 
@@ -864,7 +905,8 @@ void FS_GNSS_DeInit(void)
 	// Add event log entries for timing info
 	FS_Log_WriteEvent("----------");
 	FS_Log_WriteEvent("%lu/%lu slots used in GNSS buffer", bufferUsed, GNSS_RX_BUF_LEN);
-	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task", updateTotalTime / updateCount);
+	FS_Log_WriteEvent("%lu ms average time spent in GNSS update task",
+			(updateCount > 0) ? (updateTotalTime / updateCount) : 0);
 	FS_Log_WriteEvent("%lu ms maximum time spent in GNSS update task", updateMaxTime);
 	FS_Log_WriteEvent("%lu ms maximum time between calls to GNSS update task", updateMaxInterval);
 }
@@ -939,7 +981,10 @@ static void FS_GNSS_Update(void)
 	{
 		while (writeIndex / GNSS_RAW_BUF_LEN != gnssRawIndex)
 		{
-			FS_GNSS_RawReady_Callback();
+			if (raw_ready_callback)
+			{
+				raw_ready_callback();
+			}
 			gnssRawIndex = (gnssRawIndex + 1) % (GNSS_RX_BUF_LEN / GNSS_RAW_BUF_LEN);
 		}
 	}
@@ -956,18 +1001,14 @@ const FS_GNSS_Data_t *FS_GNSS_GetData(void)
 	return &gnssData;
 }
 
-__weak void FS_GNSS_DataReady_Callback(void)
-{
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_DataReady_Callback could be implemented in the user file
-   */
-}
-
 void FS_GNSS_Timepulse(void)
 {
 	gnssTime.time = HAL_GetTick();
 
-	FS_GNSS_TimeReady_Callback(validTime);
+	if (time_ready_callback)
+	{
+		time_ready_callback(validTime);
+	}
 
 	validTime = false;
 }
@@ -977,21 +1018,32 @@ const FS_GNSS_Time_t *FS_GNSS_GetTime(void)
 	return &gnssTime;
 }
 
-__weak void FS_GNSS_TimeReady_Callback(bool validTime)
-{
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_TimeReady_Callback could be implemented in the user file
-   */
-}
-
 const FS_GNSS_Raw_t *FS_GNSS_GetRaw(void)
 {
 	return &gnssRxData.split[gnssRawIndex];
 }
 
-__weak void FS_GNSS_RawReady_Callback(void)
+const FS_GNSS_Int_t *FS_GNSS_GetInt(void)
 {
-  /* NOTE: This function should not be modified, when the callback is needed,
-           the FS_GNSS_RawReady_Callback could be implemented in the user file
-   */
+	return &gnssInt;
+}
+
+void FS_GNSS_DataReady_SetCallback(void (*callback)(void))
+{
+	data_ready_callback = callback;
+}
+
+void FS_GNSS_TimeReady_SetCallback(void (*callback)(bool))
+{
+	time_ready_callback = callback;
+}
+
+void FS_GNSS_RawReady_SetCallback(void (*callback)(void))
+{
+	raw_ready_callback = callback;
+}
+
+void FS_GNSS_IntReady_SetCallback(void (*callback)(void))
+{
+	int_ready_callback = callback;
 }

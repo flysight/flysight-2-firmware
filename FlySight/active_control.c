@@ -44,12 +44,16 @@
 
 static uint8_t led_timer_id;
 
-static volatile bool hasFix = false;
+static volatile bool hasFix;
 
 static volatile enum {
 	FS_CONTROL_INACTIVE = 0,
 	FS_CONTROL_ACTIVE
 } state = FS_CONTROL_INACTIVE;
+
+void FS_ActiveControl_DataReady_Callback(void);
+void FS_ActiveControl_TimeReady_Callback(bool validTime);
+void FS_ActiveControl_RawReady_Callback(void);
 
 static void FS_ActiveControl_LED_Timer(void)
 {
@@ -59,6 +63,12 @@ static void FS_ActiveControl_LED_Timer(void)
 
 void FS_ActiveControl_Init(void)
 {
+	// Set callback functions
+	FS_GNSS_DataReady_SetCallback(FS_ActiveControl_DataReady_Callback);
+	FS_GNSS_TimeReady_SetCallback(FS_ActiveControl_TimeReady_Callback);
+	FS_GNSS_RawReady_SetCallback(FS_ActiveControl_RawReady_Callback);
+	FS_GNSS_IntReady_SetCallback(NULL);
+
 	// Initialize LEDs
 	FS_LED_SetColour(FS_LED_GREEN);
 	FS_LED_On();
@@ -87,6 +97,12 @@ void FS_ActiveControl_DeInit(void)
 
 	// Turn off LEDs
 	FS_LED_Off();
+
+	// Clear callback functions
+	FS_GNSS_DataReady_SetCallback(NULL);
+	FS_GNSS_TimeReady_SetCallback(NULL);
+	FS_GNSS_RawReady_SetCallback(NULL);
+	FS_GNSS_IntReady_SetCallback(NULL);
 }
 
 void FS_Baro_DataReady_Callback(void)
@@ -122,7 +138,7 @@ void FS_Mag_DataReady_Callback(void)
 	}
 }
 
-void FS_GNSS_DataReady_Callback(void)
+void FS_ActiveControl_DataReady_Callback(void)
 {
 	const FS_GNSS_Data_t *data = FS_GNSS_GetData();
 
@@ -138,18 +154,18 @@ void FS_GNSS_DataReady_Callback(void)
 	{
 		// Save to log file
 		FS_Log_WriteGNSSData(data);
+
+		// Update log path
+		FS_Log_UpdatePath(data);
 	}
 
-	if (Custom_APP_IsConnected())
-	{
-		// Update BLE characteristic
-		Custom_GNSS_Update(data);
-	}
+	// Update BLE characteristic
+	Custom_GNSS_Update(data);
 
 	hasFix = (data->gpsFix == 3);
 }
 
-void FS_GNSS_TimeReady_Callback(bool validTime)
+void FS_ActiveControl_TimeReady_Callback(bool validTime)
 {
 	if (state != FS_CONTROL_ACTIVE) return;
 
@@ -167,7 +183,7 @@ void FS_GNSS_TimeReady_Callback(bool validTime)
 	}
 }
 
-void FS_GNSS_RawReady_Callback(void)
+void FS_ActiveControl_RawReady_Callback(void)
 {
 	if (state != FS_CONTROL_ACTIVE) return;
 

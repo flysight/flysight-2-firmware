@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2024 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,34 +21,32 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef MODE_H_
-#define MODE_H_
+#include "main.h"
+#include "app_ble.h"
+#include "app_common.h"
+#include "led.h"
+#include "mode.h"
 
-typedef enum
+static void FS_PairingMode_Callback(void)
 {
-	FS_MODE_EVENT_BUTTON_PRESSED,
-	FS_MODE_EVENT_BUTTON_RELEASED,
-	FS_MODE_EVENT_TIMER,
-	FS_MODE_EVENT_VBUS_HIGH,
-	FS_MODE_EVENT_VBUS_LOW,
-	FS_MODE_EVENT_FORCE_UPDATE
-} FS_Mode_Event_t;
+	FS_Mode_PushQueue(FS_MODE_EVENT_FORCE_UPDATE);
+}
 
-typedef enum
+void FS_PairingMode_Init(void)
 {
-	FS_MODE_STATE_SLEEP,
-	FS_MODE_STATE_ACTIVE,
-	FS_MODE_STATE_CONFIG,
-	FS_MODE_STATE_USB,
-	FS_MODE_STATE_PAIRING,
-	FS_MODE_STATE_START,
+	// Initialize LEDs
+	FS_LED_SetColour(FS_LED_GREEN);
+	FS_LED_Pulse();
 
-	// Number of modes
-	FS_MODE_STATE_COUNT
-} FS_Mode_State_t;
+	// Request pairing
+	APP_BLE_RequestPairing(FS_PairingMode_Callback);
+}
 
-void FS_Mode_Init(void);
-void FS_Mode_PushQueue(FS_Mode_Event_t event);
-FS_Mode_State_t FS_Mode_State(void);
+void FS_PairingMode_DeInit(void)
+{
+	// Turn off LEDs
+	FS_LED_Off();
 
-#endif /* MODE_H_ */
+	// Cancel pairing
+	APP_BLE_CancelPairing();
+}

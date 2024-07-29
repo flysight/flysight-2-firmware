@@ -37,7 +37,7 @@
 
 #define FRAME_LENGTH 242
 
-#define TX_TIMEOUT_MSEC  100
+#define TX_TIMEOUT_MSEC  200
 #define TX_TIMEOUT_TICKS (TX_TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 
 #define RX_TIMEOUT_MSEC  10000
@@ -327,6 +327,8 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 					FS_CRS_SendNak(FS_CRS_COMMAND_READ_DIR);
 				}
 				break;
+			default:
+				FS_CRS_SendNak(packet->data[0]);
 			}
 		}
 	}
