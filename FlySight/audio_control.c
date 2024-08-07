@@ -300,7 +300,7 @@ static void getValues(
 		//check if above height tone should be silenced
 		if ((current->hMSL > (config->end_nav+config->dz_elev)) || (config->end_nav == 0))
 		{
-			tVal=calcRelBearing(config->bearing,current->heading);
+			tVal=calcRelBearing(config->bearing,current->heading/100000);
 			//check if heading not within UBX_min_angle deg of bearing or tones needed for other measurement
 			if ((ABS(tVal) > config->min_angle) || (config->mode_2 != FS_CONFIG_MODE_DIRECTION_TO_BEARING) || (config->min_angle==0))
 			{
@@ -529,7 +529,7 @@ static void speakValue(
 		if ((current->hMSL > (config->end_nav+config->dz_elev)) || (config->end_nav == 0))
 		{
 			config->speech[cur_speech].decimals = 0;
-			tVal = calcRelBearing(config->bearing,current->heading);
+			tVal = calcRelBearing(config->bearing,current->heading/100000);
 			speech_ptr = writeInt32ToBuf(speech_ptr, ABS(tVal)*100, 2, 1, 0);
 		}
 		break;
