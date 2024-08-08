@@ -562,7 +562,7 @@ static void speakValue(
 
 	// Step 2: Truncate to the desired number of decimal places
 
-	if (config->speech[cur_speech].mode != FS_CONFIG_MODE_DIRECTION_TO_DESTINATION)
+	if (config->speech[cur_speech].mode != FS_CONFIG_MODE_ALTITUDE)
 	{
 		if (config->speech[cur_speech].decimals == 0) end_ptr -= 4;
 		else end_ptr -= 3 - config->speech[cur_speech].decimals;
@@ -819,7 +819,7 @@ static void updateTones(
 			{
 				for (i = 0; i < config->num_speech; ++i)
 				{
-					if ((config->speech[cur_speech].mode != FS_CONFIG_MODE_DIRECTION_TO_DESTINATION) ||
+					if ((config->speech[cur_speech].mode != FS_CONFIG_MODE_ALTITUDE) ||
 						(current->hMSL - config->dz_elev >= ALT_MIN * 1000))
 					{
 						speakValue(config, current);
@@ -1132,7 +1132,7 @@ void FS_AudioControl_Init(void)
 
 	for (i = 0; i < config->num_speech; ++i)
 	{
-		if (config->speech[i].mode == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION)
+		if (config->speech[i].mode == FS_CONFIG_MODE_ALTITUDE)
 		{
 			flags |= FLAG_SAY_ALTITUDE;
 		}
