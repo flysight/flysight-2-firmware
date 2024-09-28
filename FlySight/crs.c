@@ -530,7 +530,7 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 					if (packet->data[1] == (next_packet & 0xff))
 #endif
 					{
-						f_write(&file, &packet->data[1], packet->length - 1, &bw);
+						f_write(&file, &packet->data[2], packet->length - 2, &bw);
 						FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_ACK, &packet->data[1], 1);
 						++next_packet;
 
