@@ -413,9 +413,6 @@ void APP_BLE_Init(void)
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
-  // Update persistent state
-  FS_State_Update();
-
   if (FS_State_Get()->enable_ble)
   {
     /**
