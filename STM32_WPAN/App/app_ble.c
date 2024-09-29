@@ -1366,6 +1366,9 @@ static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
 
   if ((NewStatus == APP_BLE_FAST_ADV) || (NewStatus == APP_BLE_LP_ADV))
   {
+    /* Set flag in manufacturer specific data */
+    mfg_data[4] = request_pairing;
+
     /* Copy manufacturer specific data */
     memcpy(&(adv_data[k]), mfg_data, sizeof(mfg_data));
     k += sizeof(mfg_data);
