@@ -243,7 +243,7 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 					packet->data[packet->length] = 0;
 
 					// Open file
-					if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE|FA_OPEN_APPEND) == FR_OK)
+					if (f_open(&file, (TCHAR *) &(packet->data[1]), FA_WRITE|FA_CREATE_ALWAYS) == FR_OK)
 					{
 						FS_CRS_SendAck(FS_CRS_COMMAND_WRITE);
 
@@ -530,7 +530,7 @@ static FS_CRS_State_t FS_CRS_State_Write(void)
 					if (packet->data[1] == (next_packet & 0xff))
 #endif
 					{
-						f_write(&file, &packet->data[1], packet->length - 1, &bw);
+						f_write(&file, &packet->data[2], packet->length - 2, &bw);
 						FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_ACK, &packet->data[1], 1);
 						++next_packet;
 
