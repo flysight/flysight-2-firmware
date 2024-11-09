@@ -833,38 +833,6 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		// Adjust using timezone
 		FS_Log_AdjustDateTime(&year, &month, &day, &hour, &min, &sec);
 
-		// Set timestamp in FILINFO structure
-		fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | day);
-		fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
-
-		// Update timestamps
-		sprintf(oldPath, "/temp/%04lu", temp_folder);
-		f_utime(oldPath, &fno);
-
-		if (enable_flags & FS_LOG_ENABLE_GNSS)
-		{
-			sprintf(oldPath, "/temp/%04lu/track.csv", temp_folder);
-			f_utime(oldPath, &fno);
-		}
-
-		if (enable_flags & FS_LOG_ENABLE_RAW)
-		{
-			sprintf(oldPath, "/temp/%04lu/raw.ubx", temp_folder);
-			f_utime(oldPath, &fno);
-		}
-
-		if (enable_flags & FS_LOG_ENABLE_SENSOR)
-		{
-			sprintf(oldPath, "/temp/%04lu/sensor.csv", temp_folder);
-			f_utime(oldPath, &fno);
-		}
-
-		if (enable_flags & FS_LOG_ENABLE_EVENT)
-		{
-			sprintf(oldPath, "/temp/%04lu/event.csv", temp_folder);
-			f_utime(oldPath, &fno);
-		}
-
 		// Format date and time
 		sprintf(date, "%02d-%02d-%02d", year % 100, month, day);
 		sprintf(time, "%02d-%02d-%02d", hour, min, sec);
@@ -874,9 +842,6 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		{
 			// Create new folder
 			f_mkdir(path);
-
-			// Update timestamp
-			f_utime(path, &fno);
 		}
 
 		// Move temporary folder

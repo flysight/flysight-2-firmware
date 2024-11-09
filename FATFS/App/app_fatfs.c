@@ -58,6 +58,7 @@ FIL USERFile;       /* File  object for USER */
 char USERPath[4];   /* USER logical drive path */
 /* USER CODE BEGIN PV */
 FS_FileOperationsTypeDef Appli_state = APPLICATION_IDLE;
+extern RTC_HandleTypeDef hrtc;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,7 +109,20 @@ int32_t MX_FATFS_Process(void)
 DWORD get_fattime(void)
 {
   /* USER CODE BEGIN get_fattime */
-  return 0;
+  RTC_DateTypeDef sDate;
+  RTC_TimeTypeDef sTime;
+
+  /* Get RTC time and date */
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+  /* Convert to DWORD format */
+  return ((DWORD) (sDate.Year + 20) << 25) +
+         ((DWORD) sDate.Month       << 21) +
+         ((DWORD) sDate.Date        << 16) +
+         ((DWORD) sTime.Hours       << 11) +
+         ((DWORD) sTime.Minutes     << 5)  +
+         ((DWORD) (sTime.Seconds / 2));
   /* USER CODE END get_fattime */
 }
 
