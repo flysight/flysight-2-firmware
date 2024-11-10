@@ -142,18 +142,18 @@ void FS_ActiveControl_DeInit(void)
 		// Calculate millisecond part of date/time
 		ms = savedTime.towMS % 1000;
 
-	    // Add the offset to milliseconds
+		// Add the offset to milliseconds
 		offset_ms = HAL_GetTick() - savedTime.time;
-	    ms_total = ms + offset_ms;
+		ms_total = ms + offset_ms;
 
-	    // Calculate new timestamp and milliseconds
-	    timestamp += ms_total / 1000;
-	    ms = ms_total % 1000;
+		// Calculate new timestamp and milliseconds
+		timestamp += ms_total / 1000;
+		ms = ms_total % 1000;
 
-	    // Convert back to date/time
-	    gmtime_r(timestamp, &year, &month, &day, &hour, &min, &sec);
+		// Convert back to date/time
+		gmtime_r(timestamp, &year, &month, &day, &hour, &min, &sec);
 
-	    // Update RTC
+		// Update RTC
 		sTime.Hours = hour;
 		sTime.Minutes = min;
 		sTime.Seconds = sec;
@@ -165,8 +165,8 @@ void FS_ActiveControl_DeInit(void)
 		sDate.Date = day;
 		sDate.Year = year % 100;
 
-	    HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-	    HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+		HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+		HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 	}
 }
 
