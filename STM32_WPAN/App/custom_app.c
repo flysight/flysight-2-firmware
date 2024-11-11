@@ -61,7 +61,8 @@ typedef struct
 
 /* Private macros -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define TIMEOUT_MSEC  30000
+#define TIMEOUT_TICKS (TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -96,6 +97,8 @@ static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
+
+static uint8_t timeout_timer_id;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -112,13 +115,14 @@ static void Custom_Start_result_Update_Char(void);
 static void Custom_Start_result_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
-static void Custom_CRS_OnConnect(void);
+static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
 static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_Start_Transmit(void);
+static void Custom_App_Timeout(void);
 /* USER CODE END PFP */
 
 /* Functions Definition ------------------------------------------------------*/
@@ -252,7 +256,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
     /* USER CODE END P2PS_CUSTOM_Notification_Custom_Evt_Opcode */
     case CUSTOM_CONN_HANDLE_EVT :
       /* USER CODE BEGIN CUSTOM_CONN_HANDLE_EVT */
-      Custom_CRS_OnConnect();
+      Custom_CRS_OnConnect(pNotification);
       /* USER CODE END CUSTOM_CONN_HANDLE_EVT */
       break;
 
@@ -288,6 +292,8 @@ void Custom_APP_Init(void)
   Custom_App_Context.Gnss_pv_Notification_Status = 0;
   Custom_App_Context.Start_control_Indication_Status = 0;
   Custom_App_Context.Start_result_Indication_Status = 0;
+
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timeout_timer_id, hw_ts_SingleShot, Custom_App_Timeout);
   /* USER CODE END CUSTOM_APP_Init */
   return;
 }
@@ -471,7 +477,7 @@ void Custom_Start_result_Send_Indication(void) /* Property Indication */
 }
 
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
-static void Custom_CRS_OnConnect(void)
+static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
 {
   // Reset buffer indices
   tx_read_index = 0;
@@ -485,10 +491,19 @@ static void Custom_CRS_OnConnect(void)
 
   // Update state
   connected_flag = 1;
+
+  // Remember connection handle
+  Custom_App_Context.ConnectionHandle = pNotification->ConnectionHandle;
+
+  // Start timeout timer
+  HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
 }
 
 static void Custom_CRS_OnDisconnect(void)
 {
+  // Stop timeout timer
+  HW_TS_Stop(timeout_timer_id);
+
   // Update state
   connected_flag = 0;
 
@@ -513,6 +528,9 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   {
     APP_DBG_MSG("Custom_CRS_OnRxWrite: buffer overflow\n");
   }
+
+  // Refresh timeout timer
+  HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
 }
 
 static void Custom_CRS_Transmit(void)
@@ -659,5 +677,11 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
   {
     UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, CFG_SCH_PRIO_1);
   }
+}
+
+static void Custom_App_Timeout(void)
+{
+  aci_gap_terminate(Custom_App_Context.ConnectionHandle,
+		  HCI_REMOTE_USER_TERMINATED_CONNECTION_ERR_CODE);
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

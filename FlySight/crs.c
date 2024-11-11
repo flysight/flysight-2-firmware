@@ -56,6 +56,7 @@ typedef enum
 	FS_CRS_COMMAND_FILE_ACK  = 0x12,
 	FS_CRS_COMMAND_NAK       = 0xf0,
 	FS_CRS_COMMAND_ACK       = 0xf1,
+	FS_CRS_COMMAND_PING      = 0xfe,
 	FS_CRS_COMMAND_CANCEL    = 0xff
 } FS_CRS_Command_t;
 
@@ -326,6 +327,9 @@ static FS_CRS_State_t FS_CRS_State_Idle(void)
 				{
 					FS_CRS_SendNak(FS_CRS_COMMAND_READ_DIR);
 				}
+				break;
+			case FS_CRS_COMMAND_PING:
+				FS_CRS_SendAck(FS_CRS_COMMAND_PING);
 				break;
 			default:
 				FS_CRS_SendNak(packet->data[0]);
