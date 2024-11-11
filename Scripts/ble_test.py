@@ -199,7 +199,7 @@ async def list_directory(address, directory):
 async def display_gnss(address):
     async with BleakClient(address, adapter=ble_adapter) as client:
         async def gnss_notification_handler(sender, data):
-            iTOW, lon, lat, hMSL, velN, velE, velD = unpack("<L6l", data)
+            flags, iTOW, lon, lat, hMSL, velN, velE, velD = unpack("<BL6l", data)
             print(f'{iTOW/1e3:.3f}, '
                   f'{lon/1e7:.7f}, {lat/1e7:.7f}, {hMSL/1e3:.3f}, '
                   f'{velN/1e3:.3f}, {velE/1e3:.3f}, {velD/1e3:.3f}')
