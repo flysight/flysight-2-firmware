@@ -86,7 +86,7 @@ static uint32_t tx_read_index, tx_write_index;
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
-static uint8_t gnss_pv_packet[28];
+static uint8_t gnss_pv_packet[29];
 
 static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
 static uint32_t start_read_index, start_write_index;
@@ -611,13 +611,14 @@ static void Custom_GNSS_Transmit(void)
 
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-  memcpy(&gnss_pv_packet[0], &(current->iTOW), sizeof(current->iTOW));
-  memcpy(&gnss_pv_packet[4], &(current->lon), sizeof(current->lon));
-  memcpy(&gnss_pv_packet[8], &(current->lat), sizeof(current->lat));
-  memcpy(&gnss_pv_packet[12], &(current->hMSL), sizeof(current->hMSL));
-  memcpy(&gnss_pv_packet[16], &(current->velN), sizeof(current->velN));
-  memcpy(&gnss_pv_packet[20], &(current->velE), sizeof(current->velE));
-  memcpy(&gnss_pv_packet[24], &(current->velD), sizeof(current->velD));
+  memset(&gnss_pv_packet[0], 0xb0, 1);
+  memcpy(&gnss_pv_packet[1], &(current->iTOW), sizeof(current->iTOW));
+  memcpy(&gnss_pv_packet[5], &(current->lon), sizeof(current->lon));
+  memcpy(&gnss_pv_packet[9], &(current->lat), sizeof(current->lat));
+  memcpy(&gnss_pv_packet[13], &(current->hMSL), sizeof(current->hMSL));
+  memcpy(&gnss_pv_packet[17], &(current->velN), sizeof(current->velN));
+  memcpy(&gnss_pv_packet[21], &(current->velE), sizeof(current->velE));
+  memcpy(&gnss_pv_packet[25], &(current->velD), sizeof(current->velD));
 
   if (Custom_App_Context.Gnss_pv_Notification_Status)
   {

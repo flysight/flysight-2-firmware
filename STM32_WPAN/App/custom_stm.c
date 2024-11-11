@@ -71,7 +71,7 @@ typedef struct{
 /* Private variables ---------------------------------------------------------*/
 uint8_t SizeCrs_Tx = 244;
 uint8_t SizeCrs_Rx = 244;
-uint8_t SizeGnss_Pv = 28;
+uint8_t SizeGnss_Pv = 29;
 uint8_t SizeStart_Control = 1;
 uint8_t SizeStart_Result = 9;
 
