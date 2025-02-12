@@ -138,12 +138,6 @@ typedef struct _tBLEProfileGlobalContext
   uint16_t appearanceCharHandle;
 
   /**
-   * connection handle of the current active connection
-   * When not in connection, the handle is set to 0xFFFF
-   */
-  uint16_t connectionHandle;
-
-  /**
    * length of the UUID list to be used while advertising
    */
   uint8_t advtServUUIDlen;
@@ -160,11 +154,17 @@ typedef struct _tBLEProfileGlobalContext
 typedef struct
 {
   BleGlobalContext_t BleApplicationContext_legacy;
-  APP_BLE_ConnStatus_t Device_Connection_Status;
-  /* USER CODE BEGIN PTD_1*/
-  uint8_t Advertising_mgr_timer_Id;
-  /* USER CODE END PTD_1 */
-}BleApplicationContext_t;
+  /**
+   * used to identify the GAP State
+   */
+  APP_BLE_ConnStatus_t SmartPhone_Connection_Status;
+
+  /**
+   * connection handle with the Central connection (Smart Phone)
+   * When not in connection, the handle is set to 0xFFFF
+   */
+  uint16_t connectionHandleCentral;
+} BleApplicationContext_t;
 
 /* USER CODE BEGIN PTD */
 
@@ -226,6 +226,8 @@ uint8_t a_AdvData[15] =
 };
 
 /* USER CODE BEGIN PV */
+uint8_t Advertising_mgr_timer_Id;
+
 /* Advertising callback */
 void (*Adv_Callback)(void) = 0;
 void (*Next_Adv_Callback)(void) = 0;
@@ -349,8 +351,8 @@ void APP_BLE_Init(void)
   /**
    * Initialization of the BLE App Context
    */
-  BleApplicationContext.Device_Connection_Status = APP_BLE_IDLE;
-  BleApplicationContext.BleApplicationContext_legacy.connectionHandle = 0xFFFF;
+  BleApplicationContext.SmartPhone_Connection_Status = APP_BLE_IDLE;
+  BleApplicationContext.connectionHandleCentral = 0xFFFF;
 
   /**
    * From here, all initialization are BLE application specific
@@ -390,7 +392,7 @@ void APP_BLE_Init(void)
 
   /* USER CODE BEGIN APP_BLE_Init_3 */
   /* Create timer to handle the connection state machine */
-  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &(BleApplicationContext.Advertising_mgr_timer_Id), hw_ts_SingleShot, Adv_Update_Req);
+  HW_TS_Create(CFG_TIM_PROC_ID_ISR, &Advertising_mgr_timer_Id, hw_ts_SingleShot, Adv_Update_Req);
 #if 0
   /* USER CODE END APP_BLE_Init_3 */
 
@@ -433,6 +435,8 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
   tBleStatus        ret = BLE_STATUS_INVALID_PARAMS;
   hci_le_enhanced_connection_complete_event_rp0 *p_enhanced_connection_complete_event;
   hci_disconnection_complete_event_rp0        *p_disconnection_complete_event;
+  uint8_t role;
+  uint16_t connection_handle;
 #if (CFG_DEBUG_APP_TRACE != 0)
   hci_le_connection_update_complete_event_rp0 *p_connection_update_complete_event;
 #endif /* CFG_DEBUG_APP_TRACE != 0 */
@@ -449,54 +453,29 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
 
   switch (p_event_pckt->evt)
   {
-    case HCI_DISCONNECTION_COMPLETE_EVT_CODE:
+  case HCI_DISCONNECTION_COMPLETE_EVT_CODE:
+    p_disconnection_complete_event = (hci_disconnection_complete_event_rp0 *) p_event_pckt->data;
+
+    /* USER CODE BEGIN EVT_DISCONN_COMPLETE */
+
+    /* USER CODE END EVT_DISCONN_COMPLETE */
+    if (p_disconnection_complete_event->Connection_Handle == BleApplicationContext.connectionHandleCentral)
     {
-      p_disconnection_complete_event = (hci_disconnection_complete_event_rp0 *) p_event_pckt->data;
+      APP_DBG_MSG("\r\n\r** DISCONNECTION EVENT OF SMART PHONE \n\r");
+      BleApplicationContext.SmartPhone_Connection_Status = APP_BLE_IDLE;
+      BleApplicationContext.connectionHandleCentral = 0xFFFF;
 
-      if (p_disconnection_complete_event->Connection_Handle == BleApplicationContext.BleApplicationContext_legacy.connectionHandle)
-      {
-        BleApplicationContext.BleApplicationContext_legacy.connectionHandle = 0;
-        BleApplicationContext.Device_Connection_Status = APP_BLE_IDLE;
-        APP_DBG_MSG(">>== HCI_DISCONNECTION_COMPLETE_EVT_CODE\n");
-        APP_DBG_MSG("     - Connection Handle:   0x%x\n     - Reason:    0x%x\n\r",
-                    p_disconnection_complete_event->Connection_Handle,
-                    p_disconnection_complete_event->Reason);
-
-        /* USER CODE BEGIN EVT_DISCONN_COMPLETE_2 */
-
-        /* USER CODE END EVT_DISCONN_COMPLETE_2 */
-      }
-
-      /* USER CODE BEGIN EVT_DISCONN_COMPLETE_1 */
-#if 0
-      /* USER CODE END EVT_DISCONN_COMPLETE_1 */
-
-      /* restart advertising */
-      Adv_Request(APP_BLE_FAST_ADV);
-
-      /**
-       * SPECIFIC to Custom Template APP
-       */
-      HandleNotification.Custom_Evt_Opcode = CUSTOM_DISCON_HANDLE_EVT;
-      HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
-      Custom_APP_Notification(&HandleNotification);
-      /* USER CODE BEGIN EVT_DISCONN_COMPLETE */
-#endif
       if (FS_State_Get()->enable_ble)
       {
         /* restart advertising */
         FS_Adv_Request(APP_BLE_FAST_ADV);
       }
 
-      /**
-       * SPECIFIC to Custom Template APP
-       */
       HandleNotification.Custom_Evt_Opcode = CUSTOM_DISCON_HANDLE_EVT;
-      HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
+      HandleNotification.ConnectionHandle = 0xFFFF;
       Custom_APP_Notification(&HandleNotification);
-      /* USER CODE END EVT_DISCONN_COMPLETE */
-      break; /* HCI_DISCONNECTION_COMPLETE_EVT_CODE */
     }
+    break; /* HCI_DISCONNECTION_COMPLETE_EVT_CODE */
 
     case HCI_LE_META_EVT_CODE:
     {
@@ -522,59 +501,40 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           break;
 
         case HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE:
-        {
           p_enhanced_connection_complete_event = (hci_le_enhanced_connection_complete_event_rp0 *) p_meta_evt->data;
           /**
            * The connection is done, there is no need anymore to schedule the LP ADV
            */
 
-          APP_DBG_MSG(">>== HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE - Connection handle: 0x%x\n", p_enhanced_connection_complete_event->Connection_Handle);
-          APP_DBG_MSG("     - Connection established with Central: @:%02x:%02x:%02x:%02x:%02x:%02x\n",
-                      p_enhanced_connection_complete_event->Peer_Address[5],
-                      p_enhanced_connection_complete_event->Peer_Address[4],
-                      p_enhanced_connection_complete_event->Peer_Address[3],
-                      p_enhanced_connection_complete_event->Peer_Address[2],
-                      p_enhanced_connection_complete_event->Peer_Address[1],
-                      p_enhanced_connection_complete_event->Peer_Address[0]);
-          APP_DBG_MSG("     - Connection Interval:   %.2f ms\n     - Connection latency:    %d\n     - Supervision Timeout: %d ms\n\r",
-                      p_enhanced_connection_complete_event->Conn_Interval*1.25,
-                      p_enhanced_connection_complete_event->Conn_Latency,
-                      p_enhanced_connection_complete_event->Supervision_Timeout*10
-                     );
+          connection_handle = p_enhanced_connection_complete_event->Connection_Handle;
+          role = p_enhanced_connection_complete_event->Role;
+          if (role == 0x00)
+          { /* ROLE CENTRAL */
 
-          if (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_CONNECTING)
-          {
-            /* Connection as client */
-            BleApplicationContext.Device_Connection_Status = APP_BLE_CONNECTED_CLIENT;
           }
           else
           {
-            /* Connection as server */
-            BleApplicationContext.Device_Connection_Status = APP_BLE_CONNECTED_SERVER;
+            APP_DBG_MSG("-- CONNECTION SUCCESS WITH SMART PHONE\n\r");
+            BleApplicationContext.SmartPhone_Connection_Status = APP_BLE_CONNECTED;
+            BleApplicationContext.connectionHandleCentral = connection_handle;
+            HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_HANDLE_EVT;
+            HandleNotification.ConnectionHandle = connection_handle;
+            Custom_APP_Notification(&HandleNotification);
+
+            /* Stop the timer */
+            HW_TS_Stop(Advertising_mgr_timer_Id);
+
+            /* Call advertising callback */
+            if (Adv_Callback) Adv_Callback();
+
+            /* Update advertising callback */
+            Adv_Callback = Next_Adv_Callback;
+            Next_Adv_Callback = 0;
+
+            /* Configure the link */
+            UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_1);
           }
-          BleApplicationContext.BleApplicationContext_legacy.connectionHandle = p_enhanced_connection_complete_event->Connection_Handle;
-          /**
-           * SPECIFIC to Custom Template APP
-           */
-          HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_HANDLE_EVT;
-          HandleNotification.ConnectionHandle = BleApplicationContext.BleApplicationContext_legacy.connectionHandle;
-          Custom_APP_Notification(&HandleNotification);
-          /* USER CODE BEGIN HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
-          /* Stop the timer */
-          HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
-
-          /* Call advertising callback */
-          if (Adv_Callback) Adv_Callback();
-
-          /* Update advertising callback */
-          Adv_Callback = Next_Adv_Callback;
-          Next_Adv_Callback = 0;
-
-          /* Configure the link */
-          UTIL_SEQ_SetTask(1 << CFG_TASK_LINK_CONFIG_ID, CFG_SCH_PRIO_1);
-          /* USER CODE END HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
-          break; /* HCI_LE_ENHANCED_CONNECTION_COMPLETE_SUBEVT_CODE */
-        }
+          break; /* HCI_LE_CONNECTION_COMPLETE_SUBEVT_CODE */
 
         default:
           /* USER CODE BEGIN SUBEVENT_DEFAULT */
@@ -638,7 +598,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         case ACI_GAP_PASS_KEY_REQ_VSEVT_CODE:
           APP_DBG_MSG(">>== ACI_GAP_PASS_KEY_REQ_VSEVT_CODE \n");
 
-          ret = aci_gap_pass_key_resp(BleApplicationContext.BleApplicationContext_legacy.connectionHandle, CFG_FIXED_PIN);
+          ret = aci_gap_pass_key_resp(BleApplicationContext.connectionHandleCentral, CFG_FIXED_PIN);
           if (ret != BLE_STATUS_SUCCESS)
           {
             APP_DBG_MSG("==>> aci_gap_pass_key_resp : Fail, reason: 0x%x\n", ret);
@@ -658,7 +618,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                       ((aci_gap_numeric_comparison_value_event_rp0 *)(p_blecore_evt->data))->Numeric_Value);
           APP_DBG_MSG("     - Hex_value = %lx\n",
                       ((aci_gap_numeric_comparison_value_event_rp0 *)(p_blecore_evt->data))->Numeric_Value);
-          ret = aci_gap_numeric_comparison_value_confirm_yesno(BleApplicationContext.BleApplicationContext_legacy.connectionHandle, YES);
+          ret = aci_gap_numeric_comparison_value_confirm_yesno(BleApplicationContext.connectionHandleCentral, YES);
           if (ret != BLE_STATUS_SUCCESS)
           {
             APP_DBG_MSG("==>> aci_gap_numeric_comparison_value_confirm_yesno-->YES : Fail, reason: 0x%x\n", ret);
@@ -694,7 +654,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         case ACI_GATT_INDICATION_VSEVT_CODE:
         {
           APP_DBG_MSG(">>== ACI_GATT_INDICATION_VSEVT_CODE \r");
-          aci_gatt_confirm_indication(BleApplicationContext.BleApplicationContext_legacy.connectionHandle);
+          aci_gatt_confirm_indication(BleApplicationContext.connectionHandleCentral);
         }
         break;
 
@@ -722,7 +682,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
 
 APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void)
 {
-  return BleApplicationContext.Device_Connection_Status;
+  return BleApplicationContext.SmartPhone_Connection_Status;
 }
 
 /* USER CODE BEGIN FD*/
@@ -1006,7 +966,7 @@ static void Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
 
-  BleApplicationContext.Device_Connection_Status = NewStatus;
+  BleApplicationContext.SmartPhone_Connection_Status = NewStatus;
   /* Start Fast or Low Power Advertising */
   ret = aci_gap_set_discoverable(ADV_TYPE,
                                  CFG_FAST_CONN_ADV_INTERVAL_MIN,
@@ -1061,13 +1021,13 @@ static void Adv_Cancel(void)
 
   /* USER CODE END Adv_Cancel_1 */
 
-  if (BleApplicationContext.Device_Connection_Status != APP_BLE_CONNECTED_SERVER)
+  if (BleApplicationContext.SmartPhone_Connection_Status != APP_BLE_CONNECTED)
   {
     tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
 
     ret = aci_gap_set_non_discoverable();
 
-    BleApplicationContext.Device_Connection_Status = APP_BLE_IDLE;
+    BleApplicationContext.SmartPhone_Connection_Status = APP_BLE_IDLE;
     if (ret != BLE_STATUS_SUCCESS)
     {
       APP_DBG_MSG("** STOP ADVERTISING **  Failed \r\n\r");
@@ -1103,7 +1063,7 @@ void BLE_SVC_L2CAP_Conn_Update(uint16_t ConnectionHandle)
     uint16_t timeout_multiplier = L2CAP_TIMEOUT_MULTIPLIER;
     tBleStatus ret;
 
-    ret = aci_l2cap_connection_parameter_update_req(BleApplicationContext.BleApplicationContext_legacy.connectionHandle,
+    ret = aci_l2cap_connection_parameter_update_req(BleApplicationContext.connectionHandleCentral,
                                                     interval_min, interval_max,
                                                     peripheral_latency, timeout_multiplier);
     if (ret != BLE_STATUS_SUCCESS)
@@ -1127,9 +1087,9 @@ void BLE_SVC_L2CAP_Conn_Update(uint16_t ConnectionHandle)
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0)
 static void Connection_Interval_Update_Req(void)
 {
-  if (BleApplicationContext.Device_Connection_Status != APP_BLE_FAST_ADV && BleApplicationContext.Device_Connection_Status != APP_BLE_IDLE)
+  if (BleApplicationContext.SmartPhone_Connection_Status != APP_BLE_FAST_ADV && BleApplicationContext.SmartPhone_Connection_Status != APP_BLE_IDLE)
   {
-    BLE_SVC_L2CAP_Conn_Update(BleApplicationContext.BleApplicationContext_legacy.connectionHandle);
+    BLE_SVC_L2CAP_Conn_Update(BleApplicationContext.connectionHandleCentral);
   }
 
   return;
@@ -1143,7 +1103,7 @@ static void LinkConfiguration(void)
 
   /* See AN5289: How to maximize data throughput */
   APP_DBG_MSG("set data length \n");
-  status = hci_le_set_data_length(BleApplicationContext.BleApplicationContext_legacy.connectionHandle,251,2120);
+  status = hci_le_set_data_length(BleApplicationContext.connectionHandleCentral,251,2120);
   if (status != BLE_STATUS_SUCCESS)
   {
     APP_DBG_MSG("set data length command error \n");
@@ -1170,10 +1130,10 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
    * Stop the timer, it will be restarted for a new shot
    * It does not hurt if the timer was not running
    */
-  HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
+  HW_TS_Stop(Advertising_mgr_timer_Id);
 
-  if ((BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
-      || (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_ADV))
+  if ((BleApplicationContext.SmartPhone_Connection_Status == APP_BLE_FAST_ADV)
+      || (BleApplicationContext.SmartPhone_Connection_Status == APP_BLE_LP_ADV))
   {
     /* Connection in ADVERTISE mode have to stop the current advertising */
     ret = aci_gap_set_non_discoverable();
@@ -1194,7 +1154,7 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   Adv_Callback = Next_Adv_Callback;
   Next_Adv_Callback = 0;
 
-  BleApplicationContext.Device_Connection_Status = NewStatus;
+  BleApplicationContext.SmartPhone_Connection_Status = NewStatus;
 
   /**
    * Prepare white list as described in PM0271 5.3.1
@@ -1249,7 +1209,7 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 
   if (NewStatus == APP_BLE_FAST_ADV)
   {
-    HW_TS_Start(BleApplicationContext.Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
+    HW_TS_Start(Advertising_mgr_timer_Id, FAST_ADV_TIMEOUT);
   }
 
   return;
@@ -1286,7 +1246,7 @@ void APP_BLE_CancelPairing(void)
   Next_Adv_Callback = 0;
   request_pairing = 0;
 
-  if (BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
+  if (BleApplicationContext.SmartPhone_Connection_Status == APP_BLE_FAST_ADV)
   {
     /* Request low power advertising */
     FS_Adv_Request(APP_BLE_LP_ADV);
@@ -1327,7 +1287,7 @@ void APP_BLE_UpdateDeviceName(void)
   }
 
   /* Update advertising data */
-  APP_BLE_UpdateAdvertisingData(BleApplicationContext.Device_Connection_Status);
+  APP_BLE_UpdateAdvertisingData(BleApplicationContext.SmartPhone_Connection_Status);
 }
 
 void APP_BLE_Reset(void)
@@ -1346,7 +1306,7 @@ void APP_BLE_Reset(void)
   }
 
   /* Re-initialize advertising */
-  FS_Adv_Request(BleApplicationContext.Device_Connection_Status);
+  FS_Adv_Request(BleApplicationContext.SmartPhone_Connection_Status);
 }
 static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
 {
