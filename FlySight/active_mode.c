@@ -49,7 +49,7 @@ void FS_ActiveMode_Init(void)
 	bool isSystemHealthy = true;
 
 	/* Start scanning for BLE peripherals */
-    UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
 
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);

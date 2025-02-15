@@ -177,13 +177,6 @@
 
 #define CONN_L(x) ((int)((x)/0.625f))
 #define CONN_P(x) ((int)((x)/1.25f))
-#define SCAN_P (0x320)
-#define SCAN_L (0x320)
-#define CONN_P1		(CONN_P(200))
-#define CONN_P2		(CONN_P(1000))
-#define SUPERV_TIMEOUT (400)
-#define CONN_L1   (CONN_L(10))
-#define CONN_L2   (CONN_L(10))
 
   /*  L2CAP Connection Update request parameters used for test only with smart Phone */
 #define L2CAP_REQUEST_NEW_CONN_PARAM             0
@@ -194,7 +187,13 @@
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
 /* USER CODE BEGIN Specific_Parameters */
-
+#define SCAN_P (0x320)
+#define SCAN_L (0x320)
+#define CONN_P1		(CONN_P(200))
+#define CONN_P2		(CONN_P(1000))
+#define SUPERV_TIMEOUT (400)
+#define CONN_L1   (CONN_L(10))
+#define CONN_L2   (CONN_L(10))
 /* USER CODE END Specific_Parameters */
 
 /******************************************************************************

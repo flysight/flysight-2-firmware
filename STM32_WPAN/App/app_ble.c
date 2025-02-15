@@ -1636,7 +1636,7 @@ static void Scan_Request(void)
 
     result = aci_gap_start_general_discovery_proc(SCAN_P,
                                                   SCAN_L,
-												  GAP_STATIC_RANDOM_ADDR,
+                                                  CFG_BLE_ADDRESS_TYPE,
                                                   1);
     if (result == BLE_STATUS_SUCCESS)
     {
@@ -1677,8 +1677,8 @@ static void Connect_Request(void)
     result = aci_gap_create_connection(SCAN_P,
                                        SCAN_L,
                                        GAP_PUBLIC_ADDR,
-									   P2P_SERVER1_BDADDR,
-									   GAP_STATIC_RANDOM_ADDR,
+                                       P2P_SERVER1_BDADDR,
+                                       CFG_BLE_ADDRESS_TYPE,
                                        CONN_P1,
                                        CONN_P2,
                                        0,
