@@ -116,9 +116,7 @@ static void Custom_Start_result_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
-static void Custom_Activelook_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
-static void Custom_Activelook_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
@@ -262,22 +260,10 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
       /* USER CODE END CUSTOM_CONN_HANDLE_EVT */
       break;
 
-    case CUSTOM_CONN_DEV_1_HANDLE_EVT :
-      /* USER CODE BEGIN CUSTOM_CONN_DEV_1_HANDLE_EVT */
-      Custom_Activelook_OnConnect(pNotification);
-      /* USER CODE END CUSTOM_CONN_DEV_1_HANDLE_EVT */
-      break;
-
     case CUSTOM_DISCON_HANDLE_EVT :
       /* USER CODE BEGIN CUSTOM_DISCON_HANDLE_EVT */
       Custom_CRS_OnDisconnect();
       /* USER CODE END CUSTOM_DISCON_HANDLE_EVT */
-      break;
-
-    case CUSTOM_DISCON_DEV_1_HANDLE_EVT :
-      /* USER CODE BEGIN CUSTOM_DISCON_DEV_1_HANDLE_EVT */
-      Custom_Activelook_OnDisconnect();
-      /* USER CODE END CUSTOM_DISCON_DEV_1_HANDLE_EVT */
       break;
 
     default:
@@ -513,11 +499,6 @@ static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
   HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
 }
 
-static void Custom_Activelook_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
-{
-
-}
-
 static void Custom_CRS_OnDisconnect(void)
 {
   // Stop timeout timer
@@ -528,11 +509,6 @@ static void Custom_CRS_OnDisconnect(void)
 
   // Call update task
   UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-}
-
-static void Custom_Activelook_OnDisconnect(void)
-{
-
 }
 
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification)

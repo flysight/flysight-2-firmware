@@ -44,6 +44,7 @@
 /* USER CODE BEGIN Includes */
 #include "common.h"
 #include "state.h"
+#include "activelook_client.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -501,9 +502,6 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         APP_DBG_MSG("\r\n\r** DISCONNECTION EVENT OF END DEVICE 1 \n\r");
         BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
         BleApplicationContext.connectionHandleEndDevice1 = 0xFFFF;
-        HandleNotification.Custom_Evt_Opcode = CUSTOM_DISCON_DEV_1_HANDLE_EVT;
-        HandleNotification.ConnectionHandle = 0xFFFF;
-        Custom_APP_Notification(&HandleNotification);
       }
 
       if (p_disconnection_complete_event->Connection_Handle == BleApplicationContext.connectionHandleCentral)
@@ -557,23 +555,10 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           role = p_enhanced_connection_complete_event->Role;
           if (role == 0x00)
           { /* ROLE CENTRAL */
-            /* Inform Application it is End Device 1 */
-            APP_DBG_MSG("-- CONNECTION SUCCESS WITH END DEVICE 1\n\r");
-            BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_CONNECTED;
-            BleApplicationContext.connectionHandleEndDevice1 = connection_handle;
-            HandleNotification.Custom_Evt_Opcode = CUSTOM_CONN_DEV_1_HANDLE_EVT;
-            HandleNotification.ConnectionHandle = connection_handle;
-            Custom_APP_Notification(&HandleNotification);
-            result = aci_gatt_disc_all_primary_services(BleApplicationContext.connectionHandleEndDevice1);
-            if (result == BLE_STATUS_SUCCESS)
-            {
-              APP_DBG_MSG("\r\n\r** GATT SERVICES & CHARACTERISTICS DISCOVERY  \n\r");
-              APP_DBG_MSG("* GATT :  Start Searching Primary Services \r\n\r");
-            }
-            else
-            {
-              APP_DBG_MSG("BLE_CTRL_App_Notification(), All services discovery Failed \r\n\r");
-            }
+        	  APP_DBG_MSG("-- CONNECTION SUCCESS WITH END DEVICE 1\n\r");
+        	  BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_CONNECTED;
+        	  BleApplicationContext.connectionHandleEndDevice1 = connection_handle;
+        	  FS_Activelook_Client_StartDiscovery(connection_handle);
           }
           else
           {
@@ -833,6 +818,10 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           break;
         /* USER CODE END BLUE_EVT */
       }
+
+      /* AFTER you handle your own cases, also pass the event to the ActiveLook client. */
+      FS_Activelook_Client_EventHandler((void*)p_blecore_evt, HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE);
+
       break; /* HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE */
 
       /* USER CODE BEGIN EVENT_PCKT */

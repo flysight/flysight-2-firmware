@@ -37,9 +37,7 @@ extern "C" {
 typedef enum
 {
   CUSTOM_CONN_HANDLE_EVT,
-  CUSTOM_CONN_DEV_1_HANDLE_EVT,
   CUSTOM_DISCON_HANDLE_EVT,
-  CUSTOM_DISCON_DEV_1_HANDLE_EVT,
 } Custom_App_Opcode_Notification_evt_t;
 
 typedef struct
