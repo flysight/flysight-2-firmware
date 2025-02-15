@@ -281,6 +281,7 @@ static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus);
 static int8_t ble_count_bonded_devices(void);
 static void Scan_Request(void);
 static void Connect_Request(void);
+static void Disconnect_Request(void);
 /* USER CODE END PFP */
 
 /* External variables --------------------------------------------------------*/
@@ -392,6 +393,7 @@ void APP_BLE_Init(void)
   UTIL_SEQ_RegTask(1<<CFG_TASK_ADV_UPDATE_ID, UTIL_SEQ_RFU, Adv_Update);
   UTIL_SEQ_RegTask(1<<CFG_TASK_START_SCAN_ID, UTIL_SEQ_RFU, Scan_Request);
   UTIL_SEQ_RegTask(1<<CFG_TASK_CONN_DEV_1_ID, UTIL_SEQ_RFU, Connect_Request);
+  UTIL_SEQ_RegTask(1<<CFG_TASK_DISCONN_DEV_1_ID, UTIL_SEQ_RFU, Disconnect_Request);
   /* USER CODE END APP_BLE_Init_4 */
 
   /**
@@ -1705,6 +1707,33 @@ static void Connect_Request(void)
   }
 
   return;
+}
+
+/**
+ * @brief  Disconnect on SERVER 1
+ * @param  None
+ * @retval None
+ */
+static void Disconnect_Request(void)
+{
+  tBleStatus result;
+  uint16_t connection_handle = BleApplicationContext.connectionHandleEndDevice1;
+
+  APP_DBG_MSG("\r\n\r** DISCONNECT FROM END DEVICE 1 **  \r\n\r");
+  if (BleApplicationContext.EndDevice_Connection_Status[0] == APP_BLE_CONNECTED)
+  {
+    result = aci_gap_terminate(connection_handle, 0x13);
+    if (result == BLE_STATUS_SUCCESS)
+    {
+      BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
+      APP_DBG_MSG("Disconnection request sent successfully.\n");
+    }
+    else
+    {
+      BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
+      APP_DBG_MSG("Failed to send disconnection request. Error: 0x%02X\n", result);
+    }
+  }
 }
 
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */

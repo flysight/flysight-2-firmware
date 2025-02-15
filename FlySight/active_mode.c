@@ -208,6 +208,9 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
+	/* Disconnect from BLE peripherals */
+	UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
+
 	/* Disable controller */
 	FS_ActiveControl_DeInit();
 
