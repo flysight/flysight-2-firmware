@@ -686,6 +686,7 @@ typedef enum
     CFG_TASK_FS_START_UPDATE_ID,
     CFG_TASK_START_SCAN_ID,
     CFG_TASK_CONN_DEV_1_ID,
+    CFG_TASK_DISCONN_DEV_1_ID,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
