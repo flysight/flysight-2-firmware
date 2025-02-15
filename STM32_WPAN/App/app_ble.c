@@ -1625,17 +1625,6 @@ static void Scan_Request(void)
     /* USER CODE BEGIN APP_BLE_CONNECTED */
 
     /* USER CODE END APP_BLE_CONNECTED */
-    result = aci_gap_set_non_discoverable();
-    if (result != BLE_STATUS_SUCCESS)
-    {
-      APP_DBG_MSG("** STOP ADVERTISING **  Failed \r\n\r");
-    }
-    else
-    {
-      APP_DBG_MSG("  \r\n\r");
-      APP_DBG_MSG("** STOP ADVERTISING **  \r\n\r");
-    }
-
     result = aci_gap_start_general_discovery_proc(SCAN_P,
                                                   SCAN_L,
                                                   CFG_BLE_ADDRESS_TYPE,
