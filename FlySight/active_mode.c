@@ -23,6 +23,7 @@
 
 #include "main.h"
 #include "active_control.h"
+#include "activelook.h"
 #include "app_common.h"
 #include "app_fatfs.h"
 #include "audio.h"
@@ -37,7 +38,6 @@
 #include "resource_manager.h"
 #include "sensor.h"
 #include "state.h"
-#include "stm32_seq.h"
 #include "vbat.h"
 
 extern UART_HandleTypeDef huart1;
@@ -47,8 +47,8 @@ void FS_ActiveMode_Init(void)
 {
 	uint8_t enable_flags;
 
-	/* Start scanning for BLE peripherals */
-	UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+	/* Initialize Activelook interface */
+	FS_Activelook_Init();
 
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
@@ -180,8 +180,8 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
-	/* Disconnect from BLE peripherals */
-	UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
+	/* De-initialize Activelook interface */
+	FS_Activelook_DeInit();
 
 	/* Disable controller */
 	FS_ActiveControl_DeInit();
