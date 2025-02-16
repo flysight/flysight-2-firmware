@@ -24,7 +24,11 @@
 #ifndef ACTIVELOOK_H_
 #define ACTIVELOOK_H_
 
+#include "gnss.h"
+
 void FS_ActiveLook_Init(void);
 void FS_ActiveLook_DeInit(void);
+
+void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current);
 
 #endif /* ACTIVELOOK_H_ */
