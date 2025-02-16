@@ -78,21 +78,32 @@ static void FS_Activelook_SendHelloWorld(void)
     }
 
     uint8_t packet[26];
-    uint8_t index = 0;
+    uint8_t index;
 
+    index = 0;
+    packet[index++] = 0xFF;
+    packet[index++] = 0x01;     // 'clear'
+    packet[index++] = 0x00;
+    packet[index++] = 5;        // total length
+    packet[index++] = 0xAA;
+
+    APP_DBG_MSG("Activelook: Clearing screen\n");
+    FS_Activelook_Client_WriteWithoutResp(packet, index);
+
+    index = 0;
     packet[index++] = 0xFF;
     packet[index++] = 0x37;     // 'txt'
     packet[index++] = 0x00;
     packet[index++] = 26;       // total length
 
-    // s16 x=0, y=0
-    packet[index++] = 0x00; packet[index++] = 0x00;
-    packet[index++] = 0x00; packet[index++] = 0x00;
+    // s16 x=255, y=128
+    packet[index++] = 0; packet[index++] = 255;
+    packet[index++] = 0; packet[index++] = 128;
 
-    // rotation=0, font=1, color=1
-    packet[index++] = 0x00;
-    packet[index++] = 0x01;
-    packet[index++] = 0x01;
+    // rotation=0, font=2, color=15
+    packet[index++] = 4;
+    packet[index++] = 2;
+    packet[index++] = 15;
 
     const char *text = "Hello, world!";
     size_t text_len = strlen(text) + 1;
@@ -101,6 +112,6 @@ static void FS_Activelook_SendHelloWorld(void)
 
     packet[index++] = 0xAA;
 
-    APP_DBG_MSG("Activelook: Sending Hello, world!\n");
-    FS_Activelook_Client_WriteWithoutResp(packet, sizeof(packet));
+    APP_DBG_MSG("Activelook: Sending Hello, world\n");
+    FS_Activelook_Client_WriteWithoutResp(packet, index);
 }
