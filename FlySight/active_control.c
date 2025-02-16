@@ -24,6 +24,7 @@
 #include <stdbool.h>
 
 #include "main.h"
+#include "activelook.h"
 #include "app_common.h"
 #include "audio_control.h"
 #include "baro.h"
@@ -226,6 +227,9 @@ void FS_ActiveControl_DataReady_Callback(void)
 
 	// Update BLE characteristic
 	Custom_GNSS_Update(data);
+
+	// Update ActiveLook glasses
+	FS_ActiveLook_GNSS_Update(data);
 
 	hasFix = (data->gpsFix == 3);
 }

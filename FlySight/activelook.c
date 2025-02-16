@@ -29,14 +29,16 @@
 #include "stm32_seq.h"
 #include <string.h>
 
+/* State */
+static uint8_t clear_display = 0;
+
 /* Forward declaration */
 static void OnActiveLookDiscoveryComplete(void);
-static void FS_ActiveLook_SendHelloWorld(void);
 
 /* We'll define the callback struct */
 static const FS_ActiveLook_ClientCb_t s_alk_cb =
 {
-    .OnDiscoveryComplete = OnActiveLookDiscoveryComplete
+	.OnDiscoveryComplete = OnActiveLookDiscoveryComplete
 };
 
 void FS_ActiveLook_Init(void)
@@ -46,72 +48,71 @@ void FS_ActiveLook_Init(void)
 
     /* Start scanning for BLE peripherals,
        leading eventually to connect to the ActiveLook device. */
-    UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+	UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
 }
 
 void FS_ActiveLook_DeInit(void)
 {
-    /* Disconnect from BLE device #1 */
-    UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
+	/* Disconnect from BLE device #1 */
+	UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
 }
 
 /* This function is called once the client discovered the Rx characteristic. */
 static void OnActiveLookDiscoveryComplete(void)
 {
-    APP_DBG_MSG("ActiveLook: Discovery complete. Let's do 'Hello, world!'...\n");
-
-    /* Example: call your HelloWorld sending function */
-    FS_ActiveLook_SendHelloWorld();
+	APP_DBG_MSG("ActiveLook: Discovery complete\n");
+	clear_display = 1;
 }
 
-/*
- * Example function that builds the 'txt' command to display "Hello, world!"
- * as you had previously. We can call it from OnActiveLookDiscoveryComplete
- * or any time later, as long as FS_ActiveLook_Client_IsReady() is true.
- */
-static void FS_ActiveLook_SendHelloWorld(void)
+void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-    if (!FS_ActiveLook_Client_IsReady())
-    {
-        APP_DBG_MSG("ActiveLook: Not ready, cannot send Hello!\n");
-        return;
-    }
+	if (!FS_ActiveLook_Client_IsReady())
+		return;
 
-    uint8_t packet[26];
-    uint8_t index;
+	uint8_t packet[26];
+	uint8_t index, length_index;
 
-    index = 0;
-    packet[index++] = 0xFF;
-    packet[index++] = 0x01;     // 'clear'
-    packet[index++] = 0x00;
-    packet[index++] = 5;        // total length
-    packet[index++] = 0xAA;
+	if (clear_display)
+	{
+		clear_display = 0;
 
-    APP_DBG_MSG("ActiveLook: Clearing screen\n");
-    FS_ActiveLook_Client_WriteWithoutResp(packet, index);
+		index = 0;
+		packet[index++] = 0xFF;
+		packet[index++] = 0x01;     // 'clear'
+		packet[index++] = 0x00;
+		packet[index++] = 5;        // total length
+		packet[index++] = 0xAA;
 
-    index = 0;
-    packet[index++] = 0xFF;
-    packet[index++] = 0x37;     // 'txt'
-    packet[index++] = 0x00;
-    packet[index++] = 26;       // total length
+		APP_DBG_MSG("ActiveLook: Clearing screen\n");
+		FS_ActiveLook_Client_WriteWithoutResp(packet, index);
+	}
+	else
+	{
+		index = 0;
+		packet[index++] = 0xFF;
+		packet[index++] = 0x37;     // 'txt'
+		packet[index++] = 0x00;
+		length_index = index++;
 
-    // s16 x=255, y=128
-    packet[index++] = 0; packet[index++] = 255;
-    packet[index++] = 0; packet[index++] = 128;
+		// s16 x=255, y=128
+		packet[index++] = 0; packet[index++] = 255;
+		packet[index++] = 0; packet[index++] = 128;
 
-    // rotation=0, font=2, color=15
-    packet[index++] = 4;
-    packet[index++] = 2;
-    packet[index++] = 15;
+		// rotation=4, font=2, color=15
+		packet[index++] = 4;
+		packet[index++] = 2;
+		packet[index++] = 15;
 
-    const char *text = "Hello, world!";
-    size_t text_len = strlen(text) + 1;
-    memcpy(&packet[index], text, text_len);
-    index += text_len;
+		char text[14];
+		snprintf(text, 14, "t: %3lu", (current->iTOW / 1000) % 1000);
+		size_t text_len = strlen(text) + 1;
+		memcpy(&packet[index], text, text_len);
+		index += text_len;
 
-    packet[index++] = 0xAA;
+		packet[index++] = 0xAA;
+		packet[length_index] = index; // total length
 
-    APP_DBG_MSG("ActiveLook: Sending Hello, world\n");
-    FS_ActiveLook_Client_WriteWithoutResp(packet, index);
+		APP_DBG_MSG("ActiveLook: Updating GNSS\n");
+		FS_ActiveLook_Client_WriteWithoutResp(packet, index);
+	}
 }
