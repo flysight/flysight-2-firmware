@@ -558,7 +558,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         	  APP_DBG_MSG("-- CONNECTION SUCCESS WITH END DEVICE 1\n\r");
         	  BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_CONNECTED;
         	  BleApplicationContext.connectionHandleEndDevice1 = connection_handle;
-        	  FS_Activelook_Client_StartDiscovery(connection_handle);
+        	  FS_ActiveLook_Client_StartDiscovery(connection_handle);
           }
           else
           {
@@ -820,7 +820,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
       }
 
       /* AFTER you handle your own cases, also pass the event to the ActiveLook client. */
-      FS_Activelook_Client_EventHandler((void*)p_blecore_evt, HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE);
+      FS_ActiveLook_Client_EventHandler((void*)p_blecore_evt, HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE);
 
       break; /* HCI_VENDOR_SPECIFIC_DEBUG_EVT_CODE */
 
