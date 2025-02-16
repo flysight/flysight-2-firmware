@@ -5,17 +5,21 @@
 #include "dbg_trace.h"
 #include "stm32_seq.h"
 #include <string.h>
+#include <stdio.h>
 
-/* 1) Define the states for our simple state machine */
+/*----- State machine states -----*/
 typedef enum
 {
-    AL_STATE_INIT = 0,     /* Not discovered yet */
-    AL_STATE_CLEAR,        /* Need to send "clear" command next */
-    AL_STATE_READY,        /* Ready to send periodic updates */
-    AL_STATE_UPDATE        /* Need to send a new GNSS update */
+    AL_STATE_INIT = 0,       /* Not discovered yet */
+    AL_STATE_CLEAR,          /* Need to send "clear" command */
+    AL_STATE_READY,          /* Idle, waiting for GNSS data */
+    AL_STATE_UPDATE_LINE_1,  /* GNSS arrived, show multiple lines */
+    AL_STATE_UPDATE_LINE_2,
+    AL_STATE_UPDATE_LINE_3,
+    AL_STATE_UPDATE_LINE_4,
 } FS_ActiveLook_State_t;
 
-/* 2) Keep track of our current state and the last GNSS data */
+/*----- Module-level static variables -----*/
 static FS_ActiveLook_State_t s_state = AL_STATE_INIT;
 static FS_GNSS_Data_t        s_gnssDataCache;
 
@@ -23,15 +27,178 @@ static FS_GNSS_Data_t        s_gnssDataCache;
 static void FS_ActiveLook_Task(void);
 static void OnActiveLookDiscoveryComplete(void);
 
-/* Callback struct for the ActiveLook_Client */
+/* Callback struct for the ActiveLook client library */
 static const FS_ActiveLook_ClientCb_t s_alk_cb =
 {
     .OnDiscoveryComplete = OnActiveLookDiscoveryComplete
 };
 
-/******************************************************************************
- * Initialization
- *****************************************************************************/
+/*******************************************************************************
+ * Small helper to build and send a "txt" command to the ActiveLook display
+ *  - x,y in 16-bit big-endian
+ *  - rotation=4, font=2, color=15 (change as desired)
+ *  - null-terminated text
+ ******************************************************************************/
+static void AL_SendTxtCmd(uint16_t x, uint16_t y, const char *text)
+{
+    uint8_t packet[64];
+    uint8_t idx = 0;
+
+    /* Start byte + Command ID for "txt" = 0x37 + no Query ID = 0x00 */
+    packet[idx++] = 0xFF;       // start byte
+    packet[idx++] = 0x37;       // "txt" command
+    packet[idx++] = 0x00;       // format flags (0x00 means "no query ID")
+    uint8_t lengthPos = idx++;  // We'll fill total packet length here at the end
+
+    /* X coordinate (big endian) */
+    packet[idx++] = (uint8_t)(x >> 8);
+    packet[idx++] = (uint8_t)(x & 0xFF);
+
+    /* Y coordinate (big endian) */
+    packet[idx++] = (uint8_t)(y >> 8);
+    packet[idx++] = (uint8_t)(y & 0xFF);
+
+    /* rotation, font, color */
+    packet[idx++] = 4;   // rotation
+    packet[idx++] = 2;   // font
+    packet[idx++] = 15;  // color
+
+    /* Copy in the string + its null terminator */
+    size_t textLen = strlen(text) + 1;
+    memcpy(&packet[idx], text, textLen);
+    idx += textLen;
+
+    /* Footer byte */
+    packet[idx++] = 0xAA;
+
+    /* Fill total length */
+    packet[lengthPos] = idx;
+
+    /* Now send it with Write Without Response */
+    FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+}
+
+/*******************************************************************************
+ * Called by the ActiveLook client once the Rx characteristic is discovered.
+ * We'll move the state to CLEAR, meaning "clear" next, and schedule the task.
+ ******************************************************************************/
+static void OnActiveLookDiscoveryComplete(void)
+{
+    APP_DBG_MSG("ActiveLook: Discovery complete\n");
+    s_state = AL_STATE_CLEAR;
+    UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+}
+
+/*******************************************************************************
+ * Called from your GNSS logic whenever new GNSS data is available.
+ * If we're READY, copy data, set state=UPDATE_SETUP, and schedule the task.
+ * Otherwise skip it.
+ ******************************************************************************/
+void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
+{
+    /* Only queue an update if we are discovered & idle. */
+    if (!FS_ActiveLook_Client_IsReady())
+    {
+        /* Possibly disconnected or not discovered. */
+        return;
+    }
+
+    if (s_state == AL_STATE_READY)
+    {
+        /* Cache the data for later use */
+        s_gnssDataCache = *current;
+
+        /* We'll do multiple lines */
+        s_state = AL_STATE_UPDATE_LINE_1;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+    }
+    else
+    {
+        APP_DBG_MSG("ActiveLook_GNSS_Update: State %d, ignoring.\n", s_state);
+    }
+}
+
+/*******************************************************************************
+ * Our main sequencer task. We handle the state machine, sending WWR commands
+ * without blocking. Each line is sent in a separate state so that we don't
+ * bombard the BLE stack with multiple WWR calls in a single pass.
+ ******************************************************************************/
+static void FS_ActiveLook_Task(void)
+{
+    char tmp[32];
+
+    switch (s_state)
+    {
+    case AL_STATE_INIT:
+        /* Not discovered yet, do nothing */
+        break;
+
+    case AL_STATE_CLEAR:
+    {
+        /* Example "clear" packet:
+         * 0xFF 0x35 0x00 0x05  0xAA
+         * Adjust if your firmware uses a different ID. */
+        uint8_t packet[5];
+        packet[0] = 0xFF;  // start
+        packet[1] = 0x35;  // "clear" command ID
+        packet[2] = 0x00;  // format
+        packet[3] = 5;     // total length
+        packet[4] = 0xAA;  // footer
+        APP_DBG_MSG("ActiveLook: Clearing display...\n");
+        FS_ActiveLook_Client_WriteWithoutResp(packet, sizeof(packet));
+
+        /* Now go idle. Wait for FS_ActiveLook_GNSS_Update to set us to "update" */
+        s_state = AL_STATE_READY;
+        break;
+    }
+
+    case AL_STATE_READY:
+        /* Idle: no action */
+        break;
+
+    case AL_STATE_UPDATE_LINE_1:
+        /* Heading (s_gnssDataCache.heading), at y=93 */
+        /* Example: "HDG: 123"  - you might scale heading if needed */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
+        AL_SendTxtCmd(255, 93, tmp);
+
+        /* Next line */
+        s_state = AL_STATE_UPDATE_LINE_2;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_UPDATE_LINE_2:
+        /* Horizontal speed (s_gnssDataCache.gSpeed/100) at y=128 */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.gSpeed/100));
+        AL_SendTxtCmd(255, 128, tmp);
+
+        s_state = AL_STATE_UPDATE_LINE_3;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_UPDATE_LINE_3:
+        /* Vertical speed (s_gnssDataCache.velD / 1000) at y=163 */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.velD/1000));
+        AL_SendTxtCmd(255, 163, tmp);
+
+        s_state = AL_STATE_UPDATE_LINE_4;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_UPDATE_LINE_4:
+        /* Elevation (s_gnssDataCache.hMSL / 1000) at y=198 */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.hMSL/1000));
+        AL_SendTxtCmd(255, 198, tmp);
+
+        /* Done with this update. Return to READY. */
+        s_state = AL_STATE_READY;
+        break;
+    }
+}
+
+/*******************************************************************************
+ * Standard init/deinit for ActiveLook
+ ******************************************************************************/
 void FS_ActiveLook_Init(void)
 {
     /* Register the callback for discovery */
@@ -43,135 +210,12 @@ void FS_ActiveLook_Init(void)
     /* Start in the INIT state */
     s_state = AL_STATE_INIT;
 
-    /* If you want to automatically scan/connect to ActiveLook now: */
+    /* If we want to automatically scan/connect: */
     UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
 }
 
-/******************************************************************************
- * De-initialization
- *****************************************************************************/
 void FS_ActiveLook_DeInit(void)
 {
-    /* If we want to disconnect from the device #1: */
+    /* Disconnect from the device if desired */
     UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
-}
-
-/******************************************************************************
- * Called by the ActiveLook client once the Rx char is discovered.
- * We'll move the state to CLEAR, meaning "send Clear next" and schedule the task.
- *****************************************************************************/
-static void OnActiveLookDiscoveryComplete(void)
-{
-    APP_DBG_MSG("ActiveLook: Discovery complete\n");
-    s_state = AL_STATE_CLEAR;  /* We want to send a 'clear' next. */
-    UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-}
-
-/******************************************************************************
- * Called from your GNSS logic whenever new GNSS data is available.
- * If we're in READY state, copy the data, set state=UPDATE, schedule the task.
- * If not ready, we skip it.
- *****************************************************************************/
-void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
-{
-    /* We only want to queue an update if we're in AL_STATE_READY. */
-    if (!FS_ActiveLook_Client_IsReady())
-    {
-        /* Not actually ready to send. It's discovered, but
-         * maybe the BLE link has disconnected. Possibly do nothing here. */
-        return;
-    }
-
-    if (s_state == AL_STATE_READY)
-    {
-        /* Copy the GNSS data for later use by FS_ActiveLook_Task() */
-        s_gnssDataCache = *current;
-
-        /* Now we want to send an update next time the task runs. */
-        s_state = AL_STATE_UPDATE;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-    }
-    else
-    {
-        /* If we are still in CLEAR or UPDATE, or if not discovered, skip. */
-        APP_DBG_MSG("ActiveLook_GNSS_Update: Not in READY, ignoring.\n");
-    }
-}
-
-/******************************************************************************
- * This function is our "Task" in the sequencer, managing the state machine.
- * Each time we set s_state, we do UTIL_SEQ_SetTask(...). That eventually
- * calls here, which checks the current state and does the appropriate BLE write.
- *****************************************************************************/
-static void FS_ActiveLook_Task(void)
-{
-    /* We'll build short packets on the stack. */
-    uint8_t packet[64];
-    uint8_t idx = 0;
-
-    switch (s_state)
-    {
-    case AL_STATE_INIT:
-        /* Haven't discovered the characteristic yet. Nothing to do. */
-        break;
-
-    case AL_STATE_CLEAR:
-        /* Build a 'clear' command. (Check your doc for exact ID or format.)
-         * Example: 0xFF 0x35 0x00 0x08  0x00 0x00 0x00 0xAA
-         * We'll do a simple 5-byte version if your firmware supports it. */
-        idx = 0;
-        packet[idx++] = 0xFF;  // Start
-        packet[idx++] = 0x35;  // Clear command ID (for example)
-        packet[idx++] = 0x00;  // Format
-        packet[idx++] = 5;     // Packet length
-        packet[idx++] = 0xAA;  // Footer
-
-        APP_DBG_MSG("ActiveLook: Sending CLEAR...\n");
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Move to READY state. Next GNSS update will cause text to be drawn. */
-        s_state = AL_STATE_READY;
-        break;
-
-    case AL_STATE_READY:
-    default:
-        /* No action needed. */
-        break;
-
-    case AL_STATE_UPDATE:
-        /* Build a small 'txt' command using s_gnssDataCache. For example: */
-
-        idx = 0;
-        packet[idx++] = 0xFF;   // Start
-        packet[idx++] = 0x37;   // "txt" command
-        packet[idx++] = 0x00;   // Format: no query ID
-        const uint8_t lengthPos = idx++; // We'll fill total length at the end
-
-        /* For example, x=255, y=128, rotation=4, font=2, color=15 */
-        packet[idx++] = 0x00; packet[idx++] = 255; // x=255 (big-endian might be 0x00, 0xFF)
-        packet[idx++] = 0x00; packet[idx++] = 128; // y=128
-        packet[idx++] = 4;    // rotation
-        packet[idx++] = 2;    // font
-        packet[idx++] = 15;   // color
-
-        /* Build a short text from s_gnssDataCache. For instance: */
-        char text[20];
-        snprintf(text, sizeof(text), "iTOW:%lu", (unsigned long)(s_gnssDataCache.iTOW/1000));
-        size_t textLen = strlen(text) + 1; /* +1 for '\0' terminator */
-        memcpy(&packet[idx], text, textLen);
-        idx += textLen;
-
-        /* Footer */
-        packet[idx++] = 0xAA;
-
-        /* Fill in total length at 'lengthPos' */
-        packet[lengthPos] = idx;
-
-        APP_DBG_MSG("ActiveLook: Sending GNSS update...\n");
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* After sending it, return to READY. Next new GNSS data triggers another update. */
-        s_state = AL_STATE_READY;
-        break;
-    }
 }
