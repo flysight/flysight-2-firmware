@@ -34,7 +34,7 @@
               | ((uint16_t)(*(((uint8_t *)(ptr))+1)) << 8U) )
 #endif
 
-/* 16-byte UUID for the Activelook Commands service
+/* 16-byte UUID for the ActiveLook Commands service
  * 0783B03E-8535-B5A0-7140-A304D2495CB7 */
 static const uint8_t ACTIVELK_SERVICE_UUID[16] =
 {
@@ -73,15 +73,15 @@ typedef struct
     uint8_t  rxCharFound;
     uint16_t rxCharHandle;
 
-    const FS_Activelook_ClientCb_t *cb;
-} FS_Activelook_Client_Context_t;
+    const FS_ActiveLook_ClientCb_t *cb;
+} FS_ActiveLook_Client_Context_t;
 
-static FS_Activelook_Client_Context_t g_ctx;
+static FS_ActiveLook_Client_Context_t g_ctx;
 
 /******************************************************************************
  * Initialize
  ******************************************************************************/
-void FS_Activelook_Client_Init(void)
+void FS_ActiveLook_Client_Init(void)
 {
     memset(&g_ctx, 0, sizeof(g_ctx));
     g_ctx.discState = DISC_STATE_IDLE;
@@ -90,7 +90,7 @@ void FS_Activelook_Client_Init(void)
 /******************************************************************************
  * Register optional callback interface
  ******************************************************************************/
-void FS_Activelook_Client_RegisterCb(const FS_Activelook_ClientCb_t *cb)
+void FS_ActiveLook_Client_RegisterCb(const FS_ActiveLook_ClientCb_t *cb)
 {
     g_ctx.cb = cb;
 }
@@ -98,7 +98,7 @@ void FS_Activelook_Client_RegisterCb(const FS_Activelook_ClientCb_t *cb)
 /******************************************************************************
  * Start discovery (including MTU exchange) after connecting
  ******************************************************************************/
-void FS_Activelook_Client_StartDiscovery(uint16_t connectionHandle)
+void FS_ActiveLook_Client_StartDiscovery(uint16_t connectionHandle)
 {
     g_ctx.connHandle = connectionHandle;
     g_ctx.discState  = DISC_STATE_EXCH_MTU;  /* <--- Start with MTU exchange */
@@ -112,11 +112,11 @@ void FS_Activelook_Client_StartDiscovery(uint16_t connectionHandle)
     tBleStatus s = aci_gatt_exchange_config(connectionHandle);
     if (s == BLE_STATUS_SUCCESS)
     {
-        APP_DBG_MSG("ActivelookClient: Requesting MTU exchange...\n");
+        APP_DBG_MSG("ActiveLook_Client: Requesting MTU exchange...\n");
     }
     else
     {
-        APP_DBG_MSG("ActivelookClient: aci_gatt_exchange_config fail=0x%02X\n", s);
+        APP_DBG_MSG("ActiveLook_Client: aci_gatt_exchange_config fail=0x%02X\n", s);
         g_ctx.discState = DISC_STATE_IDLE;  // stop
     }
 }
@@ -124,7 +124,7 @@ void FS_Activelook_Client_StartDiscovery(uint16_t connectionHandle)
 /******************************************************************************
  * Event Handler
  ******************************************************************************/
-void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_evt_code)
+void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_evt_code)
 {
     evt_blecore_aci *blecore_evt = (evt_blecore_aci*) p_blecore_evt;
 
@@ -138,7 +138,7 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
             /* This event indicates the peripheral accepted some MTU.  */
             aci_att_exchange_mtu_resp_event_rp0 *mtu_resp =
                 (aci_att_exchange_mtu_resp_event_rp0*) blecore_evt->data;
-            APP_DBG_MSG("ActivelookClient: ACI_ATT_EXCHANGE_MTU_RESP, final MTU=%d\r\n",
+            APP_DBG_MSG("ActiveLook_Client: ACI_ATT_EXCHANGE_MTU_RESP, final MTU=%d\r\n",
                         mtu_resp->Server_RX_MTU);
             /* We still must wait for ACI_GATT_PROC_COMPLETE_VSEVT_CODE, which
                means the procedure is fully done in the stack. */
@@ -165,11 +165,11 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                 tBleStatus s = aci_gatt_disc_all_primary_services(g_ctx.connHandle);
                 if (s == BLE_STATUS_SUCCESS)
                 {
-                    APP_DBG_MSG("ActivelookClient: MTU ok, now discovering service...\n");
+                    APP_DBG_MSG("ActiveLook_Client: MTU ok, now discovering service...\n");
                 }
                 else
                 {
-                    APP_DBG_MSG("ActivelookClient: disc_all_primary_services fail=0x%02X\n", s);
+                    APP_DBG_MSG("ActiveLook_Client: disc_all_primary_services fail=0x%02X\n", s);
                     g_ctx.discState = DISC_STATE_IDLE;
                 }
             }
@@ -185,17 +185,17 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                                        g_ctx.serviceEndHandle );
                     if (s == BLE_STATUS_SUCCESS)
                     {
-                        APP_DBG_MSG("ActivelookClient: Discovering chars...\n");
+                        APP_DBG_MSG("ActiveLook_Client: Discovering chars...\n");
                     }
                     else
                     {
-                        APP_DBG_MSG("ActivelookClient: disc_all_char_of_service fail=0x%02X\n", s);
+                        APP_DBG_MSG("ActiveLook_Client: disc_all_char_of_service fail=0x%02X\n", s);
                         g_ctx.discState = DISC_STATE_IDLE;
                     }
                 }
                 else
                 {
-                    APP_DBG_MSG("ActivelookClient: service not found.\n");
+                    APP_DBG_MSG("ActiveLook_Client: service not found.\n");
                     g_ctx.discState = DISC_STATE_IDLE;
                 }
             }
@@ -203,7 +203,7 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
             {
                 /* Done discovering characteristics. */
                 g_ctx.discState = DISC_STATE_IDLE;
-                APP_DBG_MSG("ActivelookClient: Char discovery complete, Rx=0x%04X\n",
+                APP_DBG_MSG("ActiveLook_Client: Char discovery complete, Rx=0x%04X\n",
                             g_ctx.rxCharHandle);
 
                 if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
@@ -233,7 +233,7 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
 
                     if (memcmp(uuid, ACTIVELK_SERVICE_UUID, 16) == 0)
                     {
-                        APP_DBG_MSG("ActivelookClient: Found Service 0x%04X–0x%04X\n", startHdl, endHdl);
+                        APP_DBG_MSG("ActiveLook_Client: Found Service 0x%04X–0x%04X\n", startHdl, endHdl);
                         g_ctx.serviceFound       = 1;
                         g_ctx.serviceStartHandle = startHdl;
                         g_ctx.serviceEndHandle   = endHdl;
@@ -267,7 +267,7 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
 
                     if (memcmp(uuid, ACTIVELK_RX_CHAR_UUID, 16) == 0)
                     {
-                        APP_DBG_MSG("ActivelookClient: Found RxChar=0x%04X\n", valH);
+                        APP_DBG_MSG("ActiveLook_Client: Found RxChar=0x%04X\n", valH);
                         g_ctx.rxCharFound  = 1;
                         g_ctx.rxCharHandle = valH;
                     }
@@ -284,7 +284,7 @@ void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
 /******************************************************************************
  * Check if Rx handle is ready
  ******************************************************************************/
-uint8_t FS_Activelook_Client_IsReady(void)
+uint8_t FS_ActiveLook_Client_IsReady(void)
 {
     return (g_ctx.rxCharFound && g_ctx.rxCharHandle != 0);
 }
@@ -292,11 +292,11 @@ uint8_t FS_Activelook_Client_IsReady(void)
 /******************************************************************************
  * Write data to Rx characteristic (WWR)
  ******************************************************************************/
-tBleStatus FS_Activelook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length)
+tBleStatus FS_ActiveLook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length)
 {
-    if (!FS_Activelook_Client_IsReady())
+    if (!FS_ActiveLook_Client_IsReady())
     {
-        APP_DBG_MSG("ActivelookClient: Not ready, no Rx handle.\n");
+        APP_DBG_MSG("ActiveLook_Client: Not ready, no Rx handle.\n");
         return BLE_STATUS_FAILED;
     }
 
@@ -306,7 +306,7 @@ tBleStatus FS_Activelook_Client_WriteWithoutResp(const uint8_t *data, uint16_t l
                                                (uint8_t*)data);
     if (s != BLE_STATUS_SUCCESS)
     {
-        APP_DBG_MSG("ActivelookClient: WWR error=0x%02X\n", s);
+        APP_DBG_MSG("ActiveLook_Client: WWR error=0x%02X\n", s);
     }
     return s;
 }

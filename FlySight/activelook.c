@@ -30,50 +30,50 @@
 #include <string.h>
 
 /* Forward declaration */
-static void OnActivelookDiscoveryComplete(void);
-static void FS_Activelook_SendHelloWorld(void);
+static void OnActiveLookDiscoveryComplete(void);
+static void FS_ActiveLook_SendHelloWorld(void);
 
 /* We'll define the callback struct */
-static const FS_Activelook_ClientCb_t s_alk_cb =
+static const FS_ActiveLook_ClientCb_t s_alk_cb =
 {
-    .OnDiscoveryComplete = OnActivelookDiscoveryComplete
+    .OnDiscoveryComplete = OnActiveLookDiscoveryComplete
 };
 
-void FS_Activelook_Init(void)
+void FS_ActiveLook_Init(void)
 {
     /* Register the callback before scanning/connecting. */
-    FS_Activelook_Client_RegisterCb(&s_alk_cb);
+	FS_ActiveLook_Client_RegisterCb(&s_alk_cb);
 
     /* Start scanning for BLE peripherals,
-       leading eventually to connect to the Activelook device. */
+       leading eventually to connect to the ActiveLook device. */
     UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
 }
 
-void FS_Activelook_DeInit(void)
+void FS_ActiveLook_DeInit(void)
 {
     /* Disconnect from BLE device #1 */
     UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
 }
 
 /* This function is called once the client discovered the Rx characteristic. */
-static void OnActivelookDiscoveryComplete(void)
+static void OnActiveLookDiscoveryComplete(void)
 {
-    APP_DBG_MSG("Activelook: Discovery complete. Let's do 'Hello, world!'...\n");
+    APP_DBG_MSG("ActiveLook: Discovery complete. Let's do 'Hello, world!'...\n");
 
     /* Example: call your HelloWorld sending function */
-    FS_Activelook_SendHelloWorld();
+    FS_ActiveLook_SendHelloWorld();
 }
 
 /*
  * Example function that builds the 'txt' command to display "Hello, world!"
- * as you had previously. We can call it from OnActivelookDiscoveryComplete
- * or any time later, as long as FS_Activelook_Client_IsReady() is true.
+ * as you had previously. We can call it from OnActiveLookDiscoveryComplete
+ * or any time later, as long as FS_ActiveLook_Client_IsReady() is true.
  */
-static void FS_Activelook_SendHelloWorld(void)
+static void FS_ActiveLook_SendHelloWorld(void)
 {
-    if (!FS_Activelook_Client_IsReady())
+    if (!FS_ActiveLook_Client_IsReady())
     {
-        APP_DBG_MSG("Activelook: Not ready, cannot send Hello!\n");
+        APP_DBG_MSG("ActiveLook: Not ready, cannot send Hello!\n");
         return;
     }
 
@@ -87,8 +87,8 @@ static void FS_Activelook_SendHelloWorld(void)
     packet[index++] = 5;        // total length
     packet[index++] = 0xAA;
 
-    APP_DBG_MSG("Activelook: Clearing screen\n");
-    FS_Activelook_Client_WriteWithoutResp(packet, index);
+    APP_DBG_MSG("ActiveLook: Clearing screen\n");
+    FS_ActiveLook_Client_WriteWithoutResp(packet, index);
 
     index = 0;
     packet[index++] = 0xFF;
@@ -112,6 +112,6 @@ static void FS_Activelook_SendHelloWorld(void)
 
     packet[index++] = 0xAA;
 
-    APP_DBG_MSG("Activelook: Sending Hello, world\n");
-    FS_Activelook_Client_WriteWithoutResp(packet, index);
+    APP_DBG_MSG("ActiveLook: Sending Hello, world\n");
+    FS_ActiveLook_Client_WriteWithoutResp(packet, index);
 }

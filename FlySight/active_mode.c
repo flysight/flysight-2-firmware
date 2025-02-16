@@ -48,8 +48,8 @@ void FS_ActiveMode_Init(void)
 	uint8_t enable_flags;
 	bool isSystemHealthy = true;
 
-	/* Initialize Activelook interface */
-	FS_Activelook_Init();
+	/* Initialize ActiveLook interface */
+	FS_ActiveLook_Init();
 
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
@@ -208,8 +208,8 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
-	/* De-initialize Activelook interface */
-	FS_Activelook_DeInit();
+	/* De-initialize ActiveLook interface */
+	FS_ActiveLook_DeInit();
 
 	/* Disable controller */
 	FS_ActiveControl_DeInit();
