@@ -30,15 +30,15 @@
 typedef struct
 {
     void (*OnDiscoveryComplete)(void);
-} FS_Activelook_ClientCb_t;
+} FS_ActiveLook_ClientCb_t;
 
-void FS_Activelook_Client_Init(void);
-void FS_Activelook_Client_RegisterCb(const FS_Activelook_ClientCb_t *cb);
-void FS_Activelook_Client_StartDiscovery(uint16_t connectionHandle);
+void FS_ActiveLook_Client_Init(void);
+void FS_ActiveLook_Client_RegisterCb(const FS_ActiveLook_ClientCb_t *cb);
+void FS_ActiveLook_Client_StartDiscovery(uint16_t connectionHandle);
 
-void FS_Activelook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_evt_code);
+void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_evt_code);
 
-uint8_t FS_Activelook_Client_IsReady(void);
-tBleStatus FS_Activelook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length);
+uint8_t FS_ActiveLook_Client_IsReady(void);
+tBleStatus FS_ActiveLook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length);
 
 #endif /* ACTIVELOOK_CLIENT_H */

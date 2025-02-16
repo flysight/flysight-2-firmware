@@ -24,7 +24,7 @@
 #ifndef ACTIVELOOK_H_
 #define ACTIVELOOK_H_
 
-void FS_Activelook_Init(void);
-void FS_Activelook_DeInit(void);
+void FS_ActiveLook_Init(void);
+void FS_ActiveLook_DeInit(void);
 
 #endif /* ACTIVELOOK_H_ */
