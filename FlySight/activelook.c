@@ -140,7 +140,7 @@ static void FS_ActiveLook_Task(void)
          * Adjust if your firmware uses a different ID. */
         uint8_t packet[5];
         packet[0] = 0xFF;  // start
-        packet[1] = 0x35;  // "clear" command ID
+        packet[1] = 0x01;  // "clear" command ID
         packet[2] = 0x00;  // format
         packet[3] = 5;     // total length
         packet[4] = 0xAA;  // footer
