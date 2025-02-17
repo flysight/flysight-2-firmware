@@ -160,7 +160,7 @@ static void FS_ActiveLook_Task(void)
         /* Heading (s_gnssDataCache.heading), at y=93 */
         /* Example: "HDG: 123"  - you might scale heading if needed */
         snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
-        AL_SendTxtCmd(255, 93, tmp);
+        AL_SendTxtCmd(255, 208, tmp);
 
         /* Next line */
         s_state = AL_STATE_UPDATE_LINE_2;
@@ -170,7 +170,7 @@ static void FS_ActiveLook_Task(void)
     case AL_STATE_UPDATE_LINE_2:
         /* Horizontal speed (s_gnssDataCache.gSpeed/100) at y=128 */
         snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.gSpeed/100));
-        AL_SendTxtCmd(255, 128, tmp);
+        AL_SendTxtCmd(255, 168, tmp);
 
         s_state = AL_STATE_UPDATE_LINE_3;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
@@ -179,7 +179,7 @@ static void FS_ActiveLook_Task(void)
     case AL_STATE_UPDATE_LINE_3:
         /* Vertical speed (s_gnssDataCache.velD / 1000) at y=163 */
         snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.velD/1000));
-        AL_SendTxtCmd(255, 163, tmp);
+        AL_SendTxtCmd(255, 128, tmp);
 
         s_state = AL_STATE_UPDATE_LINE_4;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
@@ -188,7 +188,7 @@ static void FS_ActiveLook_Task(void)
     case AL_STATE_UPDATE_LINE_4:
         /* Elevation (s_gnssDataCache.hMSL / 1000) at y=198 */
         snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.hMSL/1000));
-        AL_SendTxtCmd(255, 198, tmp);
+        AL_SendTxtCmd(255, 88, tmp);
 
         /* Done with this update. Return to READY. */
         s_state = AL_STATE_READY;
