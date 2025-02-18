@@ -20,10 +20,7 @@ typedef enum
     AL_STATE_CFG_SET,
     AL_STATE_CLEAR,          /* Need to send "clear" command */
     AL_STATE_READY,          /* Idle, waiting for GNSS data */
-    AL_STATE_UPDATE_LINE_1,  /* GNSS arrived, show multiple lines */
-    AL_STATE_UPDATE_LINE_2,
-    AL_STATE_UPDATE_LINE_3,
-    AL_STATE_UPDATE_LINE_4,
+    AL_STATE_UPDATE,         /* GNSS arrived, update page */
 } FS_ActiveLook_State_t;
 
 /*----- Module-level static variables -----*/
@@ -70,8 +67,8 @@ void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
         /* Cache the data for later use */
         s_gnssDataCache = *current;
 
-        /* We'll do multiple lines */
-        s_state = AL_STATE_UPDATE_LINE_1;
+        /* Update the page */
+        s_state = AL_STATE_UPDATE;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
     }
     else
@@ -101,7 +98,6 @@ static void AL_SendRaw(const uint8_t *data, uint16_t length)
  ******************************************************************************/
 static uint8_t AL_BuildLayout(
     uint8_t layoutId,
-    uint8_t yOffset,
     uint8_t  *outBuf
 )
 {
@@ -124,7 +120,7 @@ static uint8_t AL_BuildLayout(
     outBuf[idx++] = 0x00;  // x lo
 
     // Y (1 byte!)
-    outBuf[idx++] = yOffset;
+    outBuf[idx++] = 0x00;
 
     // Width (2 bytes, MSB first). E.g. 304 => 0x01,0x30
     outBuf[idx++] = 0x01;  // width hi
@@ -172,6 +168,122 @@ static uint8_t AL_BuildLayout(
     outBuf[idx++] = 0xAA;
 
     // Fill total length
+    outBuf[lenPos] = idx;
+    return idx;
+}
+
+/*******************************************************************************
+ * Build a "pageSave" command with 4 sublayouts. We'll call it ID=10, referencing
+ * layoutIds=1..4, each at offset x=0,y=0 inside the page.
+ *
+ * Return the final length so caller can AL_SendRaw() it.
+ ******************************************************************************/
+static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
+{
+    /* pageSave => command=0x80.
+       Format => 0x00 => 1-byte length.
+       The structure is: pageId, then for each sublayout:
+         layoutId(1B), x(2B?), y(2B?), ...
+       The exact number of bytes for x,y depends on your firmware doc.
+       We'll assume x=2 bytes, y=2 bytes for safety. Or if doc says otherwise, adapt.
+    */
+    uint8_t idx = 0;
+
+    outBuf[idx++] = 0xFF;  // start
+    outBuf[idx++] = 0x80;  // "pageSave"
+    outBuf[idx++] = 0x00;  // format => 1B length
+    uint8_t lenPos = idx++;
+
+    outBuf[idx++] = pageId;
+
+    // We have 4 sublayouts: layout #1..4
+    // Each sublayout => layoutId(1B), x(2B), y(2B)
+    // We'll set x=0,y=0 for each.
+
+    // sublayout #1
+    outBuf[idx++] = 10; // layoutId
+    outBuf[idx++] = 0x00; // x hi
+    outBuf[idx++] = 0x00; // x lo
+    outBuf[idx++] = 168; // y lo
+
+    // sublayout #2
+    outBuf[idx++] = 11;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 128;
+
+    // sublayout #3
+    outBuf[idx++] = 12;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 88;
+
+    // sublayout #4
+    outBuf[idx++] = 13;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 48;
+
+    // Footer
+    outBuf[idx++] = 0xAA;
+
+    // Fill length
+    outBuf[lenPos] = idx;
+
+    return idx;
+}
+
+/*******************************************************************************
+ * Build a single "pageClearAndDisplay" command with 4 text arguments,
+ * separated by '\0'. That is the entire update in one WWR call.
+ ******************************************************************************/
+static uint8_t AL_BuildPageUpdate(uint8_t pageId,
+                                  const char *line1,
+                                  const char *line2,
+                                  const char *line3,
+                                  const char *line4,
+                                  uint8_t *outBuf)
+{
+    /* layoutClearAndDisplay or pageClearAndDisplay => 0x6A
+       structure => [ pageId, line1\0 line2\0 line3\0 line4\0 ]
+    */
+    uint8_t idx = 0;
+
+    outBuf[idx++] = 0xFF;
+    outBuf[idx++] = 0x86; // "pageClearAndDisplay"
+    outBuf[idx++] = 0x00; // format => 1B length
+    uint8_t lenPos = idx++;
+
+    outBuf[idx++] = pageId;
+
+    // Copy line1 plus a null
+    size_t l1 = strlen(line1);
+    memcpy(&outBuf[idx], line1, l1);
+    idx += l1;
+    outBuf[idx++] = 0;
+
+    // line2
+    size_t l2 = strlen(line2);
+    memcpy(&outBuf[idx], line2, l2);
+    idx += l2;
+    outBuf[idx++] = 0;
+
+    // line3
+    size_t l3 = strlen(line3);
+    memcpy(&outBuf[idx], line3, l3);
+    idx += l3;
+    outBuf[idx++] = 0;
+
+    // line4
+    size_t l4 = strlen(line4);
+    memcpy(&outBuf[idx], line4, l4);
+    idx += l4;
+    outBuf[idx++] = 0;
+
+    // Footer
+    outBuf[idx++] = 0xAA;
+
+    // fill length
     outBuf[lenPos] = idx;
     return idx;
 }
@@ -240,41 +352,41 @@ static void FS_ActiveLook_Task(void)
     }
 
     case AL_STATE_SETUP_L1:
-        length = AL_BuildLayout(10, 168, buf);
+        length = AL_BuildLayout(10, buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #1 defined.\n");
-
-        /* Next config step */
         s_state = AL_STATE_SETUP_L2;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
 
     case AL_STATE_SETUP_L2:
-        length = AL_BuildLayout(11, 128, buf);
+        length = AL_BuildLayout(11, buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #2 defined.\n");
-
-        /* Next config step */
         s_state = AL_STATE_SETUP_L3;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
 
     case AL_STATE_SETUP_L3:
-        length = AL_BuildLayout(12, 88, buf);
+        length = AL_BuildLayout(12, buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #3 defined.\n");
-
-        /* Next config step */
         s_state = AL_STATE_SETUP_L4;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
 
     case AL_STATE_SETUP_L4:
-        length = AL_BuildLayout(13, 48, buf);
+        length = AL_BuildLayout(13, buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #4 defined.\n");
+        s_state = AL_STATE_SETUP_PAGE;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
 
-        /* Next config step */
+    case AL_STATE_SETUP_PAGE:
+        length = AL_BuildPage(10, buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("Page #10 referencing layouts #10..#13 defined.\n");
         s_state = AL_STATE_CFG_SET;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
@@ -338,137 +450,23 @@ static void FS_ActiveLook_Task(void)
         /* Idle: no action */
         break;
 
-    case AL_STATE_UPDATE_LINE_1:
+
+    case AL_STATE_UPDATE:
     {
-        uint8_t packet[128];
-        uint8_t idx = 0;
+        /* Build 4 strings from our GNSS data. Then do a single "pageClearAndDisplay" */
+        char line1[16], line2[16], line3[16], line4[16];
+        snprintf(line1, sizeof(line1), "%ld",(long)(s_gnssDataCache.heading));
+        snprintf(line2, sizeof(line2), "%ld",(long)(s_gnssDataCache.gSpeed/100));
+        snprintf(line3, sizeof(line3), "%ld",(long)(s_gnssDataCache.velD/1000));
+        snprintf(line4, sizeof(line4), "%ld",(long)(s_gnssDataCache.hMSL/1000));
 
-        packet[idx++] = 0xFF;  // start
-        packet[idx++] = 0x62;  // "layoutDisplay" command ID
-        packet[idx++] = 0x00;  // format
-        uint8_t lenPos = idx++;
+        length = AL_BuildPageUpdate(10, line1, line2, line3, line4, buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("ActiveLook: Page #10 updated with heading/speed/etc.\n");
 
-        packet[idx++] = 10;    // layout ID
-
-        /* Copy in the string */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
-        size_t textLen = strlen(tmp);
-        memcpy(&packet[idx], tmp, textLen);
-        idx += textLen;
-
-        /* Footer byte */
-        packet[idx++] = 0xAA;
-
-        /* Fill total length */
-        packet[lenPos] = idx;
-
-        /* Now send it with Write Without Response */
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Next line */
-        s_state = AL_STATE_UPDATE_LINE_2;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-        break;
-    }
-
-    case AL_STATE_UPDATE_LINE_2:
-    {
-        uint8_t packet[128];
-        uint8_t idx = 0;
-
-        packet[idx++] = 0xFF;  // start
-        packet[idx++] = 0x62;  // "layoutDisplay" command ID
-        packet[idx++] = 0x00;  // format
-        uint8_t lenPos = idx++;
-
-        packet[idx++] = 11;    // layout ID
-
-        /* Copy in the string */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.gSpeed / 100));
-        size_t textLen = strlen(tmp);
-        memcpy(&packet[idx], tmp, textLen);
-        idx += textLen;
-
-        /* Footer byte */
-        packet[idx++] = 0xAA;
-
-        /* Fill total length */
-        packet[lenPos] = idx;
-
-        /* Now send it with Write Without Response */
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Next line */
-        s_state = AL_STATE_UPDATE_LINE_3;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-        break;
-    }
-
-    case AL_STATE_UPDATE_LINE_3:
-    {
-        uint8_t packet[128];
-        uint8_t idx = 0;
-
-        packet[idx++] = 0xFF;  // start
-        packet[idx++] = 0x62;  // "layoutDisplay" command ID
-        packet[idx++] = 0x00;  // format
-        uint8_t lenPos = idx++;
-
-        packet[idx++] = 12;    // layout ID
-
-        /* Copy in the string */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.velD / 1000));
-        size_t textLen = strlen(tmp);
-        memcpy(&packet[idx], tmp, textLen);
-        idx += textLen;
-
-        /* Footer byte */
-        packet[idx++] = 0xAA;
-
-        /* Fill total length */
-        packet[lenPos] = idx;
-
-        /* Now send it with Write Without Response */
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Next line */
-        s_state = AL_STATE_UPDATE_LINE_4;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-        break;
-    }
-
-    case AL_STATE_UPDATE_LINE_4:
-    {
-        uint8_t packet[128];
-        uint8_t idx = 0;
-
-        packet[idx++] = 0xFF;  // start
-        packet[idx++] = 0x62;  // "layoutDisplay" command ID
-        packet[idx++] = 0x00;  // format
-        uint8_t lenPos = idx++;
-
-        packet[idx++] = 13;    // layout ID
-
-        /* Copy in the string */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.hMSL / 1000));
-        size_t textLen = strlen(tmp);
-        memcpy(&packet[idx], tmp, textLen);
-        idx += textLen;
-
-        /* Footer byte */
-        packet[idx++] = 0xAA;
-
-        /* Fill total length */
-        packet[lenPos] = idx;
-
-        /* Now send it with Write Without Response */
-        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Idle */
         s_state = AL_STATE_READY;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-        break;
     }
+    break;
     }
 }
 
