@@ -13,6 +13,10 @@ typedef enum
     AL_STATE_INIT = 0,       /* Not discovered yet */
     AL_STATE_CFG_WRITE,
     AL_STATE_SETUP_L1,
+    AL_STATE_SETUP_L2,
+    AL_STATE_SETUP_L3,
+    AL_STATE_SETUP_L4,
+    AL_STATE_SETUP_PAGE,
     AL_STATE_CFG_SET,
     AL_STATE_CLEAR,          /* Need to send "clear" command */
     AL_STATE_READY,          /* Idle, waiting for GNSS data */
@@ -35,51 +39,6 @@ static const FS_ActiveLook_ClientCb_t s_alk_cb =
 {
     .OnDiscoveryComplete = OnActiveLookDiscoveryComplete
 };
-
-/*******************************************************************************
- * Small helper to build and send a "txt" command to the ActiveLook display
- *  - x,y in 16-bit big-endian
- *  - rotation=4, font=2, color=15 (change as desired)
- *  - null-terminated text
- ******************************************************************************/
-static void AL_SendTxtCmd(uint16_t x, uint16_t y, const char *text)
-{
-    uint8_t packet[64];
-    uint8_t idx = 0;
-
-    /* Start byte + Command ID for "txt" = 0x37 + no Query ID = 0x00 */
-    packet[idx++] = 0xFF;       // start byte
-    packet[idx++] = 0x37;       // "txt" command
-    packet[idx++] = 0x00;       // format flags (0x00 means "no query ID")
-    uint8_t lengthPos = idx++;  // We'll fill total packet length here at the end
-
-    /* X coordinate (big endian) */
-    packet[idx++] = (uint8_t)(x >> 8);
-    packet[idx++] = (uint8_t)(x & 0xFF);
-
-    /* Y coordinate (big endian) */
-    packet[idx++] = (uint8_t)(y >> 8);
-    packet[idx++] = (uint8_t)(y & 0xFF);
-
-    /* rotation, font, color */
-    packet[idx++] = 4;   // rotation
-    packet[idx++] = 2;   // font
-    packet[idx++] = 15;  // color
-
-    /* Copy in the string + its null terminator */
-    size_t textLen = strlen(text) + 1;
-    memcpy(&packet[idx], text, textLen);
-    idx += textLen;
-
-    /* Footer byte */
-    packet[idx++] = 0xAA;
-
-    /* Fill total length */
-    packet[lengthPos] = idx;
-
-    /* Now send it with Write Without Response */
-    FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-}
 
 /*******************************************************************************
  * Called by the ActiveLook client once the Rx characteristic is discovered.
@@ -165,8 +124,7 @@ static uint8_t AL_BuildLayout(
     outBuf[idx++] = 0x00;  // x lo
 
     // Y (1 byte!)
-    // Suppose y = 168 => 0xA8
-    outBuf[idx++] = 0xA8;
+    outBuf[idx++] = yOffset;
 
     // Width (2 bytes, MSB first). E.g. 304 => 0x01,0x30
     outBuf[idx++] = 0x01;  // width hi
@@ -282,9 +240,39 @@ static void FS_ActiveLook_Task(void)
     }
 
     case AL_STATE_SETUP_L1:
-        length = AL_BuildLayout(10, "deg", buf);
+        length = AL_BuildLayout(10, 168, buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #1 defined.\n");
+
+        /* Next config step */
+        s_state = AL_STATE_SETUP_L2;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_SETUP_L2:
+        length = AL_BuildLayout(11, 128, buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("Layout #2 defined.\n");
+
+        /* Next config step */
+        s_state = AL_STATE_SETUP_L3;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_SETUP_L3:
+        length = AL_BuildLayout(12, 88, buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("Layout #3 defined.\n");
+
+        /* Next config step */
+        s_state = AL_STATE_SETUP_L4;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_SETUP_L4:
+        length = AL_BuildLayout(13, 48, buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("Layout #4 defined.\n");
 
         /* Next config step */
         s_state = AL_STATE_CFG_SET;
@@ -362,9 +350,8 @@ static void FS_ActiveLook_Task(void)
 
         packet[idx++] = 10;    // layout ID
 
-        /* Copy in the string + its null terminator */
-//        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
-        snprintf(tmp, sizeof(tmp), "TESTING");
+        /* Copy in the string */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
         size_t textLen = strlen(tmp);
         memcpy(&packet[idx], tmp, textLen);
         idx += textLen;
@@ -385,31 +372,103 @@ static void FS_ActiveLook_Task(void)
     }
 
     case AL_STATE_UPDATE_LINE_2:
-        /* Horizontal speed (s_gnssDataCache.gSpeed/100) at y=128 */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.gSpeed/100));
-        AL_SendTxtCmd(255, 168, tmp);
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
 
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0x62;  // "layoutDisplay" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        packet[idx++] = 11;    // layout ID
+
+        /* Copy in the string */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.gSpeed / 100));
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+
+        /* Next line */
         s_state = AL_STATE_UPDATE_LINE_3;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
+    }
 
     case AL_STATE_UPDATE_LINE_3:
-        /* Vertical speed (s_gnssDataCache.velD / 1000) at y=163 */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.velD/1000));
-        AL_SendTxtCmd(255, 128, tmp);
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
 
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0x62;  // "layoutDisplay" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        packet[idx++] = 12;    // layout ID
+
+        /* Copy in the string */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.velD / 1000));
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+
+        /* Next line */
         s_state = AL_STATE_UPDATE_LINE_4;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
+    }
 
     case AL_STATE_UPDATE_LINE_4:
-        /* Elevation (s_gnssDataCache.hMSL / 1000) at y=198 */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.hMSL/1000));
-        AL_SendTxtCmd(255, 88, tmp);
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
 
-        /* Done with this update. Return to READY. */
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0x62;  // "layoutDisplay" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        packet[idx++] = 13;    // layout ID
+
+        /* Copy in the string */
+        snprintf(tmp, sizeof(tmp), "%ld", (long)(s_gnssDataCache.hMSL / 1000));
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+
+        /* Idle */
         s_state = AL_STATE_READY;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
+    }
     }
 }
 
