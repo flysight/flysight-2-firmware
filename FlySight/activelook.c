@@ -11,6 +11,9 @@
 typedef enum
 {
     AL_STATE_INIT = 0,       /* Not discovered yet */
+    AL_STATE_CFG_WRITE,
+    AL_STATE_SETUP_L1,
+    AL_STATE_CFG_SET,
     AL_STATE_CLEAR,          /* Need to send "clear" command */
     AL_STATE_READY,          /* Idle, waiting for GNSS data */
     AL_STATE_UPDATE_LINE_1,  /* GNSS arrived, show multiple lines */
@@ -85,7 +88,7 @@ static void AL_SendTxtCmd(uint16_t x, uint16_t y, const char *text)
 static void OnActiveLookDiscoveryComplete(void)
 {
     APP_DBG_MSG("ActiveLook: Discovery complete\n");
-    s_state = AL_STATE_CLEAR;
+    s_state = AL_STATE_CFG_WRITE;
     UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
 }
 
@@ -119,6 +122,103 @@ void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
 }
 
 /*******************************************************************************
+ * A helper to do a single WriteWithoutResp, building or storing a raw packet.
+ * We do only one call per pass of the state machine to avoid spamming BLE.
+ ******************************************************************************/
+static void AL_SendRaw(const uint8_t *data, uint16_t length)
+{
+    FS_ActiveLook_Client_WriteWithoutResp(data, length);
+}
+
+/*******************************************************************************
+ * Build a "layoutSave" command for one row, with or without an icon, etc.
+ * We'll keep it simple: no icon here, just the normal text area. Adjust as needed.
+ *
+ * The snippet below demonstrates how you might build the layout data.
+ * If you want an icon, add sub-commands for 'img', 'txt', etc. in "extra[]".
+ *
+ * Return the final size of the packet in 'outLen', so the caller can do:
+ *    AL_SendRaw(buffer, outLen);
+ ******************************************************************************/
+static uint8_t AL_BuildLayout(
+    uint8_t layoutId,
+    uint8_t yOffset,
+    uint8_t  *outBuf
+)
+{
+    // Start building the buffer
+    uint8_t idx = 0;
+    outBuf[idx++] = 0xFF;  // Start
+    outBuf[idx++] = 0x60;  // "layoutSave"
+    outBuf[idx++] = 0x00;  // format => 1-byte length
+    uint8_t lenPos = idx++; // We'll fill the total length later
+
+    // layout ID
+    outBuf[idx++] = layoutId;
+
+    // We'll fill the additional commands size later
+    uint8_t addCmdSizePos = idx++;
+
+    // X (2 bytes, MSB first)
+    // Suppose x=0 => 0x00, 0x00
+    outBuf[idx++] = 0x00;  // x hi
+    outBuf[idx++] = 0x00;  // x lo
+
+    // Y (1 byte!)
+    // Suppose y = 168 => 0xA8
+    outBuf[idx++] = 0xA8;
+
+    // Width (2 bytes, MSB first). E.g. 304 => 0x01,0x30
+    outBuf[idx++] = 0x01;  // width hi
+    outBuf[idx++] = 0x30;  // width lo
+
+    // Height (1 byte!)
+    // e.g. 40 => 0x28
+    outBuf[idx++] = 0x28;
+
+    // ForeColor, BackColor, Font
+    outBuf[idx++] = 15; // foreColor
+    outBuf[idx++] = 0;  // backColor
+    outBuf[idx++] = 2;  // font
+
+    // TextValid
+    outBuf[idx++] = 1;  // 1 => use dynamic text argument
+
+    // Text X (2 bytes, MSB first), say 255 => 0x00,0xFF
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0xFF;
+
+    // Text Y (1 byte!), e.g. 40 => 0x28
+    outBuf[idx++] = 0x28;
+
+    // Text Rotation (1 byte)
+    outBuf[idx++] = 4;
+
+    // Text Opacity (1 byte)
+    outBuf[idx++] = 1;
+
+    //-------------------------------------------------------
+    // Additional sub-commands for icon or units, if desired:
+    //-------------------------------------------------------
+    uint8_t extra[64];
+    uint8_t e = 0;
+
+    /* No subcommands yet */
+
+    // Done building sub-commands
+    outBuf[addCmdSizePos] = e;
+    memcpy(&outBuf[idx], extra, e);
+    idx += e;
+
+    // Footer
+    outBuf[idx++] = 0xAA;
+
+    // Fill total length
+    outBuf[lenPos] = idx;
+    return idx;
+}
+
+/*******************************************************************************
  * Our main sequencer task. We handle the state machine, sending WWR commands
  * without blocking. Each line is sent in a separate state so that we don't
  * bombard the BLE stack with multiple WWR calls in a single pass.
@@ -126,12 +226,106 @@ void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
 static void FS_ActiveLook_Task(void)
 {
     char tmp[32];
+    static uint8_t buf[128]; /* re-usable buffer for building commands */
+    uint8_t length;
 
     switch (s_state)
     {
     case AL_STATE_INIT:
         /* Not discovered yet, do nothing */
         break;
+
+    case AL_STATE_CFG_WRITE:
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
+
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0xD0;  // "cfgWrite" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        snprintf(tmp, sizeof(tmp), "FLYSIGHT");
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        while (textLen < 12)
+        {
+            packet[idx++] = 0x00; // padding
+            textLen++;
+        }
+
+        packet[idx++] = 0x00;  // version
+        packet[idx++] = 0x00;
+        packet[idx++] = 0x00;
+        packet[idx++] = 0x01;
+
+        packet[idx++] = 0x01;  // password
+        packet[idx++] = 0x02;
+        packet[idx++] = 0x03;
+        packet[idx++] = 0x04;
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+
+        /* Next config step */
+        s_state = AL_STATE_SETUP_L1;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+    }
+
+    case AL_STATE_SETUP_L1:
+        length = AL_BuildLayout(10, "deg", buf);
+        AL_SendRaw(buf, length);
+        APP_DBG_MSG("Layout #1 defined.\n");
+
+        /* Next config step */
+        s_state = AL_STATE_CFG_SET;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+
+    case AL_STATE_CFG_SET:
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
+
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0xD2;  // "cfgSet" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        snprintf(tmp, sizeof(tmp), "FLYSIGHT");
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        while (textLen < 12)
+        {
+            packet[idx++] = 0x00; // padding
+            textLen++;
+        }
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+
+        /* Next config step */
+        s_state = AL_STATE_CLEAR;
+        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+        break;
+    }
 
     case AL_STATE_CLEAR:
     {
@@ -157,15 +351,38 @@ static void FS_ActiveLook_Task(void)
         break;
 
     case AL_STATE_UPDATE_LINE_1:
-        /* Heading (s_gnssDataCache.heading), at y=93 */
-        /* Example: "HDG: 123"  - you might scale heading if needed */
-        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
-        AL_SendTxtCmd(255, 208, tmp);
+    {
+        uint8_t packet[128];
+        uint8_t idx = 0;
+
+        packet[idx++] = 0xFF;  // start
+        packet[idx++] = 0x62;  // "layoutDisplay" command ID
+        packet[idx++] = 0x00;  // format
+        uint8_t lenPos = idx++;
+
+        packet[idx++] = 10;    // layout ID
+
+        /* Copy in the string + its null terminator */
+//        snprintf(tmp, sizeof(tmp), "%ld", (long)s_gnssDataCache.heading);
+        snprintf(tmp, sizeof(tmp), "TESTING");
+        size_t textLen = strlen(tmp);
+        memcpy(&packet[idx], tmp, textLen);
+        idx += textLen;
+
+        /* Footer byte */
+        packet[idx++] = 0xAA;
+
+        /* Fill total length */
+        packet[lenPos] = idx;
+
+        /* Now send it with Write Without Response */
+        FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
 
         /* Next line */
         s_state = AL_STATE_UPDATE_LINE_2;
         UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
         break;
+    }
 
     case AL_STATE_UPDATE_LINE_2:
         /* Horizontal speed (s_gnssDataCache.gSpeed/100) at y=128 */
