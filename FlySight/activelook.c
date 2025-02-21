@@ -7,6 +7,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#define ACTIVELOOK_UPDATE_MSEC    1000
+#define ACTIVELOOK_UPDATE_RATE    (ACTIVELOOK_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
+
 /*----- State machine states -----*/
 typedef enum
 {
@@ -27,7 +30,10 @@ typedef enum
 static FS_ActiveLook_State_t s_state = AL_STATE_INIT;
 static FS_GNSS_Data_t        s_gnssDataCache;
 
+static uint8_t timer_id;
+
 /* Forward references */
+static void FS_ActiveLook_Timer(void);
 static void FS_ActiveLook_Task(void);
 static void OnActiveLookDiscoveryComplete(void);
 
@@ -55,26 +61,8 @@ static void OnActiveLookDiscoveryComplete(void)
  ******************************************************************************/
 void FS_ActiveLook_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-    /* Only queue an update if we are discovered & idle. */
-    if (!FS_ActiveLook_Client_IsReady())
-    {
-        /* Possibly disconnected or not discovered. */
-        return;
-    }
-
-    if (s_state == AL_STATE_READY)
-    {
-        /* Cache the data for later use */
-        s_gnssDataCache = *current;
-
-        /* Update the page */
-        s_state = AL_STATE_UPDATE;
-        UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
-    }
-    else
-    {
-        APP_DBG_MSG("ActiveLook_GNSS_Update: State %d, ignoring.\n", s_state);
-    }
+	/* Cache the data for later use */
+	s_gnssDataCache = *current;
 }
 
 /*******************************************************************************
@@ -485,6 +473,9 @@ static void FS_ActiveLook_Task(void)
 
         /* Now go idle. Wait for FS_ActiveLook_GNSS_Update to set us to "update" */
         s_state = AL_STATE_READY;
+
+    	/* Start update timer */
+    	HW_TS_Start(timer_id, ACTIVELOOK_UPDATE_RATE);
         break;
     }
 
@@ -512,6 +503,16 @@ static void FS_ActiveLook_Task(void)
     }
 }
 
+static void FS_ActiveLook_Timer(void)
+{
+    if (s_state == AL_STATE_READY)
+    {
+		/* Update the page */
+		s_state = AL_STATE_UPDATE;
+		UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+    }
+}
+
 /*******************************************************************************
  * Standard init/deinit for ActiveLook
  ******************************************************************************/
@@ -528,10 +529,19 @@ void FS_ActiveLook_Init(void)
 
     /* If we want to automatically scan/connect: */
     UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+
+	/* Initialize update timer */
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_ActiveLook_Timer);
 }
 
 void FS_ActiveLook_DeInit(void)
 {
+	/* Reset state */
+	s_state = AL_STATE_INIT;
+
+	/* Delete update timer */
+	HW_TS_Delete(timer_id);
+
     /* Disconnect from the device if desired */
     UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
 }

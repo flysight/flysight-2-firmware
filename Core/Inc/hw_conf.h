@@ -109,7 +109,7 @@
  * The user may define the maximum number of virtual timers supported.
  * It shall not exceed 255
  */
-#define CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER  18
+#define CFG_HW_TS_MAX_NBR_CONCURRENT_TIMER  19
 
 /**
  * The user may define the priority in the NVIC of the RTC_WKUP interrupt handler that is used to manage the
