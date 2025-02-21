@@ -98,6 +98,7 @@ static void AL_SendRaw(const uint8_t *data, uint16_t length)
  ******************************************************************************/
 static uint8_t AL_BuildLayout(
     uint8_t layoutId,
+    const char *headingText,
     const char *unitsText,
     uint8_t  *outBuf
 )
@@ -139,12 +140,12 @@ static uint8_t AL_BuildLayout(
     // TextValid
     outBuf[idx++] = 1;  // 1 => use dynamic text argument
 
-    // Text X (2 bytes, MSB first), say 200 => 0x00,0xC8
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0xC8;
+    // Text X (2 bytes, MSB first), say 200
+    outBuf[idx++] = 0;
+    outBuf[idx++] = 200;
 
-    // Text Y (1 byte!), e.g. 40 => 0x28
-    outBuf[idx++] = 0x28;
+    // Text Y (1 byte!), e.g. 40
+    outBuf[idx++] = 40;
 
     // Text Rotation (1 byte)
     outBuf[idx++] = 4;
@@ -166,21 +167,39 @@ static uint8_t AL_BuildLayout(
     extra[e++] = 0x04;
     extra[e++] = 1;     // smaller font
 
-    // Example: txt => position= (240,0)
+    // Example: txt => position= (260,35)
     extra[e++] = 0x09;  // "text"
     // x=80 => 2 bytes
-    extra[e++] = 0x00;
-    extra[e++] = 80;
+    extra[e++] = 1;
+    extra[e++] = 5;
     // y=0 => 2 bytes
-    extra[e++] = 0x00;
+    extra[e++] = 0;
     extra[e++] = 35;
 
     // Then one byte with length, then the string
-    uint8_t eLenPos = e++; // We'll fill the extra length later
+    size_t headingLen = strlen(headingText);
+    extra[e++] = (uint8_t)headingLen;
+    memcpy(&extra[e], headingText, headingLen);
+    e += headingLen;
+
+    // Example: font=1
+    extra[e++] = 0x04;
+    extra[e++] = 1;     // smaller font
+
+    // Example: txt => position= (80,35)
+    extra[e++] = 0x09;  // "text"
+    // x=80 => 2 bytes
+    extra[e++] = 0;
+    extra[e++] = 80;
+    // y=0 => 2 bytes
+    extra[e++] = 0;
+    extra[e++] = 35;
+
+    // Then one byte with length, then the string
     size_t unitsLen = strlen(unitsText);
+    extra[e++] = (uint8_t)unitsLen;
     memcpy(&extra[e], unitsText, unitsLen);
     e += unitsLen;
-    extra[eLenPos] = (uint8_t)unitsLen;
 
     // Done building sub-commands
     outBuf[addCmdSizePos] = e;
@@ -375,7 +394,7 @@ static void FS_ActiveLook_Task(void)
     }
 
     case AL_STATE_SETUP_L1:
-        length = AL_BuildLayout(10, "deg", buf);
+        length = AL_BuildLayout(10, "Hdg:", "deg", buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #1 defined.\n");
         s_state = AL_STATE_SETUP_L2;
@@ -383,7 +402,7 @@ static void FS_ActiveLook_Task(void)
         break;
 
     case AL_STATE_SETUP_L2:
-        length = AL_BuildLayout(11, "m/s", buf);
+        length = AL_BuildLayout(11, "Vh:", "m/s", buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #2 defined.\n");
         s_state = AL_STATE_SETUP_L3;
@@ -391,7 +410,7 @@ static void FS_ActiveLook_Task(void)
         break;
 
     case AL_STATE_SETUP_L3:
-        length = AL_BuildLayout(12, "m/s", buf);
+        length = AL_BuildLayout(12, "Vd:", "m/s", buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #3 defined.\n");
         s_state = AL_STATE_SETUP_L4;
@@ -399,7 +418,7 @@ static void FS_ActiveLook_Task(void)
         break;
 
     case AL_STATE_SETUP_L4:
-        length = AL_BuildLayout(13, "m", buf);
+        length = AL_BuildLayout(13, "Ele:", "m", buf);
         AL_SendRaw(buf, length);
         APP_DBG_MSG("Layout #4 defined.\n");
         s_state = AL_STATE_SETUP_PAGE;
