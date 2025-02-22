@@ -200,7 +200,16 @@ static const char defaultConfig[] =
 		";          alarms will be audible.\n"
 		"\n"
 		"Win_Top:       0 ; Silence window top (m)\n"
-		"Win_Bottom:    0 ; Silence window bottom (m)\n";
+		"Win_Bottom:    0 ; Silence window bottom (m)\n"
+		"\n"
+		"; ActiveLook interface\n"
+		"\n"
+		"AL_ID:    030213 ; ActiveLook device ID\n"
+		"AL_Mode:       1 ; ActiveLook mode\n"
+		"AL_Line_1:    12 ; Course\n"
+		"AL_Line_2:     0 ; Horizontal speed\n"
+		"AL_Line_3:     1 ; Vertical speed\n"
+		"AL_Line_4:    11 ; Altitude above DZ_Elev\n";
 
 void FS_Config_Init(void)
 {
@@ -272,6 +281,13 @@ void FS_Config_Init(void)
 	config.end_nav        = 0;
 	config.max_dist       = 10000;
 	config.min_angle      = 5;
+
+	config.al_id          = 0;
+	config.al_mode        = 1;
+	config.al_line_1      = 13;
+	config.al_line_2      = 0;
+	config.al_line_3      = 1;
+	config.al_line_4      = 12;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -361,6 +377,13 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("End_Nav",   config.end_nav,      val * 1000, TRUE);
 		HANDLE_VALUE("Max_Dist",  config.max_dist,     val, val >= 0 && val <= 10000);
 		HANDLE_VALUE("Min_Angle", config.min_angle,    val, val >= 0 && val <= 360);
+
+		HANDLE_VALUE("AL_ID",     config.al_id,        val, val >= 0 && val <= 65535);
+		HANDLE_VALUE("AL_Mode",   config.al_mode,      val, val >= 0 && val <= 1);
+		HANDLE_VALUE("AL_Line_1", config.al_line_1,    val, val >= 0 && val <= 13);
+		HANDLE_VALUE("AL_Line_2", config.al_line_2,    val, val >= 0 && val <= 13);
+		HANDLE_VALUE("AL_Line_3", config.al_line_3,    val, val >= 0 && val <= 13);
+		HANDLE_VALUE("AL_Line_4", config.al_line_4,    val, val >= 0 && val <= 13);
 
 		#undef HANDLE_VALUE
 

@@ -21,15 +21,13 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef ACTIVELOOK_H_
-#define ACTIVELOOK_H_
+#ifndef ACTIVELOOK_MODE0_H_
+#define ACTIVELOOK_MODE0_H_
 
-typedef enum {
-    FS_AL_SETUP_IN_PROGRESS = 0,
-    FS_AL_SETUP_DONE
-} FS_ActiveLook_SetupStatus_t;
+#include "activelook.h"
 
-void FS_ActiveLook_Init(void);
-void FS_ActiveLook_DeInit(void);
+void FS_ActiveLook_Mode0_Init(void);
+FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void);
+void FS_ActiveLook_Mode0_Update(void);
 
-#endif /* ACTIVELOOK_H_ */
+#endif /* ACTIVELOOK_MODE0_H_ */

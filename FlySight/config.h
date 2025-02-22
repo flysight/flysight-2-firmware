@@ -157,6 +157,13 @@ typedef struct
 	uint16_t end_nav;
 	uint16_t max_dist;
 	uint16_t min_angle;
+
+	uint16_t al_id;
+	uint8_t  al_mode;
+	uint8_t  al_line_1;
+	uint8_t  al_line_2;
+	uint8_t  al_line_3;
+	uint8_t  al_line_4;
 } FS_Config_Data_t;
 
 typedef enum {
