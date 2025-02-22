@@ -21,13 +21,26 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef ACTIVELOOK_MODE0_H_
-#define ACTIVELOOK_MODE0_H_
+#ifndef ACTIVELOOK_MODE0_H
+#define ACTIVELOOK_MODE0_H
 
 #include "activelook.h"
 
+/**
+ * Called once when the mode is selected, to reset and load config data.
+ */
 void FS_ActiveLook_Mode0_Init(void);
+
+/**
+ * Called repeatedly to perform multi-step layout setup. Each call
+ * sends exactly one BLE command. Returns FS_AL_SETUP_DONE when complete.
+ */
 FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void);
+
+/**
+ * Called whenever we want to redraw or update the data on the display.
+ * Uses the config-based line definitions from FS_ActiveLook_Mode0_Init().
+ */
 void FS_ActiveLook_Mode0_Update(void);
 
-#endif /* ACTIVELOOK_MODE0_H_ */
+#endif /* ACTIVELOOK_MODE0_H */
