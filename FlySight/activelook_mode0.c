@@ -17,10 +17,10 @@
 typedef double (*LineValueFn_t)(const FS_GNSS_Data_t*);
 
 /* Simple "getter" functions for each known line type */
-static double LN_HSpeed(const FS_GNSS_Data_t *d)    { return (double)d->gSpeed / 100.0;     }
-static double LN_VSpeed(const FS_GNSS_Data_t *d)    { return (double)d->velD   / 1000.0;    }
-static double LN_Heading(const FS_GNSS_Data_t *d)   { return (double)d->heading;            }
-static double LN_Altitude(const FS_GNSS_Data_t *d)  { return (double)d->hMSL   / 1000.0;    }
+static double LN_HSpeed(const FS_GNSS_Data_t *d)    { return (double)d->gSpeed / 1e2; }
+static double LN_VSpeed(const FS_GNSS_Data_t *d)    { return (double)d->velD / 1e3; }
+static double LN_Heading(const FS_GNSS_Data_t *d)   { return (double)d->heading / 1e5; }
+static double LN_Altitude(const FS_GNSS_Data_t *d)  { return (double)d->hMSL / 1e3; }
 
 /**
  * A table entry describing one line type:
@@ -393,7 +393,7 @@ void FS_ActiveLook_Mode0_Update(void)
             val = s_lineSpecs[i].fn(gnss);
 
         // Format as integer or float, up to you
-        snprintf(line[i], sizeof(line[i]), "%ld", (long)val);
+        snprintf(line[i], sizeof(line[i]), "%.1f", val);
     }
 
     // Build the final packet with the 4 lines
