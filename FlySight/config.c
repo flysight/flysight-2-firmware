@@ -305,7 +305,7 @@ void FS_Config_Init(void)
 	config.max_dist       = 10000;
 	config.min_angle      = 5;
 
-	config.al_id          = 0;
+	*(config.al_id) = '\0';
 	config.al_mode        = 1;
 	config.num_al_lines   = 0;
 }
@@ -398,7 +398,6 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Max_Dist",  config.max_dist,     val, val >= 0 && val <= 10000);
 		HANDLE_VALUE("Min_Angle", config.min_angle,    val, val >= 0 && val <= 360);
 
-		HANDLE_VALUE("AL_ID",     config.al_id,        val, val >= 0 && val <= 65535);
 		HANDLE_VALUE("AL_Mode",   config.al_mode,      val, val >= 0 && val <= 1);
 
 		#undef HANDLE_VALUE
@@ -491,6 +490,12 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		if (!strcmp(name, "AL_Dec") && config.num_al_lines <= FS_CONFIG_MAX_AL_LINES)
 		{
 			config.al_lines[config.num_al_lines - 1].decimals = val;
+		}
+
+		if (!strcmp(name, "AL_ID"))
+		{
+			result[6] = '\0';
+			strncpy(config.al_id, result, sizeof(config.al_id));
 		}
 	}
 
