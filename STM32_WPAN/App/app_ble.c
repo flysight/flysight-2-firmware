@@ -1652,7 +1652,7 @@ static void Scan_Request(void)
   if (BleApplicationContext.EndDevice_Connection_Status[0] != APP_BLE_CONNECTED)
   {
     /* USER CODE BEGIN APP_BLE_CONNECTED */
-
+    BleApplicationContext.EndDevice1Found = 0x00;
     /* USER CODE END APP_BLE_CONNECTED */
     result = aci_gap_start_general_discovery_proc(SCAN_P,
                                                   SCAN_L,
