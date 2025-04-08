@@ -21,12 +21,6 @@ typedef enum {
     FS_UNIT_TYPE_NONE
 } FS_ParamUnitType_t;
 
-// Enum for the desired display unit system
-typedef enum {
-    FS_UNIT_SYSTEM_METRIC,
-    FS_UNIT_SYSTEM_IMPERIAL
-} FS_DisplayUnitSystem_t;
-
 // Structure to hold conversion factor and unit suffix
 typedef struct {
     double      multiplier;
@@ -39,10 +33,6 @@ typedef struct {
 #define METERS_TO_KM        0.001
 #define METERS_TO_MILES     0.000621371
 #define METERS_TO_FEET      3.28084
-
-// Placeholder for user configuration - we'll hardcode Imperial for now
-// In a real implementation, this would likely come from FS_Config_Get()
-static FS_DisplayUnitSystem_t s_unitSystem = FS_UNIT_SYSTEM_METRIC;
 
 /* --------------------------------------------------------------------------
    2. Data Structures for Each Line
@@ -166,7 +156,9 @@ static int s_step = 0;
  * Gets the conversion multiplier and unit suffix string based on parameter type
  * and the selected unit system.
  */
-static UnitConversionInfo_t AL_GetUnitConversion(FS_ParamUnitType_t type, FS_DisplayUnitSystem_t system) {
+static UnitConversionInfo_t AL_GetUnitConversion(
+		FS_ParamUnitType_t type,
+		FS_Config_UnitSystem_t system) {
     UnitConversionInfo_t info = {1.0, ""}; // Default: no conversion, no suffix
 
     switch (type) {
@@ -314,6 +306,9 @@ static uint8_t AL_BuildLayout(uint8_t layoutId,
  */
 static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 {
+    // Read config
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+
     uint8_t idx = 0;
     outBuf[idx++] = 0xFF;
     outBuf[idx++] = 0x80;
@@ -322,29 +317,13 @@ static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 
     outBuf[idx++] = pageId;
 
-    // Sublayout #1 => layout=10
-    outBuf[idx++] = 10;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 168;
-
-    // Sublayout #2 => layout=11
-    outBuf[idx++] = 11;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 128;
-
-    // Sublayout #3 => layout=12
-    outBuf[idx++] = 12;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 88;
-
-    // Sublayout #4 => layout=13
-    outBuf[idx++] = 13;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 48;
+    for (int i = 0; i < cfg->num_al_lines; i++)
+    {
+		outBuf[idx++] = 10 + i;
+		outBuf[idx++] = 0x00;
+		outBuf[idx++] = 0x00;
+		outBuf[idx++] = 168 - 40 * i;
+    }
 
     outBuf[idx++] = 0xAA;
     outBuf[lenPos] = idx;
@@ -423,35 +402,25 @@ static const AL_Mode0_LineMap_t* FindLineMapEntry(uint8_t typeId) {
  */
 void FS_ActiveLook_Mode0_Init(void)
 {
-    s_step = 0;
-
     // Read config
     const FS_Config_Data_t *cfg = FS_Config_Get();
 
-    // Grab the line IDs the user wants
-    uint8_t lineTypes[4] = {
-        cfg->al_line_1,
-        cfg->al_line_2,
-        cfg->al_line_3,
-        cfg->al_line_4
-    };
+    s_step = 0;
 
     // For each line i, find its base label and store typeId
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < cfg->num_al_lines; i++)
     {
-        const AL_Mode0_LineMap_t* entry = FindLineMapEntry(lineTypes[i]);
+        const AL_Mode0_LineMap_t* entry = FindLineMapEntry(
+        		cfg->al_lines[i].mode);
         if (entry) {
             s_lineSpecs[i].typeId = entry->typeId;
             s_lineSpecs[i].label  = entry->label;
         } else {
             // Fallback if typeId is not found in the map
-            s_lineSpecs[i].typeId = lineTypes[i]; // Store the requested ID anyway
+            s_lineSpecs[i].typeId = 0;
             s_lineSpecs[i].label  = "?";
         }
     }
-
-    // Set the desired unit system
-    s_unitSystem = FS_UNIT_SYSTEM_METRIC;
 }
 
 /**
@@ -459,25 +428,30 @@ void FS_ActiveLook_Mode0_Init(void)
  *
  * Multi-step routine. In each step (0-3), builds a layout (#10-13).
  * It now dynamically determines the unit suffix based on the line's parameter type
- * and the chosen unit system (s_unitSystem).
+ * and the chosen unit system.
  * Step 4 builds the page definition.
  */
 FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
 {
+    // Read config
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+
     uint8_t buf[128];
     uint8_t length;
     FS_ActiveLook_SetupStatus_t status = FS_AL_SETUP_IN_PROGRESS;
 
-    int lineIndex = s_step; // Corresponds to s_lineSpecs[lineIndex]
-
-    if (s_step >= 0 && s_step < 4) { // Steps 0-3: Build Layouts 10-13
+    if (s_step >= 0 && s_step < cfg->num_al_lines) { // Build layouts
+        int lineIndex = s_step; // Corresponds to s_lineSpecs[lineIndex]
         uint8_t layoutId = 10 + lineIndex;
-        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[lineIndex].typeId);
+        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(
+        		s_lineSpecs[lineIndex].typeId);
         const char* label = s_lineSpecs[lineIndex].label;
         const char* unitSuffix = ""; // Default empty suffix
 
         if (mapEntry) {
-            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(mapEntry->unitType, s_unitSystem);
+            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
+            		mapEntry->unitType,
+					cfg->al_lines[s_step].units);
             unitSuffix = unitInfo.suffix;
         } else {
              // Use fallback label "?" if entry not found (already set in Init)
@@ -492,7 +466,7 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
             // Handle layout build error? Maybe retry or abort?
              status = FS_AL_SETUP_DONE; // Or some error status if defined
         }
-    } else if (s_step == 4) { // Step 4: Build Page 10
+    } else if (s_step == cfg->num_al_lines) { // Build page
         length = AL_BuildPage(10, buf); // Page ID 10 references layouts 10-13
         if (length > 0) {
             AL_SendRaw(buf, length);
@@ -524,25 +498,28 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
  */
 void FS_ActiveLook_Mode0_Update(void)
 {
+    // Read config
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+
     const FS_GNSS_Data_t *gnss = FS_GNSS_GetData();
     char lineValueStr[4][16]; // Buffer for formatted value strings
 
     // For each line, calculate, convert, and format the value
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < cfg->num_al_lines; i++)
     {
         double baseVal = 0.0;
         double displayVal = 0.0;
-        FS_ParamUnitType_t unitType = FS_UNIT_TYPE_NONE;
 
         const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[i].typeId);
 
         if (mapEntry && mapEntry->fn) {
             // 1. Get base value (m/s, m, deg, etc.)
             baseVal = mapEntry->fn(gnss);
-            unitType = mapEntry->unitType;
 
             // 2. Get conversion info based on type and chosen system
-            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(unitType, s_unitSystem);
+            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
+            		mapEntry->unitType,
+					cfg->al_lines[i].units);
 
             // 3. Calculate display value
             displayVal = baseVal * unitInfo.multiplier;
@@ -556,7 +533,12 @@ void FS_ActiveLook_Mode0_Update(void)
         }
 
         // 4. Format the display value
-        snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "%.1f", displayVal);
+        snprintf(
+        		lineValueStr[i],
+				sizeof(lineValueStr[i]),
+				"%.*f",
+				(int)(cfg->al_lines[i].decimals),
+				displayVal);
     }
 
     // Build the final packet with the 4 lines

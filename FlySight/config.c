@@ -26,9 +26,10 @@
 #include "config.h"
 #include "ff.h"
 
-#define CONFIG_FIRST_ALARM  0x01
-#define CONFIG_FIRST_WINDOW 0x02
-#define CONFIG_FIRST_SPEECH 0x04
+#define CONFIG_FIRST_ALARM   0x01
+#define CONFIG_FIRST_WINDOW  0x02
+#define CONFIG_FIRST_SPEECH  0x04
+#define CONFIG_FIRST_AL_LINE 0x08
 
 static FS_Config_Data_t config;
 static FIL configFile;
@@ -206,10 +207,33 @@ static const char defaultConfig[] =
 		"\n"
 		"AL_ID:    030213 ; ActiveLook device ID\n"
 		"AL_Mode:       1 ; ActiveLook mode\n"
-		"AL_Line_1:    12 ; Course\n"
-		"AL_Line_2:     0 ; Horizontal speed\n"
-		"AL_Line_3:     1 ; Vertical speed\n"
-		"AL_Line_4:    11 ; Altitude above DZ_Elev\n";
+		"\n"
+		"AL_Line:      13 ; ActiveLook line\n"
+		"                 ;   0 = Horizontal speed\n"
+		"                 ;   1 = Vertical speed\n"
+		"                 ;   2 = Glide ratio\n"
+		"                 ;   3 = Inverse glide ratio\n"
+		"                 ;   4 = Total speed\n"
+		"                 ;   11 = Dive angle\n"
+		"                 ;   12 = Altitude above DZ_Elev\n"
+		"                 ;   13 = Course\n"
+		"AL_Units:      0 ; ActiveLook units\n"
+		"                 ;   0 = km/h or m\n"
+		"                 ;   1 = mph or feet\n"
+		"AL_Dec:        1 ; ActiveLook precision\n"
+		"                 ;   Decimal places\n"
+		"\n"
+		"AL_Line:       5 ; Direction to destination\n"
+		"AL_Units:      0 ; ActiveLook units\n"
+		"AL_Dec:        1 ; ActiveLook precision\n"
+		"\n"
+		"AL_Line:       6 ; Distance to destination\n"
+		"AL_Units:      0 ; ActiveLook units\n"
+		"AL_Dec:        1 ; ActiveLook precision\n"
+		"\n"
+		"AL_Line:      12 ; Altitude above DZ_Elev\n"
+		"AL_Units:      1 ; ActiveLook units\n"
+		"AL_Dec:        0 ; ActiveLook precision\n";
 
 void FS_Config_Init(void)
 {
@@ -231,7 +255,6 @@ void FS_Config_Init(void)
 
 	config.sp_rate       = 0;
 	config.sp_volume     = 0;
-
 	config.num_speech    = 0;
 
 	config.threshold     = 1000;
@@ -284,10 +307,7 @@ void FS_Config_Init(void)
 
 	config.al_id          = 0;
 	config.al_mode        = 1;
-	config.al_line_1      = 13;
-	config.al_line_2      = 0;
-	config.al_line_3      = 1;
-	config.al_line_4      = 12;
+	config.num_al_lines   = 0;
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -380,10 +400,6 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 
 		HANDLE_VALUE("AL_ID",     config.al_id,        val, val >= 0 && val <= 65535);
 		HANDLE_VALUE("AL_Mode",   config.al_mode,      val, val >= 0 && val <= 1);
-		HANDLE_VALUE("AL_Line_1", config.al_line_1,    val, val >= 0 && val <= 13);
-		HANDLE_VALUE("AL_Line_2", config.al_line_2,    val, val >= 0 && val <= 13);
-		HANDLE_VALUE("AL_Line_3", config.al_line_3,    val, val >= 0 && val <= 13);
-		HANDLE_VALUE("AL_Line_4", config.al_line_4,    val, val >= 0 && val <= 13);
 
 		#undef HANDLE_VALUE
 
@@ -453,6 +469,28 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		if (!strcmp(name, "Sp_Dec") && config.num_speech <= FS_CONFIG_MAX_SPEECH)
 		{
 			config.speech[config.num_speech - 1].decimals = val;
+		}
+
+		if (!strcmp(name, "AL_Line") && config.num_al_lines < FS_CONFIG_MAX_AL_LINES)
+		{
+			if (!(flags & CONFIG_FIRST_AL_LINE))
+			{
+				config.num_al_lines = 0;
+				flags |= CONFIG_FIRST_AL_LINE;
+			}
+
+			++config.num_al_lines;
+			config.al_lines[config.num_al_lines - 1].mode = val;
+			config.al_lines[config.num_al_lines - 1].units = FS_UNIT_SYSTEM_IMPERIAL;
+			config.al_lines[config.num_al_lines - 1].decimals = 1;
+		}
+		if (!strcmp(name, "AL_Units") && config.num_al_lines <= FS_CONFIG_MAX_AL_LINES)
+		{
+			config.al_lines[config.num_al_lines - 1].units = val;
+		}
+		if (!strcmp(name, "AL_Dec") && config.num_al_lines <= FS_CONFIG_MAX_AL_LINES)
+		{
+			config.al_lines[config.num_al_lines - 1].decimals = val;
 		}
 	}
 
