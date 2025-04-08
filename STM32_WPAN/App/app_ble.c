@@ -45,6 +45,7 @@
 #include "common.h"
 #include "state.h"
 #include "activelook_client.h"
+#include "config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -602,6 +603,16 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           adv_report_data = (uint8_t*)(&le_advertising_event->Advertising_Report[0].Length_Data) + 1;
           k = 0;
 
+          // Define the target device name we are looking for
+          char targetDeviceName[14];
+          snprintf(targetDeviceName, sizeof(targetDeviceName),
+        		   "ENGO 2 %.*s", 6, FS_Config_Get()->al_id);
+          const size_t targetDeviceNameLen = strlen(targetDeviceName);
+
+          // Flags to track if we found the required data within *this specific* advertising report
+          uint8_t foundMfgData = 0; // Flag for correct manufacturer data
+          uint8_t foundDeviceName = 0; // Flag for correct device name
+
           /* search AD TYPE 0x09 (Complete Local Name) */
           /* search AD Type 0x02 (16 bits UUIDS) */
           if (event_type == ADV_IND)
@@ -625,19 +636,48 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                   if (last2 == 0x08F2)
                   {
                     APP_DBG_MSG("-- Found ActiveLook device (mfg data ends with 0x08F2)\n\r");
-                    BleApplicationContext.EndDevice1Found = 0x01;
-                    P2P_SERVER1_BDADDR[0] = le_advertising_event->Advertising_Report[0].Address[0];
-                    P2P_SERVER1_BDADDR[1] = le_advertising_event->Advertising_Report[0].Address[1];
-                    P2P_SERVER1_BDADDR[2] = le_advertising_event->Advertising_Report[0].Address[2];
-                    P2P_SERVER1_BDADDR[3] = le_advertising_event->Advertising_Report[0].Address[3];
-                    P2P_SERVER1_BDADDR[4] = le_advertising_event->Advertising_Report[0].Address[4];
-                    P2P_SERVER1_BDADDR[5] = le_advertising_event->Advertising_Report[0].Address[5];
+                    foundMfgData = 1; // Set flag indicating manufacturer data is correct
                   }
+                }
+              }
+              else if (adtype == AD_TYPE_COMPLETE_LOCAL_NAME || adtype == AD_TYPE_SHORTENED_LOCAL_NAME)
+              {
+                const uint8_t *name_data = &adv_report_data[k + 2];
+                uint8_t name_len = adlength - 1;
+
+                APP_DBG_MSG("-- Found Device Name: '");
+                for(int i=0; i<name_len; i++) { APP_DBG_MSG("%c", name_data[i]); }
+                APP_DBG_MSG("'\n\r");
+
+                // Compare the found name with the target name
+                if ((name_len == targetDeviceNameLen) &&
+                		(memcmp(name_data, targetDeviceName, targetDeviceNameLen) == 0))
+                {
+                   APP_DBG_MSG("-- Device Name matches target '%s'\n\r", targetDeviceName);
+                   foundDeviceName = 1; // Set flag indicating device name is correct
                 }
               }
 
               k += adlength + 1;
             } /* end while(k < event_data_size) */
+
+            // Check if *both* flags are set after processing all AD structures in this report
+            if (foundMfgData && foundDeviceName)
+            {
+                APP_DBG_MSG("-- Found matching ENGO 2 device!\n\r");
+                BleApplicationContext.EndDevice1Found = 0x01;
+                // Store the BD Address of this device
+                P2P_SERVER1_BDADDR[0] = le_advertising_event->Advertising_Report[0].Address[0];
+                P2P_SERVER1_BDADDR[1] = le_advertising_event->Advertising_Report[0].Address[1];
+                P2P_SERVER1_BDADDR[2] = le_advertising_event->Advertising_Report[0].Address[2];
+                P2P_SERVER1_BDADDR[3] = le_advertising_event->Advertising_Report[0].Address[3];
+                P2P_SERVER1_BDADDR[4] = le_advertising_event->Advertising_Report[0].Address[4];
+                P2P_SERVER1_BDADDR[5] = le_advertising_event->Advertising_Report[0].Address[5];
+
+                APP_DBG_MSG("   Address: %02X:%02X:%02X:%02X:%02X:%02X\n\r",
+                            P2P_SERVER1_BDADDR[5], P2P_SERVER1_BDADDR[4], P2P_SERVER1_BDADDR[3],
+                            P2P_SERVER1_BDADDR[2], P2P_SERVER1_BDADDR[1], P2P_SERVER1_BDADDR[0]);
+            }
           } /* end if (event_type == ADV_IND) */
           break;
 
