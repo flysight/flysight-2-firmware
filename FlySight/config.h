@@ -171,7 +171,7 @@ typedef struct
 	uint16_t max_dist;
 	uint16_t min_angle;
 
-	uint16_t al_id;
+	char     al_id[6];
 	uint8_t  al_mode;
 
 	FS_Config_AL_Line_t al_lines[FS_CONFIG_MAX_AL_LINES];
