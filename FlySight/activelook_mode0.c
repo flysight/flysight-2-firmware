@@ -2,9 +2,11 @@
 #include "activelook_client.h"    // For FS_ActiveLook_Client_WriteWithoutResp
 #include "config.h"               // For FS_Config_Get()
 #include "gnss.h"                 // For FS_GNSS_GetData()
+#include "nav.h"                  // For calcDirection, calcDistance, calcRelBearing
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>                 // For atan2, fabs
 
 /* --------------------------------------------------------------------------
    1. Data Structures for Each Line
@@ -17,10 +19,60 @@
 typedef double (*LineValueFn_t)(const FS_GNSS_Data_t*);
 
 /* Simple "getter" functions for each known line type */
-static double LN_HSpeed(const FS_GNSS_Data_t *d)    { return (double)d->gSpeed / 1e2; }
-static double LN_VSpeed(const FS_GNSS_Data_t *d)    { return (double)d->velD / 1e3; }
-static double LN_Heading(const FS_GNSS_Data_t *d)   { return (double)d->heading / 1e5; }
-static double LN_Altitude(const FS_GNSS_Data_t *d)  { return (double)d->hMSL / 1e3; }
+static double LN_HSpeed(const FS_GNSS_Data_t *d) {
+	return (double)d->gSpeed / 1000.0; // mm/s to m/s
+}
+static double LN_VSpeed(const FS_GNSS_Data_t *d) {
+	return (double)d->velD / 1000.0; // mm/s to m/s
+}
+static double LN_GlideRatio(const FS_GNSS_Data_t *d) {
+    if (d->velD != 0) {
+        return (double)(d->gSpeed / 100.0) / (double)(d->velD / 1000.0);
+    }
+    return 0.0; // Or some indicator for undefined glide ratio
+}
+static double LN_InvGlideRatio(const FS_GNSS_Data_t *d) {
+    if (d->gSpeed != 0) {
+        return (double)(d->velD / 1000.0) / (double)(d->gSpeed / 100.0);
+    }
+    return 0.0; // Or some indicator
+}
+static double LN_TotalSpeed(const FS_GNSS_Data_t *d) {
+	return (double)d->speed / 100.0; // cm/s to m/s
+}
+static double LN_DirToDest(const FS_GNSS_Data_t *d) {
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+    // Check if destination is set and within reasonable range if needed
+    if ((calcDistance(d->lat, d->lon, cfg->lat, cfg->lon) < cfg->max_dist) || (cfg->max_dist == 0)) {
+         return (double)calcDirection(d->lat, d->lon, cfg->lat, cfg->lon, d->heading);
+    }
+    return 0.0; // Indicate no destination or out of range
+}
+static double LN_DistToDest(const FS_GNSS_Data_t *d) {
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+	return (double)calcDistance(d->lat, d->lon, cfg->lat, cfg->lon); // in meters
+}
+static double LN_DirToBearing(const FS_GNSS_Data_t *d) {
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+    // Assuming bearing is configured
+    return (double)calcRelBearing(cfg->bearing, d->heading / 100000); // heading is 1e-5 deg
+}
+static double LN_DiveAngle(const FS_GNSS_Data_t *d) {
+    if (d->gSpeed > 0) { // Avoid division by zero
+        // velD is positive down, gSpeed is horizontal speed (always positive)
+        // atan2(y, x) -> atan2(vertical_speed, horizontal_speed)
+        // Need to convert cm/s to m/s or be consistent
+        return atan2((double)(d->velD / 1000.0), (double)(d->gSpeed / 100.0)) * (180.0 / M_PI); // Result in degrees
+    }
+    return 0.0;
+}
+static double LN_Altitude(const FS_GNSS_Data_t *d) {
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+    return ((double)d->hMSL - (double)cfg->dz_elev) / 1000.0; // mm to m, relative to DZ elev
+}
+static double LN_Heading(const FS_GNSS_Data_t *d) {
+	return (double)d->heading / 100000.0; // 1e-5 deg to deg
+}
 
 /**
  * A table entry describing one line type:
@@ -37,15 +89,23 @@ typedef struct {
 } AL_Mode0_LineMap_t;
 
 /*
-   A dictionary of possible line types.
-   Fill in as many as you want to support.
+   A dictionary of possible line types based on FS_CONFIG_MODE_* in config.h
+   and implementations in audio_control.c.
 */
 static const AL_Mode0_LineMap_t s_lineMap[] =
 {
-    {  0, "HSpd:",  "m/s",  LN_HSpeed   },
-    {  1, "VSpd:",  "m/s",  LN_VSpeed   },
-    { 12, "Alt:",   "m",    LN_Altitude },
-    { 13, "Hdg:",   "deg",  LN_Heading  },
+    { FS_CONFIG_MODE_HORIZONTAL_SPEED,         "HSpd:", "m/s",   LN_HSpeed       }, // 0
+    { FS_CONFIG_MODE_VERTICAL_SPEED,           "VSpd:", "m/s",   LN_VSpeed       }, // 1
+    { FS_CONFIG_MODE_GLIDE_RATIO,              "GR:",   "",      LN_GlideRatio   }, // 2
+    { FS_CONFIG_MODE_INVERSE_GLIDE_RATIO,      "1/GR:", "",      LN_InvGlideRatio}, // 3
+    { FS_CONFIG_MODE_TOTAL_SPEED,              "Spd:",  "m/s",   LN_TotalSpeed   }, // 4
+    { FS_CONFIG_MODE_DIRECTION_TO_DESTINATION, "Dir:",  "deg",   LN_DirToDest    }, // 5
+    { FS_CONFIG_MODE_DISTANCE_TO_DESTINATION,  "Dist:", "m",     LN_DistToDest   }, // 6
+    { FS_CONFIG_MODE_DIRECTION_TO_BEARING,     "Brg:",  "deg",   LN_DirToBearing }, // 7
+    { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive:", "deg",   LN_DiveAngle    }, // 11
+    { FS_CONFIG_MODE_ALTITUDE,                 "Alt:",  "m",     LN_Altitude     }, // 12
+    // Mode 13 seems specific to ActiveLook in config.c, reusing Heading
+    { 13,                                      "Hdg:",  "deg",   LN_Heading      },
 };
 static const unsigned s_lineMapCount = sizeof(s_lineMap) / sizeof(s_lineMap[0]);
 
