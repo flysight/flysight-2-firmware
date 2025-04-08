@@ -9,7 +9,43 @@
 #include <math.h>                 // For atan2, fabs
 
 /* --------------------------------------------------------------------------
-   1. Data Structures for Each Line
+   1. Unit System Definitions
+   -------------------------------------------------------------------------- */
+
+// Enum to categorize the physical quantity a parameter represents
+typedef enum {
+    FS_UNIT_TYPE_SPEED,
+    FS_UNIT_TYPE_DISTANCE,
+    FS_UNIT_TYPE_ALTITUDE,
+    FS_UNIT_TYPE_ANGLE,
+    FS_UNIT_TYPE_NONE
+} FS_ParamUnitType_t;
+
+// Enum for the desired display unit system
+typedef enum {
+    FS_UNIT_SYSTEM_METRIC,
+    FS_UNIT_SYSTEM_IMPERIAL
+} FS_DisplayUnitSystem_t;
+
+// Structure to hold conversion factor and unit suffix
+typedef struct {
+    double      multiplier;
+    const char* suffix;
+} UnitConversionInfo_t;
+
+// --- Conversion Constants ---
+#define M_PER_S_TO_KMH      3.6
+#define M_PER_S_TO_MPH      2.23694
+#define METERS_TO_KM        0.001
+#define METERS_TO_MILES     0.000621371
+#define METERS_TO_FEET      3.28084
+
+// Placeholder for user configuration - we'll hardcode Imperial for now
+// In a real implementation, this would likely come from FS_Config_Get()
+static FS_DisplayUnitSystem_t s_unitSystem = FS_UNIT_SYSTEM_METRIC;
+
+/* --------------------------------------------------------------------------
+   2. Data Structures for Each Line
    -------------------------------------------------------------------------- */
 
 /**
@@ -75,17 +111,14 @@ static double LN_Heading(const FS_GNSS_Data_t *d) {
 }
 
 /**
- * A table entry describing one line type:
- *   - typeId:  which numeric ID from the config (0,1,7,12, etc.)
- *   - label:   text label to show on the layout, e.g. "HSpd:"
- *   - units:   text units after the label, e.g. "m/s"
- *   - fn:      function that returns the numeric value for the line
+ * Updated table entry: includes unitType for conversion purposes.
+ * 'units' field removed, as it's now dynamic based on user choice.
  */
 typedef struct {
-    uint8_t       typeId;
-    const char   *label;
-    const char   *units;
-    LineValueFn_t fn;
+    uint8_t             typeId;   // ID from config (e.g., FS_CONFIG_MODE_HORIZONTAL_SPEED)
+    const char         *label;    // Base text label (e.g., "HSpd:")
+    FS_ParamUnitType_t  unitType; // Type of quantity (Speed, Distance, etc.)
+    LineValueFn_t       fn;       // Function returning the value in base units (m/s, m, deg)
 } AL_Mode0_LineMap_t;
 
 /*
@@ -94,31 +127,28 @@ typedef struct {
 */
 static const AL_Mode0_LineMap_t s_lineMap[] =
 {
-    { FS_CONFIG_MODE_HORIZONTAL_SPEED,         "HSpd:", "m/s",   LN_HSpeed       }, // 0
-    { FS_CONFIG_MODE_VERTICAL_SPEED,           "VSpd:", "m/s",   LN_VSpeed       }, // 1
-    { FS_CONFIG_MODE_GLIDE_RATIO,              "GR:",   "",      LN_GlideRatio   }, // 2
-    { FS_CONFIG_MODE_INVERSE_GLIDE_RATIO,      "1/GR:", "",      LN_InvGlideRatio}, // 3
-    { FS_CONFIG_MODE_TOTAL_SPEED,              "Spd:",  "m/s",   LN_TotalSpeed   }, // 4
-    { FS_CONFIG_MODE_DIRECTION_TO_DESTINATION, "Dir:",  "deg",   LN_DirToDest    }, // 5
-    { FS_CONFIG_MODE_DISTANCE_TO_DESTINATION,  "Dist:", "m",     LN_DistToDest   }, // 6
-    { FS_CONFIG_MODE_DIRECTION_TO_BEARING,     "Brg:",  "deg",   LN_DirToBearing }, // 7
-    { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive:", "deg",   LN_DiveAngle    }, // 11
-    { FS_CONFIG_MODE_ALTITUDE,                 "Alt:",  "m",     LN_Altitude     }, // 12
-    // Mode 13 seems specific to ActiveLook in config.c, reusing Heading
-    { 13,                                      "Hdg:",  "deg",   LN_Heading      },
+    { FS_CONFIG_MODE_HORIZONTAL_SPEED,         "HSpd:", FS_UNIT_TYPE_SPEED,    LN_HSpeed       }, // 0
+    { FS_CONFIG_MODE_VERTICAL_SPEED,           "VSpd:", FS_UNIT_TYPE_SPEED,    LN_VSpeed       }, // 1
+    { FS_CONFIG_MODE_GLIDE_RATIO,              "GR:",   FS_UNIT_TYPE_NONE,     LN_GlideRatio   }, // 2
+    { FS_CONFIG_MODE_INVERSE_GLIDE_RATIO,      "1/GR:", FS_UNIT_TYPE_NONE,     LN_InvGlideRatio}, // 3
+    { FS_CONFIG_MODE_TOTAL_SPEED,              "Spd:",  FS_UNIT_TYPE_SPEED,    LN_TotalSpeed   }, // 4
+    { FS_CONFIG_MODE_DIRECTION_TO_DESTINATION, "Dir:",  FS_UNIT_TYPE_ANGLE,    LN_DirToDest    }, // 5
+    { FS_CONFIG_MODE_DISTANCE_TO_DESTINATION,  "Dist:", FS_UNIT_TYPE_DISTANCE, LN_DistToDest   }, // 6
+    { FS_CONFIG_MODE_DIRECTION_TO_BEARING,     "Brg:",  FS_UNIT_TYPE_ANGLE,    LN_DirToBearing }, // 7
+    // Mode 8, 9, 10?
+    { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive:", FS_UNIT_TYPE_ANGLE,    LN_DiveAngle    }, // 11
+    { FS_CONFIG_MODE_ALTITUDE,                 "Alt:",  FS_UNIT_TYPE_ALTITUDE, LN_Altitude     }, // 12
+    { 13,                                      "Hdg:",  FS_UNIT_TYPE_ANGLE,    LN_Heading      }, // Mode 13 (Heading)
 };
 static const unsigned s_lineMapCount = sizeof(s_lineMap) / sizeof(s_lineMap[0]);
 
 /**
- * For the four lines in this mode, we store a "resolved" spec.
- * That includes a pointer to the label, units, and function pointer
- * to compute the value. We fill this in FS_ActiveLook_Mode0_Init()
- * based on the user config (al_line_1..4).
+ * Updated line spec: stores only typeId and label.
+ * Units and value calculation/conversion happen dynamically.
  */
 typedef struct {
-    const char    *label;
-    const char    *units;
-    LineValueFn_t  fn;
+    uint8_t      typeId; // ID from config (e.g., FS_CONFIG_MODE_HORIZONTAL_SPEED)
+    const char  *label;  // Base label (e.g., "HSpd:")
 } AL_Mode0_LineSpec_t;
 
 static AL_Mode0_LineSpec_t s_lineSpecs[4];
@@ -129,7 +159,57 @@ static AL_Mode0_LineSpec_t s_lineSpecs[4];
 static int s_step = 0;
 
 /* --------------------------------------------------------------------------
-   2. Helpers for Sending Commands / Building Layout
+   3. Unit Conversion Logic (to be factored out later)
+   -------------------------------------------------------------------------- */
+
+/**
+ * Gets the conversion multiplier and unit suffix string based on parameter type
+ * and the selected unit system.
+ */
+static UnitConversionInfo_t AL_GetUnitConversion(FS_ParamUnitType_t type, FS_DisplayUnitSystem_t system) {
+    UnitConversionInfo_t info = {1.0, ""}; // Default: no conversion, no suffix
+
+    switch (type) {
+        case FS_UNIT_TYPE_SPEED: // Base unit: m/s
+            if (system == FS_UNIT_SYSTEM_METRIC) {
+                info.multiplier = M_PER_S_TO_KMH;
+                info.suffix = "km/h";
+            } else { // Imperial
+                info.multiplier = M_PER_S_TO_MPH;
+                info.suffix = "mph";
+            }
+            break;
+        case FS_UNIT_TYPE_DISTANCE: // Base unit: m
+             if (system == FS_UNIT_SYSTEM_METRIC) {
+                info.multiplier = METERS_TO_KM;
+                info.suffix = "km";
+            } else { // Imperial
+                info.multiplier = METERS_TO_MILES;
+                info.suffix = "mi";
+            }
+           break;
+        case FS_UNIT_TYPE_ALTITUDE: // Base unit: m
+            if (system == FS_UNIT_SYSTEM_METRIC) {
+                // info.multiplier = 1.0; // Default is already 1.0
+                info.suffix = "m";
+            } else { // Imperial
+                info.multiplier = METERS_TO_FEET;
+                info.suffix = "ft";
+            }
+            break;
+        case FS_UNIT_TYPE_ANGLE: // Base unit: degrees
+            // No conversion needed between metric/imperial for angles
+            info.suffix = "deg";
+            break;
+        case FS_UNIT_TYPE_NONE:  // Unitless
+            // No conversion, no suffix (defaults are correct)
+            break;
+    }
+    return info;
+}
+
+/* --------------------------------------------------------------------------
+   4. Helpers for Sending Commands / Building Layout
    -------------------------------------------------------------------------- */
 
 /* A helper to do a single WriteWithoutResp to the BLE client. */
@@ -322,6 +402,17 @@ static uint8_t AL_BuildPageUpdate(uint8_t pageId,
    3. Mode0 Implementation
    -------------------------------------------------------------------------- */
 
+// Helper to find the LineMap entry by typeId
+static const AL_Mode0_LineMap_t* FindLineMapEntry(uint8_t typeId) {
+    for (unsigned k = 0; k < s_lineMapCount; k++) {
+        if (s_lineMap[k].typeId == typeId) {
+            return &s_lineMap[k];
+        }
+    }
+    return NULL;
+}
+
+
 /**
  * FS_ActiveLook_Mode0_Init()
  *
@@ -345,124 +436,136 @@ void FS_ActiveLook_Mode0_Init(void)
         cfg->al_line_4
     };
 
-    // For each line i, pick a default label/units/fn if not found
-    for (int i=0; i<4; i++)
+    // For each line i, find its base label and store typeId
+    for (int i = 0; i < 4; i++)
     {
-        s_lineSpecs[i].label = "?";
-        s_lineSpecs[i].units = "";
-        s_lineSpecs[i].fn    = NULL;
-
-        // Search the dictionary for a match
-        for (unsigned k=0; k < s_lineMapCount; k++)
-        {
-            if (s_lineMap[k].typeId == lineTypes[i])
-            {
-                s_lineSpecs[i].label = s_lineMap[k].label;
-                s_lineSpecs[i].units = s_lineMap[k].units;
-                s_lineSpecs[i].fn    = s_lineMap[k].fn;
-                break;
-            }
+        const AL_Mode0_LineMap_t* entry = FindLineMapEntry(lineTypes[i]);
+        if (entry) {
+            s_lineSpecs[i].typeId = entry->typeId;
+            s_lineSpecs[i].label  = entry->label;
+        } else {
+            // Fallback if typeId is not found in the map
+            s_lineSpecs[i].typeId = lineTypes[i]; // Store the requested ID anyway
+            s_lineSpecs[i].label  = "?";
         }
     }
+
+    // Set the desired unit system
+    s_unitSystem = FS_UNIT_SYSTEM_METRIC;
 }
 
 /**
  * FS_ActiveLook_Mode0_Setup()
  *
- * Multi-step routine to define each layout #10..13 with the user-chosen
- * label/units, then define the page referencing them.
- * We do one BLE command per call, returning FS_AL_SETUP_IN_PROGRESS
- * until we're done.
+ * Multi-step routine. In each step (0-3), builds a layout (#10-13).
+ * It now dynamically determines the unit suffix based on the line's parameter type
+ * and the chosen unit system (s_unitSystem).
+ * Step 4 builds the page definition.
  */
 FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
 {
     uint8_t buf[128];
     uint8_t length;
+    FS_ActiveLook_SetupStatus_t status = FS_AL_SETUP_IN_PROGRESS;
 
-    switch (s_step)
-    {
-    case 0:
-        length = AL_BuildLayout(10,
-                                s_lineSpecs[0].label,
-                                s_lineSpecs[0].units,
-                                buf);
-        AL_SendRaw(buf, length);
-        s_step++;
-        return FS_AL_SETUP_IN_PROGRESS;
+    int lineIndex = s_step; // Corresponds to s_lineSpecs[lineIndex]
 
-    case 1:
-        length = AL_BuildLayout(11,
-                                s_lineSpecs[1].label,
-                                s_lineSpecs[1].units,
-                                buf);
-        AL_SendRaw(buf, length);
-        s_step++;
-        return FS_AL_SETUP_IN_PROGRESS;
+    if (s_step >= 0 && s_step < 4) { // Steps 0-3: Build Layouts 10-13
+        uint8_t layoutId = 10 + lineIndex;
+        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[lineIndex].typeId);
+        const char* label = s_lineSpecs[lineIndex].label;
+        const char* unitSuffix = ""; // Default empty suffix
 
-    case 2:
-        length = AL_BuildLayout(12,
-                                s_lineSpecs[2].label,
-                                s_lineSpecs[2].units,
-                                buf);
-        AL_SendRaw(buf, length);
-        s_step++;
-        return FS_AL_SETUP_IN_PROGRESS;
+        if (mapEntry) {
+            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(mapEntry->unitType, s_unitSystem);
+            unitSuffix = unitInfo.suffix;
+        } else {
+             // Use fallback label "?" if entry not found (already set in Init)
+             // unitSuffix remains ""
+        }
 
-    case 3:
-        length = AL_BuildLayout(13,
-                                s_lineSpecs[3].label,
-                                s_lineSpecs[3].units,
-                                buf);
-        AL_SendRaw(buf, length);
-        s_step++;
-        return FS_AL_SETUP_IN_PROGRESS;
-
-    case 4:
-        // Finally define the page referencing #10..#13
-        length = AL_BuildPage(10, buf);
-        AL_SendRaw(buf, length);
-        s_step++;
-        return FS_AL_SETUP_DONE;
-
-    default:
-        // If we get here, we've already finished or are in error
-        return FS_AL_SETUP_DONE;
+        length = AL_BuildLayout(layoutId, label, unitSuffix, buf);
+        if (length > 0) {
+            AL_SendRaw(buf, length);
+            s_step++;
+        } else {
+            // Handle layout build error? Maybe retry or abort?
+             status = FS_AL_SETUP_DONE; // Or some error status if defined
+        }
+    } else if (s_step == 4) { // Step 4: Build Page 10
+        length = AL_BuildPage(10, buf); // Page ID 10 references layouts 10-13
+        if (length > 0) {
+            AL_SendRaw(buf, length);
+            s_step++;
+            status = FS_AL_SETUP_DONE; // Final step completed successfully
+        } else {
+             // Handle page build error?
+            status = FS_AL_SETUP_DONE; // Consider setup failed/done
+        }
+    } else { // Steps > 4: Already done
+        status = FS_AL_SETUP_DONE;
     }
+
+    return status;
 }
 
 /**
  * FS_ActiveLook_Mode0_Update()
  *
- * Called periodically (e.g. from a timer or when new GNSS data arrives)
- * to fill the 4 lines with fresh values.
- *
- * We call each line's function pointer to compute a double, then format
- * it into a string, then send a single "pageClearAndDisplay" command
- * containing all 4 lines.
+ * Called periodically to update the display.
+ * - Gets current GNSS data.
+ * - For each line:
+ * - Finds the corresponding map entry using stored typeId.
+ * - Calls the base value function (fn).
+ * - Gets the correct unit conversion info (multiplier).
+ * - Calculates the display value by applying the multiplier.
+ * - Formats the display value into a string.
+ * - Builds and sends the "pageClearAndDisplay" command with the 4 formatted value strings.
  */
 void FS_ActiveLook_Mode0_Update(void)
 {
     const FS_GNSS_Data_t *gnss = FS_GNSS_GetData();
-    char line[4][16];
+    char lineValueStr[4][16]; // Buffer for formatted value strings
 
-    // For each line, call the function pointer to get a numeric value
-    for (int i=0; i<4; i++)
+    // For each line, calculate, convert, and format the value
+    for (int i = 0; i < 4; i++)
     {
-        double val = 0.0;
-        if (s_lineSpecs[i].fn)
-            val = s_lineSpecs[i].fn(gnss);
+        double baseVal = 0.0;
+        double displayVal = 0.0;
+        FS_ParamUnitType_t unitType = FS_UNIT_TYPE_NONE;
 
-        // Format as integer or float, up to you
-        snprintf(line[i], sizeof(line[i]), "%.1f", val);
+        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[i].typeId);
+
+        if (mapEntry && mapEntry->fn) {
+            // 1. Get base value (m/s, m, deg, etc.)
+            baseVal = mapEntry->fn(gnss);
+            unitType = mapEntry->unitType;
+
+            // 2. Get conversion info based on type and chosen system
+            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(unitType, s_unitSystem);
+
+            // 3. Calculate display value
+            displayVal = baseVal * unitInfo.multiplier;
+
+        } else {
+            // Handle case where line type or function is invalid - display default
+            displayVal = 0.0; // Or NAN?
+            // snprintf might format NAN as "nan", maybe use "?" or "---"
+            snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "---");
+            continue; // Skip normal formatting for this line
+        }
+
+        // 4. Format the display value
+        snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "%.1f", displayVal);
     }
 
     // Build the final packet with the 4 lines
     uint8_t buf[128];
     uint8_t length = AL_BuildPageUpdate(10,
-                                        line[0],
-                                        line[1],
-                                        line[2],
-                                        line[3],
+                                        lineValueStr[0],
+                                        lineValueStr[1],
+                                        lineValueStr[2],
+                                        lineValueStr[3],
                                         buf);
     AL_SendRaw(buf, length);
 }
