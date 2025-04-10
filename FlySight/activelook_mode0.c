@@ -1,6 +1,30 @@
+/***************************************************************************
+**                                                                        **
+**  FlySight 2 firmware                                                   **
+**  Copyright 2025 Bionic Avionics Inc.                                   **
+**                                                                        **
+**  This program is free software: you can redistribute it and/or modify  **
+**  it under the terms of the GNU General Public License as published by  **
+**  the Free Software Foundation, either version 3 of the License, or     **
+**  (at your option) any later version.                                   **
+**                                                                        **
+**  This program is distributed in the hope that it will be useful,       **
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of        **
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         **
+**  GNU General Public License for more details.                          **
+**                                                                        **
+**  You should have received a copy of the GNU General Public License     **
+**  along with this program.  If not, see <http://www.gnu.org/licenses/>. **
+**                                                                        **
+****************************************************************************
+**  Contact: Bionic Avionics Inc.                                         **
+**  Website: http://flysight.ca/                                          **
+****************************************************************************/
+
 #include "activelook_mode0.h"
 #include "activelook_client.h"    // For FS_ActiveLook_Client_WriteWithoutResp
 #include "config.h"               // For FS_Config_Get()
+#include "flight_params.h"
 #include "gnss.h"                 // For FS_GNSS_GetData()
 #include "nav.h"                  // For calcDirection, calcDistance, calcRelBearing
 #include <string.h>
@@ -46,10 +70,14 @@ typedef double (*LineValueFn_t)(const FS_GNSS_Data_t*);
 
 /* Simple "getter" functions for each known line type */
 static double LN_HSpeed(const FS_GNSS_Data_t *d) {
-	return (double)d->gSpeed / 1000.0; // mm/s to m/s
+    double base_hspeed = (double)d->gSpeed / 100.0; // cm/s to m/s
+    double correction_factor = FS_FlightParams_GetSASCorrectionFactor(d->hMSL);
+    return base_hspeed * correction_factor;
 }
 static double LN_VSpeed(const FS_GNSS_Data_t *d) {
-	return (double)d->velD / 1000.0; // mm/s to m/s
+    double base_vspeed = (double)d->velD / 1000.0; // mm/s to m/s
+    double correction_factor = FS_FlightParams_GetSASCorrectionFactor(d->hMSL);
+    return base_vspeed * correction_factor;
 }
 static double LN_GlideRatio(const FS_GNSS_Data_t *d) {
     if (d->velD != 0) {
@@ -64,7 +92,9 @@ static double LN_InvGlideRatio(const FS_GNSS_Data_t *d) {
     return 0.0; // Or some indicator
 }
 static double LN_TotalSpeed(const FS_GNSS_Data_t *d) {
-	return (double)d->speed / 100.0; // cm/s to m/s
+    double base_speed = (double)d->speed / 100.0; // cm/s to m/s
+    double correction_factor = FS_FlightParams_GetSASCorrectionFactor(d->hMSL);
+    return base_speed * correction_factor;
 }
 static double LN_DirToDest(const FS_GNSS_Data_t *d) {
     const FS_Config_Data_t *cfg = FS_Config_Get();
