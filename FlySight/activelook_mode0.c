@@ -58,6 +58,9 @@ typedef struct {
 #define METERS_TO_MILES     0.000621371
 #define METERS_TO_FEET      3.28084
 
+// Minimum announced altitude (mm)
+#define ALT_MIN_MM (1500L * 1000L)
+
 /* --------------------------------------------------------------------------
    2. Data Structures for Each Line
    -------------------------------------------------------------------------- */
@@ -534,11 +537,15 @@ void FS_ActiveLook_Mode0_Update(void)
     const FS_GNSS_Data_t *gnss = FS_GNSS_GetData();
     char lineValueStr[4][16]; // Buffer for formatted value strings
 
+    // Calculate altitude above ground level once
+    double altitude_agl_mm = (double)gnss->hMSL - (double)cfg->dz_elev;
+
     // For each line, calculate, convert, and format the value
     for (int i = 0; i < cfg->num_al_lines; i++)
     {
         double baseVal = 0.0;
         double displayVal = 0.0;
+        bool display_invalid = false; // Flag to indicate if "----" should be shown
 
         const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[i].typeId);
 
@@ -546,29 +553,77 @@ void FS_ActiveLook_Mode0_Update(void)
             // 1. Get base value (m/s, m, deg, etc.)
             baseVal = mapEntry->fn(gnss);
 
-            // 2. Get conversion info based on type and chosen system
-            UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
-            		mapEntry->unitType,
-					cfg->al_lines[i].units);
+            // 2. Check validity limits
+            // Check for valid GNSS fix
+			if (gnss->gpsFix != 3) {
+				display_invalid = true;
+			}
 
-            // 3. Calculate display value
-            displayVal = baseVal * unitInfo.multiplier;
+            // Check ALT_MIN for Altitude display
+            if (mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE) {
+                if (altitude_agl_mm < ALT_MIN_MM) {
+                    display_invalid = true;
+                }
+            }
 
+            // Check end_nav for Navigation parameters
+            if (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+                mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+                mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING)
+            {
+                 // end_nav is in mm in config struct, compare directly
+                if ((cfg->end_nav != 0) && (altitude_agl_mm < cfg->end_nav)) {
+                    display_invalid = true;
+                }
+            }
+
+            // Check max_dist for Destination parameters (only if not already invalid)
+            if (!display_invalid &&
+                (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+                 mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION))
+            {
+                // baseVal for DistToDest is already the distance in meters
+                // For DirToDest, we need to recalculate distance if baseVal isn't distance
+                double distance_m;
+                if (mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION) {
+                    distance_m = baseVal;
+                } else {
+                     // Recalculate distance if the primary value isn't distance
+                     distance_m = (double)calcDistance(gnss->lat, gnss->lon, cfg->lat, cfg->lon);
+                }
+
+                // max_dist is in meters in config struct
+                if ((cfg->max_dist != 0) && (distance_m > cfg->max_dist)) {
+                    display_invalid = true;
+                }
+            }
+
+            if (!display_invalid) {
+				// 3. Get conversion info based on type and chosen system
+				UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
+						mapEntry->unitType,
+						cfg->al_lines[i].units);
+
+				// 4. Calculate display value
+				displayVal = baseVal * unitInfo.multiplier;
+
+                // 5. Format the display value
+                snprintf(
+                        lineValueStr[i],
+                        sizeof(lineValueStr[i]),
+                        "%.*f",
+                        (int)(cfg->al_lines[i].decimals),
+                        displayVal);
+            }
         } else {
-            // Handle case where line type or function is invalid - display default
-            displayVal = 0.0; // Or NAN?
-            // snprintf might format NAN as "nan", maybe use "?" or "---"
-            snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "---");
-            continue; // Skip normal formatting for this line
+            // Handle case where line type or function is invalid
+            display_invalid = true;
         }
 
-        // 4. Format the display value
-        snprintf(
-        		lineValueStr[i],
-				sizeof(lineValueStr[i]),
-				"%.*f",
-				(int)(cfg->al_lines[i].decimals),
-				displayVal);
+        // If any limit check failed, display "----"
+        if (display_invalid) {
+             snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "----");
+        }
     }
 
     // Build the final packet with the 4 lines
