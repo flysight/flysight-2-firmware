@@ -223,6 +223,18 @@ static void getValues(
 		}
 	}
 
+	// If navigation is disabled and the requested mode is a
+	// navigation-related feature, mark it as invalid
+	if (!config->enable_nav &&
+	    (mode == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+	     mode == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+	     mode == FS_CONFIG_MODE_DIRECTION_TO_BEARING ||
+	     mode == FS_CONFIG_MODE_LEFT_RIGHT))
+	{
+		*val = INVALID_VALUE;
+		return;
+	}
+
 	switch (mode)
 	{
 	case FS_CONFIG_MODE_HORIZONTAL_SPEED:
@@ -440,6 +452,17 @@ static void speakValue(
 			uint16_t y2 = sas_table[i + 1];
 			speed_mul = y1 + ((y2 - y1) * j) / 1024;
 		}
+	}
+
+	// If navigation is disabled and the requested mode is a
+	// navigation-related feature, mark it as invalid
+	if (!config->enable_nav &&
+	   (config->speech[cur_speech].mode == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+	    config->speech[cur_speech].mode == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+	    config->speech[cur_speech].mode == FS_CONFIG_MODE_DIRECTION_TO_BEARING ||
+	    config->speech[cur_speech].mode == FS_CONFIG_MODE_LEFT_RIGHT))
+	{
+		return;
 	}
 
 	switch (config->speech[cur_speech].units)
