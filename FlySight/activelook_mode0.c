@@ -109,7 +109,7 @@ static double LN_DirToDest(const FS_GNSS_Data_t *d) {
 }
 static double LN_DistToDest(const FS_GNSS_Data_t *d) {
     const FS_Config_Data_t *cfg = FS_Config_Get();
-	return (double)calcDistance(d->lat, d->lon, cfg->lat, cfg->lon); // in meters
+    return (double)calcDistance(d->lat, d->lon, cfg->lat, cfg->lon); // in meters
 }
 static double LN_DirToBearing(const FS_GNSS_Data_t *d) {
     const FS_Config_Data_t *cfg = FS_Config_Get();
@@ -130,7 +130,7 @@ static double LN_Altitude(const FS_GNSS_Data_t *d) {
     return ((double)d->hMSL - (double)cfg->dz_elev) / 1000.0; // mm to m, relative to DZ elev
 }
 static double LN_Heading(const FS_GNSS_Data_t *d) {
-	return (double)d->heading / 100000.0; // 1e-5 deg to deg
+    return (double)d->heading / 100000.0; // 1e-5 deg to deg
 }
 
 /**
@@ -190,8 +190,8 @@ static int s_step = 0;
  * and the selected unit system.
  */
 static UnitConversionInfo_t AL_GetUnitConversion(
-		FS_ParamUnitType_t type,
-		FS_Config_UnitSystem_t system) {
+        FS_ParamUnitType_t type,
+        FS_Config_UnitSystem_t system) {
     UnitConversionInfo_t info = {1.0, ""}; // Default: no conversion, no suffix
 
     switch (type) {
@@ -352,10 +352,10 @@ static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 
     for (int i = 0; i < cfg->num_al_lines; i++)
     {
-		outBuf[idx++] = 10 + i;
-		outBuf[idx++] = 0x00;
-		outBuf[idx++] = 0x00;
-		outBuf[idx++] = 168 - 40 * i;
+        outBuf[idx++] = 10 + i;
+        outBuf[idx++] = 0x00;
+        outBuf[idx++] = 0x00;
+        outBuf[idx++] = 168 - 40 * i;
     }
 
     outBuf[idx++] = 0xAA;
@@ -444,7 +444,7 @@ void FS_ActiveLook_Mode0_Init(void)
     for (int i = 0; i < cfg->num_al_lines; i++)
     {
         const AL_Mode0_LineMap_t* entry = FindLineMapEntry(
-        		cfg->al_lines[i].mode);
+                cfg->al_lines[i].mode);
         if (entry) {
             s_lineSpecs[i].typeId = entry->typeId;
             s_lineSpecs[i].label  = entry->label;
@@ -477,14 +477,14 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
         int lineIndex = s_step; // Corresponds to s_lineSpecs[lineIndex]
         uint8_t layoutId = 10 + lineIndex;
         const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(
-        		s_lineSpecs[lineIndex].typeId);
+                s_lineSpecs[lineIndex].typeId);
         const char* label = s_lineSpecs[lineIndex].label;
         const char* unitSuffix = ""; // Default empty suffix
 
         if (mapEntry) {
             UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
-            		mapEntry->unitType,
-					cfg->al_lines[s_step].units);
+                    mapEntry->unitType,
+                    cfg->al_lines[s_step].units);
             unitSuffix = unitInfo.suffix;
         } else {
              // Use fallback label "?" if entry not found (already set in Init)
@@ -550,28 +550,41 @@ void FS_ActiveLook_Mode0_Update(void)
         const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[i].typeId);
 
         if (mapEntry && mapEntry->fn) {
-            // 1. Get base value (m/s, m, deg, etc.)
-            baseVal = mapEntry->fn(gnss);
+            // 1. If nav is disabled but line is a navigation mode, mark it invalid
+            //    so we display "----"
+            if (!cfg->enable_nav &&
+               (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+                mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+                mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING ||
+                mapEntry->typeId == FS_CONFIG_MODE_LEFT_RIGHT))
+            {
+                display_invalid = true;
+            }
 
-            // 2. Check validity limits
-            // Check for valid GNSS fix
-			if (gnss->gpsFix != 3) {
-				display_invalid = true;
-			}
+            // 2. Get base value if not invalid
+            if (!display_invalid) {
+                baseVal = mapEntry->fn(gnss);
+            }
+
+            // 3. Check validity limits
+            if (!display_invalid && gnss->gpsFix != 3) {
+                display_invalid = true;
+            }
 
             // Check ALT_MIN for Altitude display
-            if (mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE) {
+            if (!display_invalid && mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE) {
                 if (altitude_agl_mm < ALT_MIN_MM) {
                     display_invalid = true;
                 }
             }
 
             // Check end_nav for Navigation parameters
-            if (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
-                mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
-                mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING)
+            if (!display_invalid &&
+                (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
+                 mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+                 mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING))
             {
-                 // end_nav is in mm in config struct, compare directly
+                // end_nav is in mm in config struct, compare directly
                 if ((cfg->end_nav != 0) && (altitude_agl_mm < cfg->end_nav)) {
                     display_invalid = true;
                 }
@@ -599,15 +612,15 @@ void FS_ActiveLook_Mode0_Update(void)
             }
 
             if (!display_invalid) {
-				// 3. Get conversion info based on type and chosen system
-				UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
-						mapEntry->unitType,
-						cfg->al_lines[i].units);
+                // 4. Get conversion info based on type and chosen system
+                UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
+                        mapEntry->unitType,
+                        cfg->al_lines[i].units);
 
-				// 4. Calculate display value
-				displayVal = baseVal * unitInfo.multiplier;
+                // 5. Calculate display value
+                displayVal = baseVal * unitInfo.multiplier;
 
-                // 5. Format the display value
+                // 6. Format the display value
                 snprintf(
                         lineValueStr[i],
                         sizeof(lineValueStr[i]),

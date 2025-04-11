@@ -176,6 +176,9 @@ typedef struct
 
 	FS_Config_AL_Line_t al_lines[FS_CONFIG_MAX_AL_LINES];
 	uint8_t  num_al_lines;
+
+	// Flag to control whether navigation modes are allowed
+	uint8_t  enable_nav;
 } FS_Config_Data_t;
 
 typedef enum {
