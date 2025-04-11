@@ -27,6 +27,8 @@
 #include "flight_params.h"
 #include "gnss.h"                 // For FS_GNSS_GetData()
 #include "nav.h"                  // For calcDirection, calcDistance, calcRelBearing
+#include "vbat.h"
+#include "app_common.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -605,6 +607,8 @@ void FS_ActiveLook_Mode0_Update(void)
     const FS_Config_Data_t *cfg = FS_Config_Get();
 
     const FS_GNSS_Data_t *gnss = FS_GNSS_GetData();
+    const FS_VBAT_Data_t *vbat = FS_VBAT_GetData();
+
     char lineValueStr[4][16]; // Buffer for formatted value strings
 
     // Calculate altitude above ground level once
@@ -711,7 +715,9 @@ void FS_ActiveLook_Mode0_Update(void)
 
     // Build header text
     char battLevels[30];
-    sprintf(battLevels, "AL:100%%  FS:100%%  NS:%02d", gnss->numSV);
+    int fs_pct = (100 * (vbat->voltage - 3300)) / (4200 - 3200);
+    fs_pct = MAX(0, MIN(100, fs_pct));
+    sprintf(battLevels, "AL:100%%  FS:%d%%  NS:%02d", fs_pct, gnss->numSV);
 
     // Build the final packet with the 4 lines
     uint8_t buf[128];
