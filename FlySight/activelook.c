@@ -92,8 +92,15 @@ void AL_SelectMode(uint8_t modeId)
 static void OnActiveLookDiscoveryComplete(void)
 {
     APP_DBG_MSG("ActiveLook: Discovery complete\n");
+
+    // Initialize state
     s_state = AL_STATE_CFG_WRITE;
+
+    // Begin updates
     UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+
+    // Start Battery notifications
+    FS_ActiveLook_Client_EnableBatteryNotifications();
 }
 
 /*******************************************************************************
