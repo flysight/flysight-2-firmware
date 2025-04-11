@@ -32,13 +32,37 @@ typedef struct
     void (*OnDiscoveryComplete)(void);
 } FS_ActiveLook_ClientCb_t;
 
+/* Initialize the ActiveLook client state machine */
 void FS_ActiveLook_Client_Init(void);
+
+/* Register optional callback interface */
 void FS_ActiveLook_Client_RegisterCb(const FS_ActiveLook_ClientCb_t *cb);
+
+/* Start discovery (including MTU exchange) after connecting */
 void FS_ActiveLook_Client_StartDiscovery(uint16_t connectionHandle);
 
+/* The main BLE event handler for ActiveLook */
 void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_evt_code);
 
+/* Check if ActiveLook Rx characteristic is ready */
 uint8_t FS_ActiveLook_Client_IsReady(void);
+
+/* Write data to Rx characteristic (WriteWithoutResp) */
 tBleStatus FS_ActiveLook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length);
+
+/**
+ * @brief Enable battery notifications for the standard Battery Service.
+ *        This writes 0x01 to the CCC descriptor of the Battery Level char.
+ *        Should be called after service/char discovery is complete.
+ *
+ * @return tBleStatus  BLE_STATUS_SUCCESS or an error code.
+ */
+tBleStatus FS_ActiveLook_Client_EnableBatteryNotifications(void);
+
+/**
+ * @brief Get the last known battery level from the glasses (0–100%).
+ * @return uint8_t
+ */
+uint8_t FS_ActiveLook_Client_GetBatteryLevel(void);
 
 #endif /* ACTIVELOOK_CLIENT_H */

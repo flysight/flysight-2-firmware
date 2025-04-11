@@ -608,6 +608,7 @@ void FS_ActiveLook_Mode0_Update(void)
 
     const FS_GNSS_Data_t *gnss = FS_GNSS_GetData();
     const FS_VBAT_Data_t *vbat = FS_VBAT_GetData();
+    uint8_t alBatt = FS_ActiveLook_Client_GetBatteryLevel();
 
     char lineValueStr[4][16]; // Buffer for formatted value strings
 
@@ -715,9 +716,17 @@ void FS_ActiveLook_Mode0_Update(void)
 
     // Build header text
     char battLevels[30];
+
+    char alBattStr[5];
+    if (alBatt == 255)
+        snprintf(alBattStr, sizeof(alBattStr), "??");
+    else
+        snprintf(alBattStr, sizeof(alBattStr), "%d", alBatt);
+
     int fs_pct = (100 * (vbat->voltage - 3300)) / (4200 - 3200);
     fs_pct = MAX(0, MIN(100, fs_pct));
-    sprintf(battLevels, "AL:100%%  FS:%d%%  NS:%02d", fs_pct, gnss->numSV);
+
+    sprintf(battLevels, "A:%s%%   F:%d%%   N:%d", alBattStr, fs_pct, gnss->numSV);
 
     // Build the final packet with the 4 lines
     uint8_t buf[128];
