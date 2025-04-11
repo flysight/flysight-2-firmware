@@ -244,8 +244,57 @@ static void AL_SendRaw(const uint8_t *data, uint16_t length)
 }
 
 /**
- * Build your "layoutSave" command.
- * This is the same code you've used; simplified for brevity.
+ * Build status layout
+ */
+static uint8_t AL_BuildStatus(uint8_t layoutId,
+                              uint8_t *outBuf)
+{
+    uint8_t idx = 0;
+    outBuf[idx++] = 0xFF;
+    outBuf[idx++] = 0x60;  // "layoutSave"
+    outBuf[idx++] = 0x00;  // 1B length
+    uint8_t lenPos = idx++;
+
+    // layout ID
+    outBuf[idx++] = layoutId;
+
+    // Additional commands size placeholder
+    uint8_t addCmdSizePos = idx++;
+
+    // X, Y, Width, Height, color, etc. Hard-coded example
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x01;
+    outBuf[idx++] = 0x30;
+    outBuf[idx++] = 0x28;
+    outBuf[idx++] = 15;
+    outBuf[idx++] = 0;
+    outBuf[idx++] = 1;
+    outBuf[idx++] = 1;
+    outBuf[idx++] = 1;
+    outBuf[idx++] = 5;
+    outBuf[idx++] = 35;
+    outBuf[idx++] = 4;
+    outBuf[idx++] = 1;
+
+    // Build sub-commands for label & units
+    uint8_t extra[64];
+    uint8_t e = 0;
+
+    // copy extras
+    outBuf[addCmdSizePos] = e;
+    memcpy(&outBuf[idx], extra, e);
+    idx += e;
+
+    outBuf[idx++] = 0xAA; // footer
+    outBuf[lenPos] = idx; // fill length
+
+    return idx;
+}
+
+/**
+ * Build flight parameter layout
  */
 static uint8_t AL_BuildLayout(uint8_t layoutId,
                               const char *headingText,
@@ -335,7 +384,7 @@ static uint8_t AL_BuildLayout(uint8_t layoutId,
 }
 
 /**
- * Build a page referencing layout #10..#13.
+ * Build a page referencing layout #10..#14
  */
 static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 {
@@ -350,12 +399,17 @@ static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 
     outBuf[idx++] = pageId;
 
+    outBuf[idx++] = 14;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 0x00;
+    outBuf[idx++] = 138 + 40;
+
     for (int i = 0; i < cfg->num_al_lines; i++)
     {
         outBuf[idx++] = 10 + i;
         outBuf[idx++] = 0x00;
         outBuf[idx++] = 0x00;
-        outBuf[idx++] = 168 - 40 * i;
+        outBuf[idx++] = 133 - 40 * i;
     }
 
     outBuf[idx++] = 0xAA;
@@ -367,6 +421,7 @@ static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
  * Build a single pageUpdate command with 4 lines separated by '\0'.
  */
 static uint8_t AL_BuildPageUpdate(uint8_t pageId,
+                                  const char *heading,
                                   const char *line1,
                                   const char *line2,
                                   const char *line3,
@@ -380,6 +435,12 @@ static uint8_t AL_BuildPageUpdate(uint8_t pageId,
     uint8_t lenPos = idx++;
 
     outBuf[idx++] = pageId;
+
+    // heading
+    size_t lh = strlen(heading);
+    memcpy(&outBuf[idx], heading, lh);
+    idx += lh;
+    outBuf[idx++] = 0;
 
     // line1
     size_t l1 = strlen(line1);
@@ -473,8 +534,17 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
     uint8_t length;
     FS_ActiveLook_SetupStatus_t status = FS_AL_SETUP_IN_PROGRESS;
 
-    if (s_step >= 0 && s_step < cfg->num_al_lines) { // Build layouts
-        int lineIndex = s_step; // Corresponds to s_lineSpecs[lineIndex]
+    if (s_step == 0) { // Build status layout
+        length = AL_BuildStatus(14, buf);
+        if (length > 0) {
+            AL_SendRaw(buf, length);
+            s_step++;
+        } else {
+            // Handle layout build error? Maybe retry or abort?
+             status = FS_AL_SETUP_DONE; // Or some error status if defined
+        }
+    } else if (s_step >= 1 && s_step < cfg->num_al_lines + 1) { // Build layouts
+        int lineIndex = s_step - 1; // Corresponds to s_lineSpecs[lineIndex]
         uint8_t layoutId = 10 + lineIndex;
         const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(
                 s_lineSpecs[lineIndex].typeId);
@@ -499,7 +569,7 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
             // Handle layout build error? Maybe retry or abort?
              status = FS_AL_SETUP_DONE; // Or some error status if defined
         }
-    } else if (s_step == cfg->num_al_lines) { // Build page
+    } else if (s_step == cfg->num_al_lines + 1) { // Build page
         length = AL_BuildPage(10, buf); // Page ID 10 references layouts 10-13
         if (length > 0) {
             AL_SendRaw(buf, length);
@@ -639,9 +709,14 @@ void FS_ActiveLook_Mode0_Update(void)
         }
     }
 
+    // Build header text
+    char battLevels[30];
+    sprintf(battLevels, "AL:100%%  FS:100%%  NS:%02d", gnss->numSV);
+
     // Build the final packet with the 4 lines
     uint8_t buf[128];
     uint8_t length = AL_BuildPageUpdate(10,
+                                        battLevels,
                                         lineValueStr[0],
                                         lineValueStr[1],
                                         lineValueStr[2],
