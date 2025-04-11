@@ -60,7 +60,8 @@ typedef enum {
     DISC_STATE_EXCH_MTU,
     DISC_STATE_SVC_IN_PROGRESS,
     DISC_STATE_CHAR_IN_PROGRESS,
-    DISC_STATE_DESC_IN_PROGRESS
+    DISC_STATE_DESC_IN_PROGRESS,
+    DISC_STATE_BATTERY_NOTIFY_WRITE
 } DiscoveryState_t;
 
 /* We define a separate enum to track which service we are scanning for chars. */
@@ -97,6 +98,9 @@ typedef struct
 
     /* Keep track of which service we are currently discovering chars for */
     WhichService_t whichService;
+
+    /* Track which handle we requested to read, so we know how to interpret the response. */
+    uint16_t currentReadHandle;
 
     /* Callback interface if set */
     const FS_ActiveLook_ClientCb_t *cb;
@@ -320,12 +324,38 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                 {
                     tBleStatus s2 = FS_ActiveLook_Client_EnableBatteryNotifications();
                     APP_DBG_MSG("EnableBatteryNotifications => 0x%02X\n", s2);
+                    if (s2 == BLE_STATUS_SUCCESS)
+                    {
+                        /* Expect a GATT procedure complete event for the CCC write. */
+                        g_ctx.discState = DISC_STATE_BATTERY_NOTIFY_WRITE;
+                    }
                 }
 
                 /* If we also found Rx char, call the callback now if desired */
                 if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
                 {
                     g_ctx.cb->OnDiscoveryComplete();
+                }
+            }
+            else if (g_ctx.discState == DISC_STATE_BATTERY_NOTIFY_WRITE)
+            {
+                /* The CCCD write just completed successfully. We can now read. */
+                g_ctx.discState = DISC_STATE_IDLE;
+
+                if (g_ctx.batteryCharFound && (g_ctx.batteryCharHandle != 0))
+                {
+                    g_ctx.currentReadHandle = g_ctx.batteryCharHandle;
+                    tBleStatus readStatus = aci_gatt_read_char_value(g_ctx.connHandle, g_ctx.batteryCharHandle);
+
+                    if (readStatus == BLE_STATUS_SUCCESS)
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: Requesting immediate battery read...\n");
+                    }
+                    else
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: Battery read failed => 0x%02X\n", readStatus);
+                        g_ctx.currentReadHandle = 0; /* just in case */
+                    }
                 }
             }
         }
@@ -490,6 +520,31 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                 {
                     /* 128-bit descriptors if needed... not typical for CCCD. */
                 }
+            }
+        }
+        break;
+
+        case ACI_ATT_READ_RESP_VSEVT_CODE:
+        {
+            aci_att_read_resp_event_rp0 *pRead =
+                (aci_att_read_resp_event_rp0*) blecore_evt->data;
+
+            /* Check if it's our connection */
+            if (pRead->Connection_Handle == g_ctx.connHandle)
+            {
+                /* If we had queued up a read to batteryCharHandle, interpret it now */
+                if (g_ctx.currentReadHandle == g_ctx.batteryCharHandle)
+                {
+                    if (pRead->Event_Data_Length >= 1)
+                    {
+                        g_ctx.lastBatteryPercent = pRead->Attribute_Value[0];
+                        APP_DBG_MSG("ActiveLook_Client: Immediate battery read => %d%%\n",
+                                    g_ctx.lastBatteryPercent);
+                    }
+                }
+
+                /* Reset it so we don't confuse subsequent read responses. */
+                g_ctx.currentReadHandle = 0;
             }
         }
         break;
