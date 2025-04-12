@@ -29,6 +29,7 @@
 #include "app_common.h"
 #include "button.h"
 #include "config_mode.h"
+#include "custom_app.h"
 #include "mode.h"
 #include "pairing_mode.h"
 #include "start_mode.h"
@@ -277,10 +278,22 @@ static FS_Mode_State_t FS_Mode_State_Start(FS_Mode_Event_t event)
 
 static void FS_Mode_Update(void)
 {
-	while (!FS_Mode_QueueEmpty())
-	{
-		mode_state = mode_state_table[mode_state](FS_Mode_PopQueue());
-	}
+    while (!FS_Mode_QueueEmpty())
+    {
+        FS_Mode_State_t oldMode = mode_state;
+        FS_Mode_Event_t event   = FS_Mode_PopQueue();
+
+        /* The table call: next_mode = mode_state_table[current_mode](event) */
+        FS_Mode_State_t nextMode = mode_state_table[oldMode](event);
+
+        if (nextMode != oldMode)
+        {
+            mode_state = nextMode;
+
+            /* Notify BLE about the updated mode (cast enum -> 1-byte) */
+            Custom_Mode_Update((uint8_t) nextMode);
+        }
+    }
 }
 
 static void FS_Mode_Timer(void)
