@@ -556,7 +556,7 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
         if (mapEntry) {
             UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
                     mapEntry->unitType,
-                    cfg->al_lines[s_step].units);
+                    cfg->al_lines[lineIndex].units);
             unitSuffix = unitInfo.suffix;
         } else {
              // Use fallback label "?" if entry not found (already set in Init)
