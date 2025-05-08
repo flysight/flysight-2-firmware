@@ -102,6 +102,7 @@ static uint8_t watchdog_timer_id;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
+static void MX_RF_Init(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_IPCC_Init(void);
@@ -109,7 +110,6 @@ static void MX_RTC_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_RF_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -163,13 +163,13 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  MX_RF_Init();
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_RTC_Init();
   MX_I2C3_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
-  MX_RF_Init();
   /* USER CODE BEGIN 2 */
   FS_State_Init();
   FS_IMU_Init();

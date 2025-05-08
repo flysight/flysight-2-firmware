@@ -40,6 +40,7 @@ typedef struct
   uint8_t               Crs_tx_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
+  uint8_t               Gnss_control_Notification_Status;
   /* Start */
   uint8_t               Start_control_Indication_Status;
   uint8_t               Start_result_Indication_Status;
@@ -108,6 +109,8 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
+static void Custom_Gnss_control_Update_Char(void);
+static void Custom_Gnss_control_Send_Notification(void);
 /* Start */
 static void Custom_Start_control_Update_Char(void);
 static void Custom_Start_control_Send_Indication(void);
@@ -183,6 +186,24 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       Custom_App_Context.Gnss_pv_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_CONTROL_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
       break;
 
     /* Start */
@@ -393,6 +414,45 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
   /* USER CODE BEGIN Gnss_pv_NS_Last*/
 
   /* USER CODE END Gnss_pv_NS_Last*/
+
+  return;
+}
+
+void Custom_Gnss_control_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_control_UC_1*/
+
+  /* USER CODE END Gnss_control_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_control_UC_Last*/
+
+  /* USER CODE END Gnss_control_UC_Last*/
+  return;
+}
+
+void Custom_Gnss_control_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_control_NS_1*/
+
+  /* USER CODE END Gnss_control_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_control_NS_Last*/
+
+  /* USER CODE END Gnss_control_NS_Last*/
 
   return;
 }
