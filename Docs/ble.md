@@ -1,0 +1,276 @@
+# FlySight 2 BLE Interface Developer Documentation
+
+## Overview
+
+This document describes the Bluetooth Low Energy (BLE) interface for the FlySight 2 device. This interface allows applications to interact with the FlySight 2 for file access (reading, writing, deleting files and directories) and accessing real-time sensor data.
+
+The interface utilizes standard BLE GATT services where applicable, but primarily relies on custom services for its core functionality. Familiarity with BLE concepts (GATT, Services, Characteristics, UUIDs, Notifications, Writes, Bonding, Security Modes) is recommended.
+
+**Note:** This interface is under active development. Details may change in future firmware versions. This documentation reflects the state based on developer discussions and firmware code (`v2024.11.11.release_candidate` or similar, check `flysight.txt` for exact version).
+
+## Prerequisites
+
+*   **Firmware:** A FlySight 2 unit running firmware version `v2024.11.11.release_candidate` or later is recommended to ensure compatibility with the features described here, especially the pairing mechanism and connection timeout. Firmware updates can be performed via the [online tool](https://flysight.ca/firmware/?include_beta=true). Note that different hardware batches (B1-B5, identifiable via `flysight.txt` or serial number) require specific firmware builds.
+*   **BLE Client:** A BLE central device (e.g., smartphone, computer) with a compatible BLE stack and application, supporting secure connections (pairing/bonding) and configurable MTU.
+
+## Core Concepts
+
+### Pairing, Bonding, and Security
+
+FlySight 2 employs BLE security features (bonding and whitelisting) to prevent unauthorized access.
+
+1.  **Pairing Request Mode:**
+    *   To initiate pairing with a *new* central device, the FlySight 2 must be put into "Pairing Request Mode".
+    *   **Activation:** While the unit is off (Idle Mode, LED is off), perform **two short presses** of the power button.
+    *   **Indication:** The **green LED** will pulse slowly (2-second period).
+    *   **Advertising:** In this mode, the FlySight advertises as "limited discoverable" and includes specific manufacturer data indicating pairing mode is active (`0xDB0901`, see Advertising section).
+    *   **Duration:** Pairing request mode lasts for 30 seconds, or until a BLE connection is established, or until the button is pressed again (which cancels it and returns to Idle).
+    *   **Functionality:** While in this mode, *any* central device can connect and initiate pairing/bonding. The whitelist filter is temporarily disabled.
+
+2.  **Whitelisting (Filter Accept List):**
+    *   FlySight 2 uses the BLE "filter accept list" (based on the bonded device list). Outside of Pairing Request Mode, it only accepts connections from devices on this list (i.e., devices it has previously bonded with).
+    *   **Adding Devices:** When a central device successfully completes the bonding process initiated during Pairing Request Mode, its address/identity is added to the FlySight's internal bonded device list, effectively whitelisting it for future connections.
+    *   **Storage:** The bonded device list (including security keys like IRK/ERK) is stored persistently in the FlySight 2's non-volatile memory.
+
+3.  **Bonding Process:**
+    *   **Initiation:** After connecting to a FlySight 2 in Pairing Request Mode, the central device *must* initiate bonding to establish a secure, encrypted link and be added to the whitelist.
+    *   **Security:** FlySight 2 requests **Security Mode 1, Level 2** (Authenticated pairing with encryption, No MITM protection). It uses the **Just Works** association model (as it has NoInput/NoOutput capabilities).
+    *   **Triggering Pairing:** Since the peripheral (FlySight) cannot force pairing, the central device must trigger it. A reliable method is to attempt to **read a secure characteristic** (e.g., `CRS_RX` UUID `00000002-8e22-4541-9d4c-21edae82ed19`) immediately after connecting. FlySight 2 requires encryption for accessing user data characteristics. This read attempt will fail with an "insufficient authentication/encryption" error from the FlySight's BLE stack, which typically prompts the central device's OS/BLE stack to initiate the pairing/bonding procedure (often showing a system dialog to the user like "Pair with FlySight?").
+    *   **Completion:** Once pairing is complete, the central device should store the bonding information (keys) provided by the BLE stack for future use. The FlySight stores the central's identity.
+
+4.  **Reconnecting:**
+    *   Once a central device is bonded and whitelisted, it can reconnect to the FlySight 2 even when the FlySight is *not* in Pairing Request Mode (e.g., when the LED is off or solid green), provided the FlySight is advertising (typically in slow advertising mode).
+    *   The connection attempt will use the stored security keys to establish an encrypted link automatically. No user interaction (like button presses on the FlySight) is needed for reconnection.
+
+5.  **Resetting BLE Security:**
+    *   **Purpose:** To clear existing bonds if connection issues arise or if the user wants to remove access for previously paired devices.
+    *   **FlySight Side:**
+        *   Connect the FlySight 2 via USB.
+        *   Edit the `FLYSIGHT.TXT` file and set `Reset_BLE = 1`. Save the file.
+        *   Eject and unplug the FlySight. The BLE bond list and keys (IRK/ERK) are cleared when the device restarts after unplugging. The `Reset_BLE` value will be automatically set back to `0` in `FLYSIGHT.TXT`.
+        *   Alternatively, deleting `flysight.txt` entirely will cause it to be recreated with defaults, including `Reset_BLE = 1`, triggering a reset on the next boot.
+    *   **Central Device Side:** Crucially, you must also **"forget" or "unpair"** the FlySight device in the central device's system Bluetooth settings. This clears the stored keys on the central side. Simply clearing app cache or restarting Bluetooth may not be sufficient.
+    *   **Hardware Reset (10s Hold):** This forces a processor reset but does *not* clear the BLE bonding information on its own. It's useful for recovering from a stuck state but should be used *in conjunction* with the `Reset_BLE` flag method for a full security reset.
+
+6.  **Connection Timeout & Ping:**
+    *   **Timeout:** FlySight 2 implements a **30-second** inactivity timeout (`TIMEOUT_MSEC`). If no BLE *write* activity occurs on the `CRS_RX` characteristic for this duration, the FlySight will terminate the connection (disconnect reason `0x13`, Remote User Terminated Connection).
+    *   **Keep-Alive:** To maintain a connection during periods of inactivity (e.g., user browsing files in the app, waiting between commands), the central application **must** send a command to the `CRS_RX` characteristic at least once every 30 seconds.
+    *   **Ping Command:** A dedicated "ping" command (`0xfe`) can be used for this. Writing `0xfe` to `CRS_RX` resets the timer and elicits an ACK (`0xf1 fe`) response on `CRS_TX`. A recommended interval is every 15 seconds.
+    *   **Implicit Reset:** *Any* successful write to `CRS_RX` (including file transfer commands) also resets the 30-second timeout timer.
+
+### Device States and BLE Availability
+
+The FlySight 2's operational mode affects BLE service availability, primarily due to resource contention (SD card access). BLE connection itself is generally possible in most states if the device is whitelisted and advertising.
+
+*   **Idle Mode (LED Off):** Default low-power state. BLE is active (slow advertising). Full BLE functionality (File Access, Real-time Data subscription, State Control) is available. This is the **required** mode for file system operations via BLE.
+*   **Active Mode (Green LED):** GNSS active, logging, audio feedback. Entered via a ~1s power button press from Idle.
+    *   Real-time data (`GNSS_PV`) notifications are available if subscribed.
+    *   **File Access (CRS service) is UNAVAILABLE** due to potential SD card conflicts with logging. Commands will likely return NAK (`0xf0`).
+*   **Config Selection Mode (Orange LED):** Entered via short press then long press from Idle. BLE connection may be possible, but file access is unavailable.
+*   **USB Mode (Red/Green LED):** Mass Storage Device mode. BLE connection may be possible, but **File Access (CRS service) is UNAVAILABLE** due to USB using the file system.
+*   **Firmware Update Mode (Orange LED when plugged in):** Bootloader mode. BLE is inactive.
+*   **Pairing Request Mode (Pulsing Green LED):** Temporary mode (30s) entered via double-press from Idle. Allows connection from *any* device to initiate pairing. File access might be available after pairing is complete *within* this mode, but it's generally expected the app will proceed after pairing without extensive file ops immediately.
+
+*Current State via BLE is planned but not yet implemented.*
+
+### Advertising Details
+
+*   **Modes:** Fast advertising (100ms interval for 30s after reset/button press), then Slow advertising (2.5s interval). Uses Limited Discoverable in Pairing Request Mode, Undirected Connectable otherwise.
+*   **Address:** Uses Random Private Resolvable Addresses (RPA). Central devices should support RPAs. Issues were observed when a central tried using Random Static Address after pairing.
+*   **Manufacturer Specific Data (Adv. Packet Payload):**
+    *   Format: `[Length: 0x04] [Type: 0xFF] [Manuf. ID LSB: 0xDB] [Manuf. ID MSB: 0x09] [Status Byte: 0x00 or 0x01]`
+    *   Manufacturer ID: `0x09DB` (Bionic Avionics Inc.)
+    *   **Status Byte:**
+        *   `0x00`: Normal operation (not in pairing request mode).
+        *   `0x01`: **In Pairing Request Mode.**
+    *   Use this data to filter scans specifically for FlySight 2 devices and identify those ready for initial pairing.
+
+## BLE Services and Characteristics
+
+### 1. Custom File Access Service (CRS - Cable Replacement Service)
+
+Provides serial-like file system operations. Requires bonding. File operations only functional in Idle Mode.
+
+*   **Service UUID:** `00000000-cc7a-482a-984a-7f2ed5b3e58f`
+*   **Characteristics:**
+
+    *   **`CRS_TX` (Transmit from FlySight)**
+        *   UUID: `00000001-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Notify**
+        *   Permissions: Encrypted Read/Write required for CCCD (Client Characteristic Configuration Descriptor) to enable notifications.
+        *   Usage: Sends data packets (`0x10`), file info packets (`0x11`), and ACK/NAK responses (`0xf1`/`0xf0`, `0x12`) *from* FlySight *to* the central device via notifications. Central must enable notifications on this characteristic after connecting and bonding.
+        *   Max Length: 244 bytes (`SizeCrs_Tx`) - Note: Effective length depends on negotiated MTU.
+
+    *   **`CRS_RX` (Receive by FlySight)**
+        *   UUID: `00000002-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **WriteWithoutResponse, Read**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Receives commands and file data *from* the central device *to* the FlySight.
+            *   Uses WriteWithoutResponse for speed. Reliability via application-layer ACKs and GBN ARQ.
+            *   Reading this characteristic can be used to trigger the pairing process after initial connection in Pairing Request Mode.
+            *   *Any* write to this characteristic resets the 30s connection inactivity timer.
+        *   Max Length: 244 bytes (`SizeCrs_Rx`) - Note: Effective length depends on negotiated MTU.
+
+#### CRS Command Protocol
+
+Packets sent over `CRS_RX` (WriteWithoutResponse) and received via notifications on `CRS_TX`.
+
+**Packet Format:** `[Command Byte (uint8)] [Payload...]`
+
+**Commands from Central to FlySight (Write to `CRS_RX`):**
+
+| Opcode | Command Name         | Payload Format                                                        | Notes                                                                              |
+| :----- | :------------------- | :-------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
+| `0x01` | Delete File/Dir    | `Path (null-terminated string)`                                       |                                                                                    |
+| `0x02` | Read File            | `Offset_multiplier (uint32_t), Stride_minus_1_multiplier (uint32_t), Path (null-terminated string)` | Opens file for reading. `Offset = Offset_multiplier * FRAME_LENGTH`. `Stride = (Stride_minus_1_multiplier + 1) * FRAME_LENGTH`. Path follows stride. |
+| `0x03` | Write File (Open)    | `Path (null-terminated string)`                                       | Opens/Creates (overwrites) file for writing. FlySight will be ready to receive file data chunks via `0x10` command. |
+| `0x04` | Create Directory     | `Path (null-terminated string)`                                       |                                                                                    |
+| `0x05` | List Directory       | `Path (null-terminated string)`                                       |                                                                                    |
+| `0x10` | File Data (Write Chunk)| `PacketCounter (uint8), DataBytes (...)`                              | Chunk of file data sent by Central to FS during write. Max data length = MTU - 3. Requires `0x12` ACK from FS. |
+| `0x12` | ACK File Data Packet | `PacketCounter (uint8)`                                               | Acknowledges receipt of packet `0x10` (during read from FS).                       |
+| `0xfe` | Ping                 | (None)                                                                | Keeps connection alive. Resets 30s timeout.                                        |
+| `0xff` | Cancel Transfer      | (None)                                                                | Cancels ongoing Read/Write/List operation.                                         |
+
+*Deprecated Commands (since ~v2024.09.29):*
+*   `0x00`: Create File. Use Write File (`0x03` with path) instead; it now creates/overwrites. Sending `0x00` may return NAK.
+
+**Responses/Data from FlySight to Central (Notify on `CRS_TX`):**
+
+| Opcode | Response Name         | Payload Format                                                            | Notes                                                                                    |
+| :----- | :-------------------- | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------- |
+| `0x10` | File Data (Read Chunk)| `PacketCounter (uint8), DataBytes (...)`                                  | Chunk of file data sent by FS *to* Central during read. Max data length = MTU - 3. Zero-length data signals EOF. Requires `0x12` ACK from Central. |
+| `0x11` | File Info             | `PacketCounter (uint8), Size (uint32_t), Date (uint16), Time (uint16), Attributes (uint8), Name (13 bytes, null-padded)` | One packet per dir entry. `Name[0]==0` signals end of list. Date/Time format per FATFS standard. |
+| `0x12` | ACK File Data Packet  | `PacketCounter (uint8)`                                                   | Acknowledges receipt of packet `0x10` (during write to FS).                               |
+| `0xf0` | NAK                   | `OriginalCommand (uint8)`                                                 | Command failed (e.g., file busy, not found, invalid).                                      |
+| `0xf1` | ACK                   | `OriginalCommand (uint8)`                                                 | Command initiation successful (e.g., file opened, ping received, dir opened, delete OK). |
+
+*(Note: All multi-byte integers are Little Endian unless specified otherwise. `FRAME_LENGTH` is 242 from `crs.c`)*
+
+#### Go-Back-N ARQ for Reliable File Transfer
+
+*   **Purpose:** Ensure reliable transfer over unreliable `WriteWithoutResponse` and `Notify`.
+*   **Applies To:**
+    *   Reading from FlySight: Central sends `0x02` (Read File), FlySight sends `0x10` (File Data Read Chunk) packets.
+    *   Writing to FlySight: Central sends initial `0x03` (Write File Open), then Central sends `0x10` (File Data Write Chunk) packets.
+*   **Window Size:** 8 packets (`FS_CRS_WINDOW_LENGTH`). The sender can send up to 8 data packets before needing an ACK for the first one.
+*   **Packet Counter:** A **1-byte** counter included in each `0x10` data packet (both directions). Increments modulo 256 (wraps 0xff -> 0x00).
+*   **Acknowledgement (`0x12`):** The **receiver** of `0x10` data packets sends an `0x12` ACK (containing the received packet's counter) back to the **sender** for *each* `0x10` data packet successfully received *in the expected sequence*.
+*   **Timeout & Retransmission:**
+    *   The **sender** of `0x10` data packets uses a timeout (`TX_TIMEOUT_MSEC` = 200ms for reads from FS; `RX_TIMEOUT_MSEC` = 10000ms for FS waiting for data from central during a write).
+    *   If the sender doesn't receive the expected `0x12` ACK within its timeout, it assumes the data packet or its ACK was lost.
+    *   It **goes back** and retransmits all packets starting from the first unacknowledged one.
+    *   The receiver discards any duplicate or out-of-order packets based on the packet counter.
+*   **End of Transfer:**
+    *   **Reading from FS:** FlySight signals EOF by sending a final `0x10` data packet with a payload containing only the packet counter (data length of 1).
+    *   **Writing to FS:** Central signals EOF by sending a final `0x10` data packet with a payload containing only the packet counter (data length of 1, indicating zero actual data bytes).
+    *   The receiver still ACKs this final zero-data-length packet.
+*   **Cancel:** Sending `0xff` to `CRS_RX` aborts the current transfer state on FlySight.
+
+**Revised Flow (Writing to FlySight):**
+1.  Central sends `0x03 [Path]` to `CRS_RX` to open/create the file.
+2.  FlySight, if successful, sends `0xf1 03` (ACK) on `CRS_TX`. FlySight is now ready to receive file data chunks.
+3.  Central sends a window of `0x10 [PacketCounter] [DataBytes]` packets to `CRS_RX`.
+4.  FlySight receives `0x10` packets. For each valid sequential packet, it writes data and sends `0x12 [PacketCounter]` ACK on `CRS_TX`.
+5.  Repeat until entire file is sent, ending with a `0x10 [PacketCounter]` (zero data bytes) packet.
+
+### 2. Custom Real-time Data Service (GNSS)
+
+Provides live GNSS data when FlySight is in Active Mode. Requires bonding.
+
+*   **Service UUID:** `00000001-cc7a-482a-984a-7f2ed5b3e58f`
+*   **Characteristics:**
+
+    *   **`GNSS_PV` (Position/Velocity)**
+        *   UUID: `00000000-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Streams core GNSS data. Updates at rate set in `config.txt` *only when FlySight is in Active Mode*. Central must enable notifications. Reading can trigger pairing.
+        *   Max Length: 44 bytes (actual payload 29 bytes in current format). (`SizeGnss_Pv`)
+        *   **Data Format (29 bytes total, Little Endian):**
+            *   Byte 0: `flags` (uint8). Bitmask indicating present fields. `0xb0` = `0b10110000` means iTOW (bit 7), Position (bit 5), and Velocity (bit 4) are present.
+            *   Bytes 1-4: `iTOW` (uint32_t). GNSS Time of Week (ms).
+            *   Bytes 5-8: `Longitude` (int32_t). Degrees * 1e7.
+            *   Bytes 9-12: `Latitude` (int32_t). Degrees * 1e7.
+            *   Bytes 13-16: `hMSL` (int32_t). Height above Mean Sea Level (mm).
+            *   Bytes 17-20: `velN` (int32_t). Velocity North (mm/s).
+            *   Bytes 21-24: `velE` (int32_t). Velocity East (mm/s).
+            *   Bytes 25-28: `velD` (int32_t). Velocity Down (mm/s).
+
+    *   **`GNSS_Control`**
+        *   UUID: `00000006-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Write, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: (Planned/Partial) Used to control which data fields are included in the `GNSS_PV` characteristic notifications (and potentially others). May also receive responses/confirmations via Notify. Central enables notifications if responses are desired.
+        *   Max Length: 2 bytes (`SizeGnss_Control`).
+
+### 3. Custom Start Pistol Service
+
+Used for synchronized start timing in specific scenarios (e.g., BASE race). Likely not needed for general applications. Requires bonding.
+
+*   **Service UUID:** `00000002-cc7a-482a-984a-7f2ed5b3e58f`
+*   **Characteristics:**
+
+    *   **`Start_Control`**
+        *   UUID: `00000003-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Write, Indicate**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Sends control commands to the start pistol feature. Indications may provide feedback.
+        *   Length: 1 byte (`SizeStart_Control`).
+
+    *   **`Start_Result`**
+        *   UUID: `00000004-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Indicate**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Provides results from the start pistol function (e.g., precise start time).
+        *   Length: 9 bytes (`SizeStart_Result`). Data format (from `Custom_Start_Update`): `Year (u16), Month (u8), Day (u8), Hour (u8), Min (u8), Sec (u8), ms (u16)`.
+
+### 4. Standard BLE Services
+
+FlySight 2 also implements standard BLE services:
+
+*   **Device Information Service (DIS - 0x180A):** Provides Manufacturer Name ("Bionic Avionics Inc."), Model Number ("FlySight 2"), Firmware Revision (`GIT_TAG`), etc.
+*   **Battery Service (BAS - 0x180F):** (Planned) Will expose battery level via the standard Battery Level characteristic (0x2A19).
+
+## Implementation Notes & Best Practices
+
+*   **Error Handling:** Expect NAKs (`0xf0`) for commands sent when the FlySight is in an incompatible state (e.g., file access during Active mode or USB connection). Handle timeouts appropriately, especially for the GBN ARQ.
+*   **State Awareness:** Be mindful of the FlySight's operational mode (Idle, Active, USB). File access is generally only reliable in Idle mode. Real-time data (`GNSS_PV`) is only sent in Active mode.
+*   **MTU Negotiation:** Request a larger MTU (e.g., 247 bytes) after connection for efficient file transfer. Handle potential failures where the MTU remains small (e.g., 23 bytes with BLE 4.0/4.1 devices), potentially by fragmenting CRS data packets if necessary (though the current CRS implementation seems to assume MTU is large enough for its framing).
+*   **Pairing Flow:** Implement the connect-then-read-secure-characteristic flow to reliably trigger pairing, especially if developing a cross-platform application.
+*   **Connection Management:** Use the ping command (`0xfe`) to keep connections alive during inactivity. Handle disconnects gracefully. Be aware of the Android system pairing behavior possibly leaving connections open.
+*   **Code Examples:** Refer extensively to the provided Python, iOS, and Android examples for practical implementation details, especially for the GBN ARQ logic.
+
+## Appendix
+
+### Known UUIDs
+
+| Feature              | Characteristic Name | UUID                                         | Service         | Properties             |
+| :------------------- | :------------------ | :------------------------------------------- | :-------------- | :--------------------- |
+| File Access Service  |                     | `00000000-cc7a-482a-984a-7f2ed5b3e58f`       | Custom File     |                        |
+| File Access TX       | `CRS_TX`            | `00000001-8e22-4541-9d4c-21edae82ed19`       | Custom File     | Notify                 |
+| File Access RX       | `CRS_RX`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | Custom File     | WriteWithoutResponse, Read |
+| GNSS Service         |                     | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Custom GNSS     |                        |
+| Live GNSS P/V        | `GNSS_PV`           | `00000000-8e22-4541-9d4c-21edae82ed19`       | Custom GNSS     | Read, Notify           |
+| GNSS Control         | `GNSS_Control`      | `00000006-8e22-4541-9d4c-21edae82ed19`       | Custom GNSS     | Write, Notify          |
+| Start Pistol Service |                     | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Custom Start    |                        |
+| Start Pistol Control | `Start_Control`     | `00000003-8e22-4541-9d4c-21edae82ed19`       | Custom Start    | Write, Indicate        |
+| Start Pistol Result  | `Start_Result`      | `00000004-8e22-4541-9d4c-21edae82ed19`       | Custom Start    | Read, Indicate         |
+
+### CRS Command Opcodes
+
+| Opcode | Command Name           | Direction      | Payload Description                            | Response (on TX)                                   |
+| :----- | :--------------------- | :------------- | :--------------------------------------------- | :------------------------------------------------- |
+| `0x01` | Delete File/Dir      | Central -> FS  | `[Path]`                                       | `0xf1 01` (ACK) / `0xf0 01` (NAK)                  |
+| `0x02` | Read File              | Central -> FS  | `[Offset_mult (u32)] [Stride-1_mult (u32)] [Path]` | `0xf1 02` (ACK) / `0xf0 02` (NAK), then `0x10` data packets |
+| `0x03` | Write File (Open)      | Central -> FS  | `[Path]`                                       | `0xf1 03` (ACK) / `0xf0 03` (NAK)                  |
+| `0x04` | Create Directory       | Central -> FS  | `[Path]`                                       | `0xf1 04` (ACK) / `0xf0 04` (NAK)                  |
+| `0x05` | List Directory         | Central -> FS  | `[Path]`                                       | `0xf1 05` (ACK) / `0xf0 05` (NAK), then `0x11` info packets |
+| `0x10` | File Data (Chunk)      | Bidirectional  | `[Counter (u8)] [Data...]`                     | Receiver sends `0x12 [Counter]` ACK                |
+| `0x11` | File Info              | FS -> Central  | `[Counter (u8)] [Size] [Date] [Time] [Attr] [Name]` | N/A                                                |
+| `0x12` | ACK File Data Packet   | Receiver -> Sender | `[Counter (u8)]`                           | N/A                                                |
+| `0xf0` | NAK                    | FS -> Central  | `[Original Command (u8)]`                    | N/A                                                |
+| `0xf1` | ACK                    | FS -> Central  | `[Original Command (u8)]`                    | N/A                                                |
+| `0xfe` | Ping                   | Central -> FS  | (None)                                         | `0xf1 fe` (ACK)                                    |
+| `0xff` | Cancel Transfer        | Central -> FS  | (None)                                         | (None expected, state just resets)                 |
+
+*(Note: Path is a null-terminated string. `0x10` is used by Central to send data chunks to FS during a write operation (after `0x03` has opened the file), and by FS to send data chunks to Central during a read operation. `FRAME_LENGTH` is 242.)*
