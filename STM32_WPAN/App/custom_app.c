@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "crs.h"
 #include "start_control.h"
+#include "gnss_ble.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,7 +88,8 @@ static uint32_t tx_read_index, tx_write_index;
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
-static uint8_t gnss_pv_packet[29];
+static uint8_t gnss_pv_packet[GNSS_BLE_MAX_LEN];
+static uint8_t gnss_control_rsp[4];
 
 static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
 static uint32_t start_read_index, start_write_index;
@@ -98,6 +100,9 @@ static uint8_t connected_flag = 0;
 
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
+
+extern uint8_t SizeGnss_Pv;
+extern uint8_t SizeGnss_Control;
 
 static uint8_t timeout_timer_id;
 /* USER CODE END PV */
@@ -190,9 +195,20 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_GNSS_CONTROL_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+      {
+        uint8_t rsp_len = GNSS_BLE_HandleCtrlWrite(
+                              pNotification->DataTransfered.pPayload,
+                              pNotification->DataTransfered.Length,
+                              gnss_control_rsp);
 
+        if (rsp_len && Custom_App_Context.Gnss_control_Notification_Status)
+        {
+          SizeGnss_Control = rsp_len;
+          Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, gnss_control_rsp);
+        }
+      }
       /* USER CODE END CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
-      break;
+    break;
 
     case CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
@@ -671,14 +687,7 @@ static void Custom_GNSS_Transmit(void)
 
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-  memset(&gnss_pv_packet[0], 0xb0, 1);
-  memcpy(&gnss_pv_packet[1], &(current->iTOW), sizeof(current->iTOW));
-  memcpy(&gnss_pv_packet[5], &(current->lon), sizeof(current->lon));
-  memcpy(&gnss_pv_packet[9], &(current->lat), sizeof(current->lat));
-  memcpy(&gnss_pv_packet[13], &(current->hMSL), sizeof(current->hMSL));
-  memcpy(&gnss_pv_packet[17], &(current->velN), sizeof(current->velN));
-  memcpy(&gnss_pv_packet[21], &(current->velE), sizeof(current->velE));
-  memcpy(&gnss_pv_packet[25], &(current->velD), sizeof(current->velD));
+  SizeGnss_Pv = GNSS_BLE_Build(current, gnss_pv_packet);
 
   if (Custom_App_Context.Gnss_pv_Notification_Status)
   {
