@@ -67,13 +67,13 @@ uint8_t GNSS_BLE_Build(const FS_GNSS_Data_t *src, uint8_t *dst)
     }
 
     if (s_mask & GNSS_BLE_BIT_ACCURACY) {             /* accuracy             */
-        memcpy(p, &src->velN, sizeof(src->hAcc));   p += 4;
-        memcpy(p, &src->velE, sizeof(src->vAcc));   p += 4;
-        memcpy(p, &src->velD, sizeof(src->sAcc));   p += 4;
+        memcpy(p, &src->hAcc, sizeof(src->hAcc));   p += 4;
+        memcpy(p, &src->vAcc, sizeof(src->vAcc));   p += 4;
+        memcpy(p, &src->sAcc, sizeof(src->sAcc));   p += 4;
     }
 
     if (s_mask & GNSS_BLE_BIT_NUM_SV) {               /* number of satellites */
-        memcpy(p, &src->velN, sizeof(src->numSV));  p += 1;
+        memcpy(p, &src->numSV, sizeof(src->numSV));  p += 1;
     }
 
     return (uint8_t)(p - dst);                        /* total payload length */
