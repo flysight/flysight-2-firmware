@@ -25,6 +25,7 @@
 #include "app_common.h"
 #include "crs.h"
 #include "custom_app.h"
+#include "crs_tx_queue.h"
 #include "dbg_trace.h"
 #include "ff.h"
 #include "resource_manager.h"
@@ -105,14 +106,14 @@ static volatile uint8_t timeout_flag;
 
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
-	Custom_CRS_Packet_t *tx_packet;
+	CRS_TX_Queue_Packet_t *tx_packet;
 
-	if ((tx_packet = Custom_CRS_GetNextTxPacket()))
+	if ((tx_packet = CRS_TX_Queue_GetNextTxPacket()))
 	{
 		tx_packet->length = length + 1;
 		*(tx_packet->data) = command;
 		memcpy(tx_packet->data + 1, payload, length);
-		Custom_CRS_SendNextTxPacket();
+		CRS_TX_Queue_SendNextTxPacket();
 	}
 }
 
@@ -344,6 +345,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_DIR;
 	Custom_CRS_Packet_t *packet;
+	CRS_TX_Queue_Packet_t *tx_packet;
 	FILINFO fno;
 
 	if (!Custom_APP_IsConnected())
@@ -365,7 +367,8 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 		}
 	}
 
-	while ((next_state == FS_CRS_STATE_DIR) && (packet = Custom_CRS_GetNextTxPacket()))
+	while ((next_state == FS_CRS_STATE_DIR) &&
+			(tx_packet = CRS_TX_Queue_GetNextTxPacket()))
 	{
 		// Read a directory item
 		if (f_readdir(&dir, &fno) == FR_OK)
@@ -406,6 +409,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_READ;
 	Custom_CRS_Packet_t *packet;
+	CRS_TX_Queue_Packet_t *tx_packet;
 	UINT br;
 
 	if (!Custom_APP_IsConnected())
@@ -452,7 +456,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 	}
 
 	while ((next_state == FS_CRS_STATE_READ) &&
-			(packet = Custom_CRS_GetNextTxPacket()) &&
+			(tx_packet = CRS_TX_Queue_GetNextTxPacket()) &&
 			(next_packet < next_ack + FS_CRS_WINDOW_LENGTH) &&
 			(next_packet < last_packet))
 	{
