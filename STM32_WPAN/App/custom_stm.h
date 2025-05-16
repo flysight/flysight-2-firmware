@@ -28,7 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ble_types.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

@@ -111,7 +111,7 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 	{
 		tx_buffer[0] = command;
 		memcpy(&tx_buffer[1], payload, length);
-		CRS_TX_Queue_SendNextTxPacket(length + 1);
+		CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, length + 1);
 	}
 }
 
@@ -379,7 +379,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 			tx_buffer[10] = fno.fattrib;
 			memcpy(&tx_buffer[11], fno.fname, sizeof(fno.fname));
 
-			CRS_TX_Queue_SendNextTxPacket(24);
+			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 24);
 
 			if (fno.fname[0] == 0)
 			{
@@ -465,7 +465,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 		if (f_eof(&file))
 		{
 			// Send empty buffer to signal end of file
-			CRS_TX_Queue_SendNextTxPacket(2);
+			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 2);
 			last_packet = ++next_packet;
 		}
 		else if (f_read(&file, &tx_buffer[2], FRAME_LENGTH, &br) == FR_OK)
@@ -477,7 +477,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			}
 
 			// Send data
-			CRS_TX_Queue_SendNextTxPacket(br + 2);
+			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, br + 2);
 			++next_packet;
 		}
 		else
