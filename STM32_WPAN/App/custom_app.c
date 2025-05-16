@@ -30,6 +30,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "crs.h"
+#include "crs_tx_queue.h"
 #include "start_control.h"
 #include "gnss_ble.h"
 /* USER CODE END Includes */
@@ -46,7 +47,7 @@ typedef struct
   uint8_t               Start_control_Indication_Status;
   uint8_t               Start_result_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
-  uint8_t               Crs_tx_Flow_Status;
+
   /* USER CODE END CUSTOM_APP_Context_t */
 
   uint16_t              ConnectionHandle;
@@ -82,9 +83,6 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
-static uint32_t tx_read_index, tx_write_index;
-
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
@@ -98,7 +96,6 @@ static uint8_t start_result_packet[9];
 
 static uint8_t connected_flag = 0;
 
-extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
 
 extern uint8_t SizeGnss_Pv;
@@ -126,7 +123,6 @@ static void Custom_Start_result_Send_Indication(void);
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_CRS_Transmit(void);
 static void Custom_GNSS_Transmit(void);
 static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_Start_Transmit(void);
@@ -149,7 +145,6 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       Custom_App_Context.Crs_tx_Notification_Status = 1;
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
@@ -320,12 +315,12 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
+  CRS_TX_Queue_Init();
+
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_Start_Transmit);
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
-  Custom_App_Context.Crs_tx_Flow_Status = 1;
   Custom_App_Context.Gnss_pv_Notification_Status = 0;
   Custom_App_Context.Start_control_Indication_Status = 0;
   Custom_App_Context.Start_result_Indication_Status = 0;
@@ -338,8 +333,7 @@ void Custom_APP_Init(void)
 /* USER CODE BEGIN FD */
 void Custom_APP_TxPoolAvailableNotification(void)
 {
-  Custom_App_Context.Crs_tx_Flow_Status = 1;
-  UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  CRS_TX_Queue_TxPoolAvailableNotification();
 }
 
 uint8_t Custom_APP_IsConnected(void)
@@ -556,9 +550,6 @@ void Custom_Start_result_Send_Indication(void) /* Property Indication */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
 {
   // Reset buffer indices
-  tx_read_index = 0;
-  tx_write_index = 0;
-
   rx_read_index = 0;
   rx_write_index = 0;
 
@@ -607,65 +598,6 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 
   // Refresh timeout timer
   HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
-}
-
-static void Custom_CRS_Transmit(void)
-{
-  static uint8_t tx_busy = 0;
-  Custom_CRS_Packet_t *packet;
-  tBleStatus status;
-
-  if (!tx_busy
-      && (tx_read_index < tx_write_index)
-      && Custom_App_Context.Crs_tx_Notification_Status
-      && Custom_App_Context.Crs_tx_Flow_Status)
-  {
-    tx_busy = 1;
-
-	packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
-	SizeCrs_Tx = packet->length;
-
-	status = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
-	if (status == BLE_STATUS_INSUFFICIENT_RESOURCES)
-	{
-      Custom_App_Context.Crs_tx_Flow_Status = 0;
-	}
-	else
-	{
-      ++tx_read_index;
-
-      // Call update task and transmit next packet
-      UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-	}
-
-    tx_busy = 0;
-  }
-}
-
-Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
-{
-  Custom_CRS_Packet_t *ret = 0;
-
-  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
-  {
-	ret = &tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
-  }
-
-  return ret;
-}
-
-void Custom_CRS_SendNextTxPacket(void)
-{
-  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
-  {
-    ++tx_write_index;
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-  }
-  else
-  {
-    APP_DBG_MSG("Custom_CRS_SendNextTxPacket: buffer overflow\n");
-  }
 }
 
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
