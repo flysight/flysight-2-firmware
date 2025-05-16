@@ -24,10 +24,13 @@
 #ifndef APP_CRS_TX_QUEUE_H_
 #define APP_CRS_TX_QUEUE_H_
 
+#include "custom_stm.h"
+
 void CRS_TX_Queue_Init(void);
 void CRS_TX_Queue_TxPoolAvailableNotification(void);
 
 uint8_t *CRS_TX_Queue_GetNextTxPacket(void);
-void CRS_TX_Queue_SendNextTxPacket(uint8_t length);
+void CRS_TX_Queue_SendNextTxPacket(
+		Custom_STM_Char_Opcode_t opcode, uint8_t length);
 
 #endif /* APP_CRS_TX_QUEUE_H_ */

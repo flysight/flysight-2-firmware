@@ -31,8 +31,9 @@
 
 typedef struct
 {
-  uint8_t data[244];
-  uint8_t length;
+	Custom_STM_Char_Opcode_t opcode;
+	uint8_t data[244];
+	uint8_t length;
 } CRS_TX_Queue_Packet_t;
 
 static CRS_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
@@ -71,11 +72,17 @@ uint8_t *CRS_TX_Queue_GetNextTxPacket(void)
 	}
 }
 
-void CRS_TX_Queue_SendNextTxPacket(uint8_t length)
+void CRS_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
+		uint8_t length)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
-		tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH].length = length;
+		CRS_TX_Queue_Packet_t *packet =
+				&tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
+
+		packet->opcode = opcode;
+		packet->length = length;
+
 		++tx_write_index;
 		UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
@@ -100,7 +107,7 @@ static void CRS_TX_Queue_Transmit(void)
 		packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
 		SizeCrs_Tx = packet->length;
 
-		status = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
+		status = Custom_STM_App_Update_Char(packet->opcode, packet->data);
 		if (status == BLE_STATUS_INSUFFICIENT_RESOURCES)
 		{
 			tx_flow_status = 0;
