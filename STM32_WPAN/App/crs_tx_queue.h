@@ -24,16 +24,10 @@
 #ifndef APP_CRS_TX_QUEUE_H_
 #define APP_CRS_TX_QUEUE_H_
 
-typedef struct
-{
-  uint8_t data[244];
-  uint8_t length;
-} CRS_TX_Queue_Packet_t;
-
 void CRS_TX_Queue_Init(void);
 void CRS_TX_Queue_TxPoolAvailableNotification(void);
 
-CRS_TX_Queue_Packet_t *CRS_TX_Queue_GetNextTxPacket(void);
-void CRS_TX_Queue_SendNextTxPacket(void);
+uint8_t *CRS_TX_Queue_GetNextTxPacket(void);
+void CRS_TX_Queue_SendNextTxPacket(uint8_t length);
 
 #endif /* APP_CRS_TX_QUEUE_H_ */
