@@ -212,13 +212,13 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
-
+      Custom_App_Context.Gnss_control_Notification_Status = 1;
       /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
       break;
 
     case CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
-
+      Custom_App_Context.Gnss_control_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
       break;
 
