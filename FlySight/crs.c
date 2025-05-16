@@ -90,7 +90,6 @@ static FS_CRS_StateFunc_t *const state_table[FS_CRS_STATE_COUNT] =
 static FS_CRS_State_t state = FS_CRS_STATE_IDLE;
 
 static FIL file;
-static uint8_t buffer[FRAME_LENGTH + 1];
 static DIR dir;
 
 static uint32_t read_offset;
@@ -106,14 +105,13 @@ static volatile uint8_t timeout_flag;
 
 static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
-	CRS_TX_Queue_Packet_t *tx_packet;
+	uint8_t *tx_buffer;
 
-	if ((tx_packet = CRS_TX_Queue_GetNextTxPacket()))
+	if ((tx_buffer = CRS_TX_Queue_GetNextTxPacket()))
 	{
-		tx_packet->length = length + 1;
-		*(tx_packet->data) = command;
-		memcpy(tx_packet->data + 1, payload, length);
-		CRS_TX_Queue_SendNextTxPacket();
+		tx_buffer[0] = command;
+		memcpy(&tx_buffer[1], payload, length);
+		CRS_TX_Queue_SendNextTxPacket(length + 1);
 	}
 }
 
@@ -345,7 +343,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_DIR;
 	Custom_CRS_Packet_t *packet;
-	CRS_TX_Queue_Packet_t *tx_packet;
+	uint8_t *tx_buffer;
 	FILINFO fno;
 
 	if (!Custom_APP_IsConnected())
@@ -368,19 +366,20 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 	}
 
 	while ((next_state == FS_CRS_STATE_DIR) &&
-			(tx_packet = CRS_TX_Queue_GetNextTxPacket()))
+			(tx_buffer = CRS_TX_Queue_GetNextTxPacket()))
 	{
 		// Read a directory item
 		if (f_readdir(&dir, &fno) == FR_OK)
 		{
-			buffer[0] = ((next_packet++) & 0xff);
-			memcpy(buffer + 1, &fno.fsize, sizeof(fno.fsize));
-			memcpy(buffer + 5, &fno.fdate, sizeof(fno.fdate));
-			memcpy(buffer + 7, &fno.ftime, sizeof(fno.ftime));
-			buffer[9] = fno.fattrib;
-			memcpy(buffer + 10, fno.fname, sizeof(fno.fname));
+			tx_buffer[0] = FS_CRS_COMMAND_FILE_INFO;
+			tx_buffer[1] = ((next_packet++) & 0xff);
+			memcpy(&tx_buffer[2], &fno.fsize, sizeof(fno.fsize));
+			memcpy(&tx_buffer[6], &fno.fdate, sizeof(fno.fdate));
+			memcpy(&tx_buffer[8], &fno.ftime, sizeof(fno.ftime));
+			tx_buffer[10] = fno.fattrib;
+			memcpy(&tx_buffer[11], fno.fname, sizeof(fno.fname));
 
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_INFO, buffer, 23);
+			CRS_TX_Queue_SendNextTxPacket(24);
 
 			if (fno.fname[0] == 0)
 			{
@@ -409,7 +408,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 {
 	FS_CRS_State_t next_state = FS_CRS_STATE_READ;
 	Custom_CRS_Packet_t *packet;
-	CRS_TX_Queue_Packet_t *tx_packet;
+	uint8_t *tx_buffer;
 	UINT br;
 
 	if (!Custom_APP_IsConnected())
@@ -456,19 +455,20 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 	}
 
 	while ((next_state == FS_CRS_STATE_READ) &&
-			(tx_packet = CRS_TX_Queue_GetNextTxPacket()) &&
+			(tx_buffer = CRS_TX_Queue_GetNextTxPacket()) &&
 			(next_packet < next_ack + FS_CRS_WINDOW_LENGTH) &&
 			(next_packet < last_packet))
 	{
-		buffer[0] = (next_packet & 0xff);
+		tx_buffer[0] = FS_CRS_COMMAND_FILE_DATA;
+		tx_buffer[1] = (next_packet & 0xff);
 
 		if (f_eof(&file))
 		{
 			// Send empty buffer to signal end of file
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, 1);
+			CRS_TX_Queue_SendNextTxPacket(2);
 			last_packet = ++next_packet;
 		}
-		else if (f_read(&file, &buffer[1], FRAME_LENGTH, &br) == FR_OK)
+		else if (f_read(&file, &tx_buffer[2], FRAME_LENGTH, &br) == FR_OK)
 		{
 			if (read_stride > FRAME_LENGTH)
 			{
@@ -477,7 +477,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			}
 
 			// Send data
-			FS_CRS_SendPacket(FS_CRS_COMMAND_FILE_DATA, buffer, br + 1);
+			CRS_TX_Queue_SendNextTxPacket(br + 2);
 			++next_packet;
 		}
 		else

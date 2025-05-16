@@ -29,6 +29,12 @@
 #include "stm32_seq.h"
 #include "custom_stm.h"
 
+typedef struct
+{
+  uint8_t data[244];
+  uint8_t length;
+} CRS_TX_Queue_Packet_t;
+
 static CRS_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t tx_read_index, tx_write_index;
 static uint8_t tx_flow_status;
@@ -53,22 +59,23 @@ void CRS_TX_Queue_TxPoolAvailableNotification(void)
 	UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 }
 
-CRS_TX_Queue_Packet_t *CRS_TX_Queue_GetNextTxPacket(void)
+uint8_t *CRS_TX_Queue_GetNextTxPacket(void)
 {
-	CRS_TX_Queue_Packet_t *ret = 0;
-
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
-		ret = &tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
+		return tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH].data;
 	}
-
-	return ret;
+	else
+	{
+		return 0;
+	}
 }
 
-void CRS_TX_Queue_SendNextTxPacket(void)
+void CRS_TX_Queue_SendNextTxPacket(uint8_t length)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
+		tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH].length = length;
 		++tx_write_index;
 		UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
