@@ -21,11 +21,11 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
+#include <ble_tx_queue.h>
 #include "main.h"
 #include "app_common.h"
 #include "crs.h"
 #include "custom_app.h"
-#include "crs_tx_queue.h"
 #include "dbg_trace.h"
 #include "ff.h"
 #include "resource_manager.h"
@@ -107,11 +107,11 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 {
 	uint8_t *tx_buffer;
 
-	if ((tx_buffer = CRS_TX_Queue_GetNextTxPacket()))
+	if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
 	{
 		tx_buffer[0] = command;
 		memcpy(&tx_buffer[1], payload, length);
-		CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, length + 1);
+		BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, length + 1);
 	}
 }
 
@@ -366,7 +366,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 	}
 
 	while ((next_state == FS_CRS_STATE_DIR) &&
-			(tx_buffer = CRS_TX_Queue_GetNextTxPacket()))
+			(tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
 	{
 		// Read a directory item
 		if (f_readdir(&dir, &fno) == FR_OK)
@@ -379,7 +379,7 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 			tx_buffer[10] = fno.fattrib;
 			memcpy(&tx_buffer[11], fno.fname, sizeof(fno.fname));
 
-			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 24);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 24);
 
 			if (fno.fname[0] == 0)
 			{
@@ -455,7 +455,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 	}
 
 	while ((next_state == FS_CRS_STATE_READ) &&
-			(tx_buffer = CRS_TX_Queue_GetNextTxPacket()) &&
+			(tx_buffer = BLE_TX_Queue_GetNextTxPacket()) &&
 			(next_packet < next_ack + FS_CRS_WINDOW_LENGTH) &&
 			(next_packet < last_packet))
 	{
@@ -465,7 +465,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 		if (f_eof(&file))
 		{
 			// Send empty buffer to signal end of file
-			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 2);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 2);
 			last_packet = ++next_packet;
 		}
 		else if (f_read(&file, &tx_buffer[2], FRAME_LENGTH, &br) == FR_OK)
@@ -477,7 +477,7 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			}
 
 			// Send data
-			CRS_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, br + 2);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, br + 2);
 			++next_packet;
 		}
 		else

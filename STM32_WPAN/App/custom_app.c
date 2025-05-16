@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+#include <ble_tx_queue.h>
 #include "main.h"
 #include "app_common.h"
 #include "dbg_trace.h"
@@ -30,7 +31,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "crs.h"
-#include "crs_tx_queue.h"
 #include "start_control.h"
 #include "gnss_ble.h"
 /* USER CODE END Includes */
@@ -315,7 +315,7 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  CRS_TX_Queue_Init();
+  BLE_TX_Queue_Init();
 
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
   UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_Start_Transmit);
@@ -333,7 +333,7 @@ void Custom_APP_Init(void)
 /* USER CODE BEGIN FD */
 void Custom_APP_TxPoolAvailableNotification(void)
 {
-  CRS_TX_Queue_TxPoolAvailableNotification();
+  BLE_TX_Queue_TxPoolAvailableNotification();
 }
 
 uint8_t Custom_APP_IsConnected(void)

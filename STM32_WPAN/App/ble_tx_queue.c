@@ -21,10 +21,10 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
+#include <ble_tx_queue.h>
 #include "app_common.h"
 #include "dbg_trace.h"
 #include "ble.h"
-#include "crs_tx_queue.h"
 #include "crs.h"
 #include "stm32_seq.h"
 #include "custom_stm.h"
@@ -34,33 +34,33 @@ typedef struct
 	Custom_STM_Char_Opcode_t opcode;
 	uint8_t data[244];
 	uint8_t length;
-} CRS_TX_Queue_Packet_t;
+} BLE_TX_Queue_Packet_t;
 
-static CRS_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
+static BLE_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t tx_read_index, tx_write_index;
 static uint8_t tx_flow_status;
 
 extern uint8_t SizeCrs_Tx;
 
-static void CRS_TX_Queue_Transmit(void);
+static void BLE_TX_Queue_Transmit(void);
 
-void CRS_TX_Queue_Init(void)
+void BLE_TX_Queue_Init(void)
 {
 	tx_read_index = 0;
 	tx_write_index = 0;
 	tx_flow_status = 1;
 
 	UTIL_SEQ_RegTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, UTIL_SEQ_RFU,
-			CRS_TX_Queue_Transmit);
+			BLE_TX_Queue_Transmit);
 }
 
-void CRS_TX_Queue_TxPoolAvailableNotification(void)
+void BLE_TX_Queue_TxPoolAvailableNotification(void)
 {
 	tx_flow_status = 1;
 	UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 }
 
-uint8_t *CRS_TX_Queue_GetNextTxPacket(void)
+uint8_t *BLE_TX_Queue_GetNextTxPacket(void)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
@@ -72,12 +72,12 @@ uint8_t *CRS_TX_Queue_GetNextTxPacket(void)
 	}
 }
 
-void CRS_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
+void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 		uint8_t length)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
-		CRS_TX_Queue_Packet_t *packet =
+		BLE_TX_Queue_Packet_t *packet =
 				&tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
 
 		packet->opcode = opcode;
@@ -92,10 +92,10 @@ void CRS_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 	}
 }
 
-static void CRS_TX_Queue_Transmit(void)
+static void BLE_TX_Queue_Transmit(void)
 {
 	static uint8_t tx_busy = 0;
-	CRS_TX_Queue_Packet_t *packet;
+	BLE_TX_Queue_Packet_t *packet;
 	tBleStatus status;
 
 	if (!tx_busy &&
