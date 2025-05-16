@@ -123,9 +123,7 @@ static void Custom_Start_result_Send_Indication(void);
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_GNSS_Transmit(void);
 static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_Start_Transmit(void);
 static void Custom_App_Timeout(void);
 /* USER CODE END PFP */
 
@@ -316,9 +314,6 @@ void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
   BLE_TX_Queue_Init();
-
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_Start_Transmit);
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
   Custom_App_Context.Gnss_pv_Notification_Status = 0;
@@ -612,18 +607,18 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
   return ret;
 }
 
-static void Custom_GNSS_Transmit(void)
-{
-  Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
-}
-
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 {
   SizeGnss_Pv = GNSS_BLE_Build(current, gnss_pv_packet);
 
   if (Custom_App_Context.Gnss_pv_Notification_Status)
   {
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+    uint8_t *tx_buffer;
+    if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
+    {
+      memcpy(tx_buffer, gnss_pv_packet, SizeGnss_Pv);
+      BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_GNSS_PV, SizeGnss_Pv);
+    }
   }
 }
 
@@ -658,11 +653,6 @@ Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void)
   return ret;
 }
 
-static void Custom_Start_Transmit(void)
-{
-  Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
-}
-
 void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
                          uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms)
 {
@@ -677,7 +667,12 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
 
   if (Custom_App_Context.Start_result_Indication_Status)
   {
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, CFG_SCH_PRIO_1);
+    uint8_t *tx_buffer;
+    if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
+    {
+      memcpy(tx_buffer, start_result_packet, SizeStart_Result);
+      BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_START_RESULT, SizeStart_Result);
+    }
   }
 }
 

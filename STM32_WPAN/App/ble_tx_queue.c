@@ -50,14 +50,14 @@ void BLE_TX_Queue_Init(void)
 	tx_write_index = 0;
 	tx_flow_status = 1;
 
-	UTIL_SEQ_RegTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, UTIL_SEQ_RFU,
+	UTIL_SEQ_RegTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, UTIL_SEQ_RFU,
 			BLE_TX_Queue_Transmit);
 }
 
 void BLE_TX_Queue_TxPoolAvailableNotification(void)
 {
 	tx_flow_status = 1;
-	UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
+	UTIL_SEQ_SetTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 }
 
 uint8_t *BLE_TX_Queue_GetNextTxPacket(void)
@@ -84,7 +84,7 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 		packet->length = length;
 
 		++tx_write_index;
-		UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
+		UTIL_SEQ_SetTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 	}
 	else
 	{
@@ -118,7 +118,7 @@ static void BLE_TX_Queue_Transmit(void)
 
 			// Call update task and transmit next packet
 			UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-			UTIL_SEQ_SetTask(1<<CFG_TASK_CRS_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
+			UTIL_SEQ_SetTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 		}
 
 		tx_busy = 0;
