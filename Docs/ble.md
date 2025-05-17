@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the Bluetooth Low Energy (BLE) interface for the FlySight 2 device. This interface allows applications to interact with the FlySight 2 for file access (reading, writing, deleting files and directories) and accessing real-time sensor data.
+This document describes the Bluetooth Low Energy (BLE) interface for the FlySight 2 device. This interface allows applications to interact with the FlySight 2 for file access (reading, writing, deleting files and directories), accessing real-time sensor data, and managing device state.
 
 The interface utilizes standard BLE GATT services where applicable, but primarily relies on custom services for its core functionality. Familiarity with BLE concepts (GATT, Services, Characteristics, UUIDs, Notifications, Writes, Bonding, Security Modes) is recommended.
 
@@ -35,7 +35,7 @@ FlySight 2 employs BLE security features (bonding and whitelisting) to prevent u
 3.  **Bonding Process:**
     *   **Initiation:** After connecting to a FlySight 2 in Pairing Request Mode, the central device *must* initiate bonding to establish a secure, encrypted link and be added to the whitelist.
     *   **Security:** FlySight 2 requests **Security Mode 1, Level 2** (Authenticated pairing with encryption, No MITM protection). It uses the **Just Works** association model (as it has NoInput/NoOutput capabilities).
-    *   **Triggering Pairing:** Since the peripheral (FlySight) cannot force pairing, the central device must trigger it. A reliable method is to attempt to **read a secure characteristic** (e.g., `CRS_RX` UUID `00000002-8e22-4541-9d4c-21edae82ed19`) immediately after connecting. FlySight 2 requires encryption for accessing user data characteristics. This read attempt will fail with an "insufficient authentication/encryption" error from the FlySight's BLE stack, which typically prompts the central device's OS/BLE stack to initiate the pairing/bonding procedure (often showing a system dialog to the user like "Pair with FlySight?").
+    *   **Triggering Pairing:** Since the peripheral (FlySight) cannot force pairing, the central device must trigger it. A reliable method is to attempt to **read a secure characteristic** (e.g., `FT_Packet_In` UUID `00000002-8e22-4541-9d4c-21edae82ed19`) immediately after connecting. FlySight 2 requires encryption for accessing user data characteristics. This read attempt will fail with an "insufficient authentication/encryption" error from the FlySight's BLE stack, which typically prompts the central device's OS/BLE stack to initiate the pairing/bonding procedure (often showing a system dialog to the user like "Pair with FlySight?").
     *   **Completion:** Once pairing is complete, the central device should store the bonding information (keys) provided by the BLE stack for future use. The FlySight stores the central's identity.
 
 4.  **Reconnecting:**
@@ -53,25 +53,23 @@ FlySight 2 employs BLE security features (bonding and whitelisting) to prevent u
     *   **Hardware Reset (10s Hold):** This forces a processor reset but does *not* clear the BLE bonding information on its own. It's useful for recovering from a stuck state but should be used *in conjunction* with the `Reset_BLE` flag method for a full security reset.
 
 6.  **Connection Timeout & Ping:**
-    *   **Timeout:** FlySight 2 implements a **30-second** inactivity timeout (`TIMEOUT_MSEC`). If no BLE *write* activity occurs on the `CRS_RX` characteristic for this duration, the FlySight will terminate the connection (disconnect reason `0x13`, Remote User Terminated Connection).
-    *   **Keep-Alive:** To maintain a connection during periods of inactivity (e.g., user browsing files in the app, waiting between commands), the central application **must** send a command to the `CRS_RX` characteristic at least once every 30 seconds.
-    *   **Ping Command:** A dedicated "ping" command (`0xfe`) can be used for this. Writing `0xfe` to `CRS_RX` resets the timer and elicits an ACK (`0xf1 fe`) response on `CRS_TX`. A recommended interval is every 15 seconds.
-    *   **Implicit Reset:** *Any* successful write to `CRS_RX` (including file transfer commands) also resets the 30-second timeout timer.
+    *   **Timeout:** FlySight 2 implements a **30-second** inactivity timeout (`TIMEOUT_MSEC`). If no BLE *write* activity occurs on the `FT_Packet_In` characteristic for this duration, the FlySight will terminate the connection (disconnect reason `0x13`, Remote User Terminated Connection).
+    *   **Keep-Alive:** To maintain a connection during periods of inactivity (e.g., user browsing files in the app, waiting between commands), the central application **must** send a command to the `FT_Packet_In` characteristic at least once every 30 seconds.
+    *   **Ping Command:** A dedicated "ping" command (`0xfe`) can be used for this. Writing `0xfe` to `FT_Packet_In` resets the timer and elicits an ACK (`0xf1 fe`) response on `FT_Packet_Out`. A recommended interval is every 15 seconds.
+    *   **Implicit Reset:** *Any* successful write to `FT_Packet_In` (including file transfer commands) also resets the 30-second timeout timer.
 
 ### Device States and BLE Availability
 
-The FlySight 2's operational mode affects BLE service availability, primarily due to resource contention (SD card access). BLE connection itself is generally possible in most states if the device is whitelisted and advertising.
+The FlySight 2's operational mode affects BLE service availability, primarily due to resource contention (SD card access). BLE connection itself is generally possible in most states if the device is whitelisted and advertising. The current device mode can be read (and notified) via the `DS_Mode` characteristic in the `Device_State` service.
 
-*   **Idle Mode (LED Off):** Default low-power state. BLE is active (slow advertising). Full BLE functionality (File Access, Real-time Data subscription, State Control) is available. This is the **required** mode for file system operations via BLE.
+*   **Idle Mode (LED Off):** Default low-power state. BLE is active (slow advertising). Full BLE functionality (File Transfer, Real-time Data subscription, State Control) is available. This is the **required** mode for file system operations via BLE.
 *   **Active Mode (Green LED):** GNSS active, logging, audio feedback. Entered via a ~1s power button press from Idle.
-    *   Real-time data (`GNSS_PV`) notifications are available if subscribed.
-    *   **File Access (CRS service) is UNAVAILABLE** due to potential SD card conflicts with logging. Commands will likely return NAK (`0xf0`).
-*   **Config Selection Mode (Orange LED):** Entered via short press then long press from Idle. BLE connection may be possible, but file access is unavailable.
-*   **USB Mode (Red/Green LED):** Mass Storage Device mode. BLE connection may be possible, but **File Access (CRS service) is UNAVAILABLE** due to USB using the file system.
+    *   Real-time data (`SD_GNSS_Measurement`) notifications are available if subscribed.
+    *   **File Transfer (File_Transfer service) is UNAVAILABLE** due to potential SD card conflicts with logging. Commands will likely return NAK (`0xf0`).
+*   **Config Selection Mode (Orange LED):** Entered via short press then long press from Idle. BLE connection may be possible, but file transfer is unavailable.
+*   **USB Mode (Red/Green LED):** Mass Storage Device mode. BLE connection may be possible, but **File Transfer (File_Transfer service) is UNAVAILABLE** due to USB using the file system.
 *   **Firmware Update Mode (Orange LED when plugged in):** Bootloader mode. BLE is inactive.
-*   **Pairing Request Mode (Pulsing Green LED):** Temporary mode (30s) entered via double-press from Idle. Allows connection from *any* device to initiate pairing. File access might be available after pairing is complete *within* this mode, but it's generally expected the app will proceed after pairing without extensive file ops immediately.
-
-*Current State via BLE is planned but not yet implemented.*
+*   **Pairing Request Mode (Pulsing Green LED):** Temporary mode (30s) entered via double-press from Idle. Allows connection from *any* device to initiate pairing. File transfer might be available after pairing is complete *within* this mode, but it's generally expected the app will proceed after pairing without extensive file ops immediately.
 
 ### Advertising Details
 
@@ -87,21 +85,21 @@ The FlySight 2's operational mode affects BLE service availability, primarily du
 
 ## BLE Services and Characteristics
 
-### 1. Custom File Access Service (CRS - Cable Replacement Service)
+### 1. File_Transfer Service
 
 Provides serial-like file system operations. Requires bonding. File operations only functional in Idle Mode.
 
 *   **Service UUID:** `00000000-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
 
-    *   **`CRS_TX` (Transmit from FlySight)**
+    *   **`FT_Packet_Out` (Transmit from FlySight)**
         *   UUID: `00000001-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Notify**
         *   Permissions: Encrypted Read/Write required for CCCD (Client Characteristic Configuration Descriptor) to enable notifications.
         *   Usage: Sends data packets (`0x10`), file info packets (`0x11`), and ACK/NAK responses (`0xf1`/`0xf0`, `0x12`) *from* FlySight *to* the central device via notifications. Central must enable notifications on this characteristic after connecting and bonding.
-        *   Max Length: 244 bytes (`SizeCrs_Tx`) - Note: Effective length depends on negotiated MTU.
+        *   Max Length: 244 bytes (`SizeFt_Packet_Out`) - Note: Effective length depends on negotiated MTU.
 
-    *   **`CRS_RX` (Receive by FlySight)**
+    *   **`FT_Packet_In` (Receive by FlySight)**
         *   UUID: `00000002-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **WriteWithoutResponse, Read**
         *   Permissions: Encrypted Read/Write required.
@@ -109,15 +107,15 @@ Provides serial-like file system operations. Requires bonding. File operations o
             *   Uses WriteWithoutResponse for speed. Reliability via application-layer ACKs and GBN ARQ.
             *   Reading this characteristic can be used to trigger the pairing process after initial connection in Pairing Request Mode.
             *   *Any* write to this characteristic resets the 30s connection inactivity timer.
-        *   Max Length: 244 bytes (`SizeCrs_Rx`) - Note: Effective length depends on negotiated MTU.
+        *   Max Length: 244 bytes (`SizeFt_Packet_In`) - Note: Effective length depends on negotiated MTU.
 
-#### CRS Command Protocol
+#### File Transfer Command Protocol
 
-Packets sent over `CRS_RX` (WriteWithoutResponse) and received via notifications on `CRS_TX`.
+Packets sent over `FT_Packet_In` (WriteWithoutResponse) and received via notifications on `FT_Packet_Out`.
 
 **Packet Format:** `[Command Byte (uint8)] [Payload...]`
 
-**Commands from Central to FlySight (Write to `CRS_RX`):**
+**Commands from Central to FlySight (Write to `FT_Packet_In`):**
 
 | Opcode | Command Name         | Payload Format                                                        | Notes                                                                              |
 | :----- | :------------------- | :-------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
@@ -134,7 +132,7 @@ Packets sent over `CRS_RX` (WriteWithoutResponse) and received via notifications
 *Deprecated Commands (since ~v2024.09.29):*
 *   `0x00`: Create File. Use Write File (`0x03` with path) instead; it now creates/overwrites. Sending `0x00` may return NAK.
 
-**Responses/Data from FlySight to Central (Notify on `CRS_TX`):**
+**Responses/Data from FlySight to Central (Notify on `FT_Packet_Out`):**
 
 | Opcode | Response Name         | Payload Format                                                            | Notes                                                                                    |
 | :----- | :-------------------- | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------- |
@@ -164,28 +162,28 @@ Packets sent over `CRS_RX` (WriteWithoutResponse) and received via notifications
     *   **Reading from FS:** FlySight signals EOF by sending a final `0x10` data packet with a payload containing only the packet counter (data length of 1).
     *   **Writing to FS:** Central signals EOF by sending a final `0x10` data packet with a payload containing only the packet counter (data length of 1, indicating zero actual data bytes).
     *   The receiver still ACKs this final zero-data-length packet.
-*   **Cancel:** Sending `0xff` to `CRS_RX` aborts the current transfer state on FlySight.
+*   **Cancel:** Sending `0xff` to `FT_Packet_In` aborts the current transfer state on FlySight.
 
 **Revised Flow (Writing to FlySight):**
-1.  Central sends `0x03 [Path]` to `CRS_RX` to open/create the file.
-2.  FlySight, if successful, sends `0xf1 03` (ACK) on `CRS_TX`. FlySight is now ready to receive file data chunks.
-3.  Central sends a window of `0x10 [PacketCounter] [DataBytes]` packets to `CRS_RX`.
-4.  FlySight receives `0x10` packets. For each valid sequential packet, it writes data and sends `0x12 [PacketCounter]` ACK on `CRS_TX`.
+1.  Central sends `0x03 [Path]` to `FT_Packet_In` to open/create the file.
+2.  FlySight, if successful, sends `0xf1 03` (ACK) on `FT_Packet_Out`. FlySight is now ready to receive file data chunks.
+3.  Central sends a window of `0x10 [PacketCounter] [DataBytes]` packets to `FT_Packet_In`.
+4.  FlySight receives `0x10` packets. For each valid sequential packet, it writes data and sends `0x12 [PacketCounter]` ACK on `FT_Packet_Out`.
 5.  Repeat until entire file is sent, ending with a `0x10 [PacketCounter]` (zero data bytes) packet.
 
-### 2. Custom Real-time Data Service (GNSS)
+### 2. Sensor_Data Service
 
 Provides live GNSS data when FlySight is in Active Mode. Requires bonding.
 
 *   **Service UUID:** `00000001-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
 
-    *   **`GNSS_PV` (Position/Velocity)**
+    *   **`SD_GNSS_Measurement` (Position/Velocity)**
         *   UUID: `00000000-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Read, Notify**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Streams core GNSS data. Updates at rate set in `config.txt` *only when FlySight is in Active Mode*. Central must enable notifications. Reading can trigger pairing.
-        *   Max Length: 44 bytes (actual payload 29 bytes in current format). (`SizeGnss_Pv`)
+        *   Max Length: 44 bytes (actual payload 29 bytes in current format). (`SizeSd_Gnss_Measurement`)
         *   **Data Format (29 bytes total, Little Endian):**
             *   Byte 0: `flags` (uint8). Bitmask indicating present fields. `0xb0` = `0b10110000` means iTOW (bit 7), Position (bit 5), and Velocity (bit 4) are present.
             *   Bytes 1-4: `iTOW` (uint32_t). GNSS Time of Week (ms).
@@ -196,35 +194,56 @@ Provides live GNSS data when FlySight is in Active Mode. Requires bonding.
             *   Bytes 21-24: `velE` (int32_t). Velocity East (mm/s).
             *   Bytes 25-28: `velD` (int32_t). Velocity Down (mm/s).
 
-    *   **`GNSS_Control`**
+    *   **`SD_Control_Point`**
         *   UUID: `00000006-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Write, Notify**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: (Planned/Partial) Used to control which data fields are included in the `GNSS_PV` characteristic notifications (and potentially others). May also receive responses/confirmations via Notify. Central enables notifications if responses are desired.
-        *   Max Length: 2 bytes (`SizeGnss_Control`).
+        *   Usage: (Planned/Partial) Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications (and potentially others). May also receive responses/confirmations via Notify. Central enables notifications if responses are desired.
+        *   Max Length: 3 bytes (`SizeSd_Control_Point`).
 
-### 3. Custom Start Pistol Service
+### 3. Starter_Pistol Service
 
 Used for synchronized start timing in specific scenarios (e.g., BASE race). Likely not needed for general applications. Requires bonding.
 
 *   **Service UUID:** `00000002-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
 
-    *   **`Start_Control`**
+    *   **`SP_Control_Point`**
         *   UUID: `00000003-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Sends control commands to the start pistol feature. Indications may provide feedback.
-        *   Length: 1 byte (`SizeStart_Control`).
+        *   Length: 1 byte (`SizeSp_Control_Point`).
 
-    *   **`Start_Result`**
+    *   **`SP_Result`**
         *   UUID: `00000004-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Read, Indicate**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Provides results from the start pistol function (e.g., precise start time).
-        *   Length: 9 bytes (`SizeStart_Result`). Data format (from `Custom_Start_Update`): `Year (u16), Month (u8), Day (u8), Hour (u8), Min (u8), Sec (u8), ms (u16)`.
+        *   Length: 9 bytes (`SizeSp_Result`). Data format (from `Custom_Start_Update`): `Year (u16), Month (u8), Day (u8), Hour (u8), Min (u8), Sec (u8), ms (u16)`.
 
-### 4. Standard BLE Services
+### 4. Device_State Service
+
+Provides information about the device's current operational state and allows for state control. Requires bonding.
+
+*   **Service UUID:** `00000003-cc7a-482a-984a-7f2ed5b3e58f`
+*   **Characteristics:**
+
+    *   **`DS_Mode`**
+        *   UUID: `00000005-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read required.
+        *   Usage: Exposes the current operational mode of the FlySight 2 (e.g., Idle, Active). Central can read this or subscribe to notifications to be informed of mode changes.
+        *   Length: 1 byte (`SizeDs_Mode`). (Value corresponds to `FS_Mode_State_t` enum).
+
+    *   **`DS_Control_Point`**
+        *   UUID: `00000007-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Write, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: (Planned/Partial) For controlling device state aspects, such as requesting a mode change or other device-level operations. Responses or status updates may be sent via notifications.
+        *   Length: 3 bytes (`SizeDs_Control_Point`).
+
+### 5. Standard BLE Services
 
 FlySight 2 also implements standard BLE services:
 
@@ -233,32 +252,35 @@ FlySight 2 also implements standard BLE services:
 
 ## Implementation Notes & Best Practices
 
-*   **Error Handling:** Expect NAKs (`0xf0`) for commands sent when the FlySight is in an incompatible state (e.g., file access during Active mode or USB connection). Handle timeouts appropriately, especially for the GBN ARQ.
-*   **State Awareness:** Be mindful of the FlySight's operational mode (Idle, Active, USB). File access is generally only reliable in Idle mode. Real-time data (`GNSS_PV`) is only sent in Active mode.
-*   **MTU Negotiation:** Request a larger MTU (e.g., 247 bytes) after connection for efficient file transfer. Handle potential failures where the MTU remains small (e.g., 23 bytes with BLE 4.0/4.1 devices), potentially by fragmenting CRS data packets if necessary (though the current CRS implementation seems to assume MTU is large enough for its framing).
+*   **Error Handling:** Expect NAKs (`0xf0`) for commands sent when the FlySight is in an incompatible state (e.g., file transfer during Active mode or USB connection). Handle timeouts appropriately, especially for the GBN ARQ.
+*   **State Awareness:** Be mindful of the FlySight's operational mode (Idle, Active, USB), which can be obtained via the `DS_Mode` characteristic. File transfer is generally only reliable in Idle mode. Real-time data (`SD_GNSS_Measurement`) is only sent in Active mode.
+*   **MTU Negotiation:** Request a larger MTU (e.g., 247 bytes) after connection for efficient file transfer. Handle potential failures where the MTU remains small (e.g., 23 bytes with BLE 4.0/4.1 devices), potentially by fragmenting File Transfer data packets if necessary (though the current File Transfer implementation seems to assume MTU is large enough for its framing).
 *   **Pairing Flow:** Implement the connect-then-read-secure-characteristic flow to reliably trigger pairing, especially if developing a cross-platform application.
-*   **Connection Management:** Use the ping command (`0xfe`) to keep connections alive during inactivity. Handle disconnects gracefully. Be aware of the Android system pairing behavior possibly leaving connections open.
+*   **Connection Management:** Use the ping command (`0xfe` on `FT_Packet_In`) to keep connections alive during inactivity. Handle disconnects gracefully. Be aware of the Android system pairing behavior possibly leaving connections open.
 *   **Code Examples:** Refer extensively to the provided Python, iOS, and Android examples for practical implementation details, especially for the GBN ARQ logic.
 
 ## Appendix
 
 ### Known UUIDs
 
-| Feature              | Characteristic Name | UUID                                         | Service         | Properties             |
-| :------------------- | :------------------ | :------------------------------------------- | :-------------- | :--------------------- |
-| File Access Service  |                     | `00000000-cc7a-482a-984a-7f2ed5b3e58f`       | Custom File     |                        |
-| File Access TX       | `CRS_TX`            | `00000001-8e22-4541-9d4c-21edae82ed19`       | Custom File     | Notify                 |
-| File Access RX       | `CRS_RX`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | Custom File     | WriteWithoutResponse, Read |
-| GNSS Service         |                     | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Custom GNSS     |                        |
-| Live GNSS P/V        | `GNSS_PV`           | `00000000-8e22-4541-9d4c-21edae82ed19`       | Custom GNSS     | Read, Notify           |
-| GNSS Control         | `GNSS_Control`      | `00000006-8e22-4541-9d4c-21edae82ed19`       | Custom GNSS     | Write, Notify          |
-| Start Pistol Service |                     | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Custom Start    |                        |
-| Start Pistol Control | `Start_Control`     | `00000003-8e22-4541-9d4c-21edae82ed19`       | Custom Start    | Write, Indicate        |
-| Start Pistol Result  | `Start_Result`      | `00000004-8e22-4541-9d4c-21edae82ed19`       | Custom Start    | Read, Indicate         |
+| Feature                 | Characteristic Name       | UUID                                         | Service            | Properties             |
+| :---------------------- | :------------------------ | :------------------------------------------- | :----------------- | :--------------------- |
+| File Transfer Service   |                           | `00000000-cc7a-482a-984a-7f2ed5b3e58f`       | File_Transfer      |                        |
+| File Transfer TX        | `FT_Packet_Out`           | `00000001-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | Notify                 |
+| File Transfer RX        | `FT_Packet_In`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | WriteWithoutResponse, Read |
+| Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        |
+| Live GNSS Measurement   | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           |
+| Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Notify          |
+| Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        |
+| Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        |
+| Starter Pistol Result   | `SP_Result`               | `00000004-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Read, Indicate         |
+| Device State Service    |                           | `00000003-cc7a-482a-984a-7f2ed5b3e58f`       | Device_State       |                        |
+| Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Notify           |
+| Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Notify          |
 
-### CRS Command Opcodes
+### File Transfer Command Opcodes
 
-| Opcode | Command Name           | Direction      | Payload Description                            | Response (on TX)                                   |
+| Opcode | Command Name           | Direction      | Payload Description                            | Response (on `FT_Packet_Out`)                      |
 | :----- | :--------------------- | :------------- | :--------------------------------------------- | :------------------------------------------------- |
 | `0x01` | Delete File/Dir      | Central -> FS  | `[Path]`                                       | `0xf1 01` (ACK) / `0xf0 01` (NAK)                  |
 | `0x02` | Read File              | Central -> FS  | `[Offset_mult (u32)] [Stride-1_mult (u32)] [Path]` | `0xf1 02` (ACK) / `0xf0 02` (NAK), then `0x10` data packets |
@@ -273,4 +295,4 @@ FlySight 2 also implements standard BLE services:
 | `0xfe` | Ping                   | Central -> FS  | (None)                                         | `0xf1 fe` (ACK)                                    |
 | `0xff` | Cancel Transfer        | Central -> FS  | (None)                                         | (None expected, state just resets)                 |
 
-*(Note: Path is a null-terminated string. `0x10` is used by Central to send data chunks to FS during a write operation (after `0x03` has opened the file), and by FS to send data chunks to Central during a read operation. `FRAME_LENGTH` is 242.)*
+*(Note: Path is a null-terminated string. `0x10` is used by Central to send data chunks to FS (via `FT_Packet_In`) during a write operation (after `0x03` has opened the file), and by FS to send data chunks to Central (via `FT_Packet_Out`) during a read operation. `FRAME_LENGTH` is 242.)*
