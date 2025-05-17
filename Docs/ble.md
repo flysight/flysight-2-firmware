@@ -70,6 +70,10 @@ The FlySight 2's operational mode affects BLE service availability, primarily du
 *   **USB Mode (Red/Green LED):** Mass Storage Device mode. BLE connection may be possible, but **File Transfer (File_Transfer service) is UNAVAILABLE** due to USB using the file system.
 *   **Firmware Update Mode (Orange LED when plugged in):** Bootloader mode. BLE is inactive.
 *   **Pairing Request Mode (Pulsing Green LED):** Temporary mode (30s) entered via double-press from Idle. Allows connection from *any* device to initiate pairing. File transfer might be available after pairing is complete *within* this mode, but it's generally expected the app will proceed after pairing without extensive file ops immediately.
+*   **Start Mode (Orange LED):** Special mode for synchronized start timing. Entered via a ~1s power button press from Idle if `Active_Mode` in `flysight.txt` is set to `1`.
+    *   Real-time data (`SD_GNSS_Measurement`) notifications are available if subscribed.
+    *   **File Transfer (File_Transfer service) is UNAVAILABLE.**
+    *   Starter Pistol service (`SP_Control_Point`, `SP_Result`) is active.
 
 ### Advertising Details
 
@@ -173,37 +177,70 @@ Packets sent over `FT_Packet_In` (WriteWithoutResponse) and received via notific
 
 ### 2. Sensor_Data Service
 
-Provides live GNSS data when FlySight is in Active Mode. Requires bonding.
+Provides live GNSS data when FlySight is in Active Mode or Start Mode. Requires bonding.
 
 *   **Service UUID:** `00000001-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
 
-    *   **`SD_GNSS_Measurement` (Position/Velocity)**
+    *   **`SD_GNSS_Measurement` (Position/Velocity/etc.)**
         *   UUID: `00000000-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Read, Notify**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: Streams core GNSS data. Updates at rate set in `config.txt` *only when FlySight is in Active Mode*. Central must enable notifications. Reading can trigger pairing.
-        *   Max Length: 44 bytes (actual payload 29 bytes in current format). (`SizeSd_Gnss_Measurement`)
-        *   **Data Format (29 bytes total, Little Endian):**
-            *   Byte 0: `flags` (uint8). Bitmask indicating present fields. `0xb0` = `0b10110000` means iTOW (bit 7), Position (bit 5), and Velocity (bit 4) are present.
-            *   Bytes 1-4: `iTOW` (uint32_t). GNSS Time of Week (ms).
-            *   Bytes 5-8: `Longitude` (int32_t). Degrees * 1e7.
-            *   Bytes 9-12: `Latitude` (int32_t). Degrees * 1e7.
-            *   Bytes 13-16: `hMSL` (int32_t). Height above Mean Sea Level (mm).
-            *   Bytes 17-20: `velN` (int32_t). Velocity North (mm/s).
-            *   Bytes 21-24: `velE` (int32_t). Velocity East (mm/s).
-            *   Bytes 25-28: `velD` (int32_t). Velocity Down (mm/s).
+        *   Usage: Streams selected GNSS data fields. Updates at rate set in `config.txt` *only when FlySight is in Active Mode or Start Mode*. Central must enable notifications. Reading can trigger pairing. The specific fields included are controlled by a bitmask set via `SD_Control_Point`.
+        *   Max Length: 44 bytes (`SizeSd_Gnss_Measurement`). Actual length depends on the fields enabled by the mask.
+        *   **Data Format (Variable Length, Little Endian):**
+            *   Byte 0: `current_mask` (uint8). A bitmask indicating which fields are *actually present* in this specific notification packet. This mask is a subset of or equal to the mask set by `SD_Control_Point`.
+                *   `0x80` (`GNSS_BLE_BIT_TOW`): Time of Week included.
+                *   `0x40` (`GNSS_BLE_BIT_WEEK`): Week Number included (Not yet implemented in firmware).
+                *   `0x20` (`GNSS_BLE_BIT_POSITION`): Position (Lon, Lat, HAE) included.
+                *   `0x10` (`GNSS_BLE_BIT_VELOCITY`): Velocity (VelN, VelE, VelD) included.
+                *   `0x08` (`GNSS_BLE_BIT_ACCURACY`): Accuracy (HAcc, VAcc, SAcc) included.
+                *   `0x04` (`GNSS_BLE_BIT_NUM_SV`): Number of Satellites included.
+            *   **Following Bytes (order matters if present, based on `current_mask`):**
+                *   If `GNSS_BLE_BIT_TOW` is set: `iTOW` (uint32_t). GNSS Time of Week (ms). (4 bytes)
+                *   If `GNSS_BLE_BIT_WEEK` is set: (Data for week number - TBD)
+                *   If `GNSS_BLE_BIT_POSITION` is set:
+                    *   `Longitude` (int32_t). Degrees * 1e7. (4 bytes)
+                    *   `Latitude` (int32_t). Degrees * 1e7. (4 bytes)
+                    *   `hMSL` (int32_t). Height above Mean Sea Level (mm). (4 bytes)
+                *   If `GNSS_BLE_BIT_VELOCITY` is set:
+                    *   `velN` (int32_t). Velocity North (mm/s). (4 bytes)
+                    *   `velE` (int32_t). Velocity East (mm/s). (4 bytes)
+                    *   `velD` (int32_t). Velocity Down (mm/s). (4 bytes)
+                *   If `GNSS_BLE_BIT_ACCURACY` is set:
+                    *   `hAcc` (uint32_t). Horizontal Accuracy Estimate (mm). (4 bytes)
+                    *   `vAcc` (uint32_t). Vertical Accuracy Estimate (mm). (4 bytes)
+                    *   `sAcc` (uint32_t). Speed Accuracy Estimate (mm/s). (4 bytes)
+                *   If `GNSS_BLE_BIT_NUM_SV` is set:
+                    *   `numSV` (uint8_t). Number of satellites in solution. (1 byte)
+        *   Default Mask: `0xB0` (iTOW, Position, Velocity).
 
     *   **`SD_Control_Point`**
         *   UUID: `00000006-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Write, Notify**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: (Planned/Partial) Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications (and potentially others). May also receive responses/confirmations via Notify. Central enables notifications if responses are desired.
+        *   Usage: Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications. Also used to retrieve the current mask. Central enables notifications if responses are desired.
         *   Max Length: 3 bytes (`SizeSd_Control_Point`).
+        *   **Write Operations (Central to FlySight):**
+            *   Byte 0: Opcode
+                *   `0x01` (`GNSS_BLE_OP_SET_MASK`): Set the data mask for `SD_GNSS_Measurement`.
+                    *   Byte 1: `new_mask` (uint8). A bitmask specifying which fields to include. Uses the same bit definitions as `current_mask` in `SD_GNSS_Measurement`.
+                *   `0x02` (`GNSS_BLE_OP_GET_MASK`): Request the current data mask.
+                    *   (No payload bytes after opcode)
+        *   **Notify Responses (FlySight to Central, if notifications enabled):**
+            *   Byte 0: Original Opcode written by Central.
+            *   Byte 1: Status or Value
+                *   If Opcode was `GNSS_BLE_OP_SET_MASK`:
+                    *   `0x00` (`GNSS_BLE_STATUS_OK`): Mask set successfully.
+                    *   `0x01` (`GNSS_BLE_STATUS_BAD_LENGTH`): Incorrect payload length for SET_MASK.
+                *   If Opcode was `GNSS_BLE_OP_GET_MASK`:
+                    *   The current `active_mask` (uint8) used by the firmware.
+                *   If Opcode was unknown:
+                    *   `0x02` (`GNSS_BLE_STATUS_BAD_OPCODE`): Opcode not recognized.
 
 ### 3. Starter_Pistol Service
 
-Used for synchronized start timing in specific scenarios (e.g., BASE race). Likely not needed for general applications. Requires bonding.
+Used for synchronized start timing in specific scenarios (e.g., BASE race). Only active in Start Mode. Requires bonding.
 
 *   **Service UUID:** `00000002-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
@@ -214,13 +251,17 @@ Used for synchronized start timing in specific scenarios (e.g., BASE race). Like
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Sends control commands to the start pistol feature. Indications may provide feedback.
         *   Length: 1 byte (`SizeSp_Control_Point`).
+        *   **Write Operations (Central to FlySight):**
+            *   Byte 0: Command
+                *   `0x00` (`FS_START_COMMAND_START`): Initiate the start sequence (countdown and tone).
+                *   `0x01` (`FS_START_COMMAND_CANCEL`): Cancel an ongoing start sequence.
 
     *   **`SP_Result`**
         *   UUID: `00000004-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Read, Indicate**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: Provides results from the start pistol function (e.g., precise start time).
-        *   Length: 9 bytes (`SizeSp_Result`). Data format (from `Custom_Start_Update`): `Year (u16), Month (u8), Day (u8), Hour (u8), Min (u8), Sec (u8), ms (u16)`.
+        *   Usage: Provides results from the start pistol function (e.g., precise start time captured by GNSS EXTINT).
+        *   Length: 9 bytes (`SizeSp_Result`). Data format (from `Custom_Start_Update`): `Year (u16), Month (u8), Day (u8), Hour (u8), Min (u8), Sec (u8), ms (u16)`. All Little Endian.
 
 ### 4. Device_State Service
 
@@ -233,8 +274,17 @@ Provides information about the device's current operational state and allows for
         *   UUID: `00000005-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Read, Notify**
         *   Permissions: Encrypted Read required.
-        *   Usage: Exposes the current operational mode of the FlySight 2 (e.g., Idle, Active). Central can read this or subscribe to notifications to be informed of mode changes.
-        *   Length: 1 byte (`SizeDs_Mode`). (Value corresponds to `FS_Mode_State_t` enum).
+        *   Usage: Exposes the current operational mode of the FlySight 2. Central can read this or subscribe to notifications to be informed of mode changes.
+        *   Length: 1 byte (`SizeDs_Mode`).
+        *   **Mode Values (corresponds to `FS_Mode_State_t` enum):**
+            | Value | Mode Name        | Description                                     |
+            | :---- | :--------------- | :---------------------------------------------- |
+            | `0x00`| SLEEP            | Idle, low power. File access available.         |
+            | `0x01`| ACTIVE           | GNSS logging, audio feedback. No file access.   |
+            | `0x02`| CONFIG           | Configuration selection mode. No file access.   |
+            | `0x03`| USB              | USB Mass Storage mode. No file access.          |
+            | `0x04`| PAIRING          | BLE pairing request mode.                       |
+            | `0x05`| START            | Starter pistol mode. No file access.            |
 
     *   **`DS_Control_Point`**
         *   UUID: `00000007-8e22-4541-9d4c-21edae82ed19`
@@ -253,7 +303,7 @@ FlySight 2 also implements standard BLE services:
 ## Implementation Notes & Best Practices
 
 *   **Error Handling:** Expect NAKs (`0xf0`) for commands sent when the FlySight is in an incompatible state (e.g., file transfer during Active mode or USB connection). Handle timeouts appropriately, especially for the GBN ARQ.
-*   **State Awareness:** Be mindful of the FlySight's operational mode (Idle, Active, USB), which can be obtained via the `DS_Mode` characteristic. File transfer is generally only reliable in Idle mode. Real-time data (`SD_GNSS_Measurement`) is only sent in Active mode.
+*   **State Awareness:** Be mindful of the FlySight's operational mode (Idle, Active, USB), which can be obtained via the `DS_Mode` characteristic. File transfer is generally only reliable in Idle mode. Real-time data (`SD_GNSS_Measurement`) is only sent in Active or Start mode.
 *   **MTU Negotiation:** Request a larger MTU (e.g., 247 bytes) after connection for efficient file transfer. Handle potential failures where the MTU remains small (e.g., 23 bytes with BLE 4.0/4.1 devices), potentially by fragmenting File Transfer data packets if necessary (though the current File Transfer implementation seems to assume MTU is large enough for its framing).
 *   **Pairing Flow:** Implement the connect-then-read-secure-characteristic flow to reliably trigger pairing, especially if developing a cross-platform application.
 *   **Connection Management:** Use the ping command (`0xfe` on `FT_Packet_In`) to keep connections alive during inactivity. Handle disconnects gracefully. Be aware of the Android system pairing behavior possibly leaving connections open.
@@ -269,7 +319,7 @@ FlySight 2 also implements standard BLE services:
 | File Transfer TX        | `FT_Packet_Out`           | `00000001-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | Notify                 |
 | File Transfer RX        | `FT_Packet_In`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | WriteWithoutResponse, Read |
 | Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        |
-| Live GNSS Measurement   | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           |
+| GNSS Measurement        | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           |
 | Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Notify          |
 | Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        |
 | Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        |
