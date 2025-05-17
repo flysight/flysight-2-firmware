@@ -33,6 +33,7 @@
 #include "crs.h"
 #include "start_control.h"
 #include "gnss_ble.h"
+#include "mode.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,6 +41,7 @@ typedef struct
 {
   /* CRS */
   uint8_t               Crs_tx_Notification_Status;
+  uint8_t               Mode_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
   uint8_t               Gnss_control_Notification_Status;
@@ -108,6 +110,8 @@ static uint8_t timeout_timer_id;
 /* CRS */
 static void Custom_Crs_tx_Update_Char(void);
 static void Custom_Crs_tx_Send_Notification(void);
+static void Custom_Mode_Update_Char(void);
+static void Custom_Mode_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
@@ -162,6 +166,25 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
       Custom_CRS_OnRxWrite(pNotification);
       /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
+      break;
+
+    case CUSTOM_STM_MODE_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_MODE_READ_EVT */
+      uint8_t modeVal = (uint8_t) FS_Mode_State();  // Get current state from mode module
+      Custom_STM_App_Update_Char(CUSTOM_STM_MODE, &modeVal);
+      /* USER CODE END CUSTOM_STM_MODE_READ_EVT */
+      break;
+
+    case CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Mode_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Mode_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT */
       break;
 
     /* GNSS */
@@ -380,6 +403,45 @@ void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
   /* USER CODE BEGIN Crs_tx_NS_Last*/
 
   /* USER CODE END Crs_tx_NS_Last*/
+
+  return;
+}
+
+void Custom_Mode_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Mode_UC_1*/
+
+  /* USER CODE END Mode_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Mode_UC_Last*/
+
+  /* USER CODE END Mode_UC_Last*/
+  return;
+}
+
+void Custom_Mode_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Mode_NS_1*/
+
+  /* USER CODE END Mode_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Mode_NS_Last*/
+
+  /* USER CODE END Mode_NS_Last*/
 
   return;
 }
@@ -673,5 +735,15 @@ static void Custom_App_Timeout(void)
 {
   aci_gap_terminate(Custom_App_Context.ConnectionHandle,
 		  HCI_REMOTE_USER_TERMINATED_CONNECTION_ERR_CODE);
+}
+
+void Custom_Mode_Update(uint8_t newMode)
+{
+    /*
+     * Even if Mode_Notification_Status == 0 (notifications off),
+     * we still call Custom_STM_App_Update_Char so that the
+     * characteristic value is always up-to-date when read.
+     */
+    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, &newMode);
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

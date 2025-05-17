@@ -31,6 +31,7 @@ typedef struct{
   uint16_t  CustomCrsHdle;                    /**< CRS handle */
   uint16_t  CustomCrs_TxHdle;                  /**< CRS_TX handle */
   uint16_t  CustomCrs_RxHdle;                  /**< CRS_RX handle */
+  uint16_t  CustomModeHdle;                  /**< Mode handle */
   uint16_t  CustomGnssHdle;                    /**< GNSS handle */
   uint16_t  CustomGnss_PvHdle;                  /**< GNSS_PV handle */
   uint16_t  CustomGnss_ControlHdle;                  /**< GNSS_Control handle */
@@ -72,6 +73,7 @@ typedef struct{
 /* Private variables ---------------------------------------------------------*/
 uint8_t SizeCrs_Tx = 244;
 uint8_t SizeCrs_Rx = 244;
+uint8_t SizeMode = 1;
 uint8_t SizeGnss_Pv = 44;
 uint8_t SizeGnss_Control = 2;
 uint8_t SizeStart_Control = 1;
@@ -129,6 +131,7 @@ do {\
 #define COPY_CRS_UUID(uuid_struct)          COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x00,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
 #define COPY_CRS_TX_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x01,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 #define COPY_CRS_RX_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x02,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_MODE_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x05,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 #define COPY_GNSS_UUID(uuid_struct)          COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x01,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
 #define COPY_GNSS_PV_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x00,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 #define COPY_GNSS_CONTROL_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x06,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
@@ -215,6 +218,50 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
               break;
             }
           }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomCrs_TxHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomModeHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3 */
+
+            /* USER CODE END CUSTOM_STM_Service_1_Char_3 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_1_Char_3_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_1_Char_3_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_1_Char_3_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_1_Char_3_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_1_Char_3_COMSVC_Notification_END */
+                break;
+
+              default:
+                /* USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_default */
+
+                /* USER CODE END CUSTOM_STM_Service_1_Char_3_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomModeHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomGnss_PvHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
           {
@@ -434,7 +481,19 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
 
           /* USER CODE END EVT_BLUE_GATT_READ_PERMIT_REQ_BEGIN */
           read_req = (aci_gatt_read_permit_req_event_rp0*)blecore_evt->data;
-          if (read_req->Attribute_Handle == (CustomContext.CustomGnss_PvHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          if (read_req->Attribute_Handle == (CustomContext.CustomModeHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_MODE_READ_EVT;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_1_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_1_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_1_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomModeHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomGnss_PvHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
             /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
@@ -545,17 +604,19 @@ void SVCCTL_InitCustomSvc(void)
   /**
    *          CRS
    *
-   * Max_Attribute_Records = 1 + 2*2 + 1*no_of_char_with_notify_or_indicate_property + 1*no_of_char_with_broadcast_property
+   * Max_Attribute_Records = 1 + 2*3 + 1*no_of_char_with_notify_or_indicate_property + 1*no_of_char_with_broadcast_property
    * service_max_attribute_record = 1 for CRS +
    *                                2 for CRS_TX +
    *                                2 for CRS_RX +
+   *                                2 for Mode +
    *                                1 for CRS_TX configuration descriptor +
-   *                              = 6
+   *                                1 for Mode configuration descriptor +
+   *                              = 9
    *
    * This value doesn't take into account number of descriptors manually added
    * In case of descriptors added, please update the max_attr_record value accordingly in the next SVCCTL_InitService User Section
    */
-  max_attr_record = 6;
+  max_attr_record = 9;
 
   /* USER CODE BEGIN SVCCTL_InitService */
   /* max_attr_record to be updated if descriptors have been added */
@@ -629,6 +690,32 @@ void SVCCTL_InitCustomSvc(void)
   /* Place holder for Characteristic Descriptors */
 
   /* USER CODE END SVCCTL_Init_Service1_Char2 */
+  /**
+   *  Mode
+   */
+  COPY_MODE_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(CustomContext.CustomCrsHdle,
+                          UUID_TYPE_128, &uuid,
+                          SizeMode,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_CONSTANT,
+                          &(CustomContext.CustomModeHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : MODE, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : MODE \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service1_Char3/ */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service1_Char3 */
 
   /**
    *          GNSS
@@ -867,6 +954,25 @@ tBleStatus Custom_STM_App_Update_Char(Custom_STM_Char_Opcode_t CharOpcode, uint8
       /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_1_Char_2*/
 
       /* USER CODE END CUSTOM_STM_App_Update_Service_1_Char_2*/
+      break;
+
+    case CUSTOM_STM_MODE:
+      ret = aci_gatt_update_char_value(CustomContext.CustomCrsHdle,
+                                       CustomContext.CustomModeHdle,
+                                       0, /* charValOffset */
+                                       SizeMode, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value MODE command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value MODE command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_1_Char_3*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_1_Char_3*/
       break;
 
     case CUSTOM_STM_GNSS_PV:
