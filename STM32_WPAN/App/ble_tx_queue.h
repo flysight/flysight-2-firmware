@@ -34,10 +34,10 @@ void BLE_TX_Queue_TxPoolAvailableNotification(void);
 uint8_t *BLE_TX_Queue_GetNextTxPacket(void);
 void BLE_TX_Queue_SendNextTxPacket(
 		Custom_STM_Char_Opcode_t opcode, uint8_t length,
-		BLE_TX_Queue_callback_t callback);
+		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
 
 void BLE_TX_Queue_SendTxPacket(
 		Custom_STM_Char_Opcode_t opcode, uint8_t *data, uint8_t length,
-		BLE_TX_Queue_callback_t callback);
+		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
 
 #endif /* APP_BLE_TX_QUEUE_H_ */

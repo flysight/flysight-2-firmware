@@ -19,7 +19,6 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include <ble_tx_queue.h>
 #include "main.h"
 #include "app_common.h"
 #include "dbg_trace.h"
@@ -34,20 +33,23 @@
 #include "start_control.h"
 #include "gnss_ble.h"
 #include "mode.h"
+#include "ble_tx_queue.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
 {
-  /* CRS */
-  uint8_t               Crs_tx_Notification_Status;
-  uint8_t               Mode_Notification_Status;
-  /* GNSS */
-  uint8_t               Gnss_pv_Notification_Status;
-  uint8_t               Gnss_control_Notification_Status;
-  /* Start */
-  uint8_t               Start_control_Indication_Status;
-  uint8_t               Start_result_Indication_Status;
+  /* File_Transfer */
+  uint8_t               Ft_packet_out_Notification_Status;
+  /* Sensor_Data */
+  uint8_t               Sd_gnss_measurement_Notification_Status;
+  uint8_t               Sd_control_point_Notification_Status;
+  /* Starter_Pistol */
+  uint8_t               Sp_control_point_Indication_Status;
+  uint8_t               Sp_result_Indication_Status;
+  /* Device_State */
+  uint8_t               Ds_mode_Notification_Status;
+  uint8_t               Ds_control_point_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -98,30 +100,31 @@ static uint8_t start_result_packet[9];
 
 static uint8_t connected_flag = 0;
 
-extern uint8_t SizeCrs_Rx;
-
-extern uint8_t SizeGnss_Pv;
-extern uint8_t SizeGnss_Control;
+extern uint8_t SizeSd_Gnss_Measurement;
+extern uint8_t SizeSd_Control_Point;
 
 static uint8_t timeout_timer_id;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-/* CRS */
-static void Custom_Crs_tx_Update_Char(void);
-static void Custom_Crs_tx_Send_Notification(void);
-static void Custom_Mode_Update_Char(void);
-static void Custom_Mode_Send_Notification(void);
-/* GNSS */
-static void Custom_Gnss_pv_Update_Char(void);
-static void Custom_Gnss_pv_Send_Notification(void);
-static void Custom_Gnss_control_Update_Char(void);
-static void Custom_Gnss_control_Send_Notification(void);
-/* Start */
-static void Custom_Start_control_Update_Char(void);
-static void Custom_Start_control_Send_Indication(void);
-static void Custom_Start_result_Update_Char(void);
-static void Custom_Start_result_Send_Indication(void);
+/* File_Transfer */
+static void Custom_Ft_packet_out_Update_Char(void);
+static void Custom_Ft_packet_out_Send_Notification(void);
+/* Sensor_Data */
+static void Custom_Sd_gnss_measurement_Update_Char(void);
+static void Custom_Sd_gnss_measurement_Send_Notification(void);
+static void Custom_Sd_control_point_Update_Char(void);
+static void Custom_Sd_control_point_Send_Notification(void);
+/* Starter_Pistol */
+static void Custom_Sp_control_point_Update_Char(void);
+static void Custom_Sp_control_point_Send_Indication(void);
+static void Custom_Sp_result_Update_Char(void);
+static void Custom_Sp_result_Send_Indication(void);
+/* Device_State */
+static void Custom_Ds_mode_Update_Char(void);
+static void Custom_Ds_mode_Send_Notification(void);
+static void Custom_Ds_control_point_Update_Char(void);
+static void Custom_Ds_control_point_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
@@ -143,140 +146,158 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     /* USER CODE END CUSTOM_STM_App_Notification_Custom_Evt_Opcode */
 
-    /* CRS */
-    case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Crs_tx_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
+    /* File_Transfer */
+    case CUSTOM_STM_FT_PACKET_OUT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_FT_PACKET_OUT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Ft_packet_out_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_FT_PACKET_OUT_NOTIFY_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Crs_tx_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_FT_PACKET_OUT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_FT_PACKET_OUT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Ft_packet_out_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_FT_PACKET_OUT_NOTIFY_DISABLED_EVT */
       break;
 
-    case CUSTOM_STM_CRS_RX_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_READ_EVT */
+    case CUSTOM_STM_FT_PACKET_IN_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_FT_PACKET_IN_READ_EVT */
 
-      /* USER CODE END CUSTOM_STM_CRS_RX_READ_EVT */
+      /* USER CODE END CUSTOM_STM_FT_PACKET_IN_READ_EVT */
       break;
 
-    case CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
+    case CUSTOM_STM_FT_PACKET_IN_WRITE_NO_RESP_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_FT_PACKET_IN_WRITE_NO_RESP_EVT */
       Custom_CRS_OnRxWrite(pNotification);
-      /* USER CODE END CUSTOM_STM_CRS_RX_WRITE_NO_RESP_EVT */
+      /* USER CODE END CUSTOM_STM_FT_PACKET_IN_WRITE_NO_RESP_EVT */
       break;
 
-    case CUSTOM_STM_MODE_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_MODE_READ_EVT */
-      uint8_t modeVal = (uint8_t) FS_Mode_State();  // Get current state from mode module
-      Custom_STM_App_Update_Char(CUSTOM_STM_MODE, &modeVal);
-      /* USER CODE END CUSTOM_STM_MODE_READ_EVT */
-      break;
-
-    case CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Mode_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_MODE_NOTIFY_ENABLED_EVT */
-      break;
-
-    case CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Mode_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_MODE_NOTIFY_DISABLED_EVT */
-      break;
-
-    /* GNSS */
-    case CUSTOM_STM_GNSS_PV_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_READ_EVT */
-      if (!Custom_App_Context.Gnss_pv_Notification_Status)
+    /* Sensor_Data */
+    case CUSTOM_STM_SD_GNSS_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GNSS_MEASUREMENT_READ_EVT */
+      if (!Custom_App_Context.Sd_gnss_measurement_Notification_Status)
       {
-        Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_GNSS_MEASUREMENT, gnss_pv_packet);
       }
-      /* USER CODE END CUSTOM_STM_GNSS_PV_READ_EVT */
+      /* USER CODE END CUSTOM_STM_SD_GNSS_MEASUREMENT_READ_EVT */
       break;
 
-    case CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Gnss_pv_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT */
+    case CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_gnss_measurement_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Gnss_pv_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_GNSS_MEASUREMENT_NOTIFY_DISABLED_EVT */
       break;
 
-    case CUSTOM_STM_GNSS_CONTROL_WRITE_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+    case CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT */
       {
         uint8_t rsp_len = GNSS_BLE_HandleCtrlWrite(
                               pNotification->DataTransfered.pPayload,
                               pNotification->DataTransfered.Length,
                               gnss_control_rsp);
 
-        if (rsp_len && Custom_App_Context.Gnss_control_Notification_Status)
+        if (rsp_len && Custom_App_Context.Sd_control_point_Notification_Status)
         {
-          SizeGnss_Control = rsp_len;
-          BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_CONTROL,
-                  gnss_control_rsp, SizeGnss_Control, 0);
+          BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_CONTROL_POINT,
+                  gnss_control_rsp, rsp_len, &SizeSd_Control_Point, 0);
         }
       }
-      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
-    break;
-
-    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Gnss_control_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
+      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT */
       break;
 
-    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Gnss_control_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_control_point_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT */
       break;
 
-    /* Start */
-    case CUSTOM_STM_START_CONTROL_WRITE_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_WRITE_EVT */
+    case CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_control_point_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+      break;
+
+    /* Starter_Pistol */
+    case CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT */
       Custom_Start_OnControlWrite(pNotification);
-      /* USER CODE END CUSTOM_STM_START_CONTROL_WRITE_EVT */
+      /* USER CODE END CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT */
       break;
 
-    case CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
-      Custom_App_Context.Start_control_Indication_Status = 1;
-      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT */
+    case CUSTOM_STM_SP_CONTROL_POINT_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_CONTROL_POINT_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Sp_control_point_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_SP_CONTROL_POINT_INDICATE_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
-      Custom_App_Context.Start_control_Indication_Status = 0;
-      /* USER CODE END CUSTOM_STM_START_CONTROL_INDICATE_DISABLED_EVT */
+    case CUSTOM_STM_SP_CONTROL_POINT_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_CONTROL_POINT_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Sp_control_point_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_SP_CONTROL_POINT_INDICATE_DISABLED_EVT */
       break;
 
-    case CUSTOM_STM_START_RESULT_READ_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_READ_EVT */
-      if (!Custom_App_Context.Start_result_Indication_Status)
+    case CUSTOM_STM_SP_RESULT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_RESULT_READ_EVT */
+      if (!Custom_App_Context.Sp_result_Indication_Status)
       {
-        Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SP_RESULT, start_result_packet);
       }
-      /* USER CODE END CUSTOM_STM_START_RESULT_READ_EVT */
+      /* USER CODE END CUSTOM_STM_SP_RESULT_READ_EVT */
       break;
 
-    case CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT */
-      Custom_App_Context.Start_result_Indication_Status = 1;
-      /* USER CODE END CUSTOM_STM_START_RESULT_INDICATE_ENABLED_EVT */
+    case CUSTOM_STM_SP_RESULT_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_RESULT_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Sp_result_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_SP_RESULT_INDICATE_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT */
-      Custom_App_Context.Start_result_Indication_Status = 0;
-      /* USER CODE END CUSTOM_STM_START_RESULT_INDICATE_DISABLED_EVT */
+    case CUSTOM_STM_SP_RESULT_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SP_RESULT_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Sp_result_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_SP_RESULT_INDICATE_DISABLED_EVT */
+      break;
+
+    /* Device_State */
+    case CUSTOM_STM_DS_MODE_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_READ_EVT */
+      uint8_t modeVal = (uint8_t) FS_Mode_State();  // Get current state from mode module
+      Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, &modeVal);
+      /* USER CODE END CUSTOM_STM_DS_MODE_READ_EVT */
+      break;
+
+    case CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Ds_mode_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Ds_mode_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT */
+
+      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT */
+      break;
+
+    case CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+
+      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -339,10 +360,10 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
   BLE_TX_Queue_Init();
 
-  Custom_App_Context.Crs_tx_Notification_Status = 0;
-  Custom_App_Context.Gnss_pv_Notification_Status = 0;
-  Custom_App_Context.Start_control_Indication_Status = 0;
-  Custom_App_Context.Start_result_Indication_Status = 0;
+  Custom_App_Context.Ft_packet_out_Notification_Status = 0;
+  Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
+  Custom_App_Context.Sp_control_point_Indication_Status = 0;
+  Custom_App_Context.Sp_result_Indication_Status = 0;
 
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timeout_timer_id, hw_ts_SingleShot, Custom_App_Timeout);
   /* USER CODE END CUSTOM_APP_Init */
@@ -367,239 +388,279 @@ uint8_t Custom_APP_IsConnected(void)
  *
  *************************************************************/
 
-/* CRS */
-void Custom_Crs_tx_Update_Char(void) /* Property Read */
+/* File_Transfer */
+void Custom_Ft_packet_out_Update_Char(void) /* Property Read */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Crs_tx_UC_1*/
+  /* USER CODE BEGIN Ft_packet_out_UC_1*/
 
-  /* USER CODE END Crs_tx_UC_1*/
+  /* USER CODE END Ft_packet_out_UC_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_FT_PACKET_OUT, (uint8_t *)UpdateCharData);
   }
 
-  /* USER CODE BEGIN Crs_tx_UC_Last*/
+  /* USER CODE BEGIN Ft_packet_out_UC_Last*/
 
-  /* USER CODE END Crs_tx_UC_Last*/
+  /* USER CODE END Ft_packet_out_UC_Last*/
   return;
 }
 
-void Custom_Crs_tx_Send_Notification(void) /* Property Notification */
+void Custom_Ft_packet_out_Send_Notification(void) /* Property Notification */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Crs_tx_NS_1*/
+  /* USER CODE BEGIN Ft_packet_out_NS_1*/
 
-  /* USER CODE END Crs_tx_NS_1*/
-
-  if (updateflag != 0)
-  {
-    Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, (uint8_t *)NotifyCharData);
-  }
-
-  /* USER CODE BEGIN Crs_tx_NS_Last*/
-
-  /* USER CODE END Crs_tx_NS_Last*/
-
-  return;
-}
-
-void Custom_Mode_Update_Char(void) /* Property Read */
-{
-  uint8_t updateflag = 0;
-
-  /* USER CODE BEGIN Mode_UC_1*/
-
-  /* USER CODE END Mode_UC_1*/
+  /* USER CODE END Ft_packet_out_NS_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_FT_PACKET_OUT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Mode_UC_Last*/
+  /* USER CODE BEGIN Ft_packet_out_NS_Last*/
 
-  /* USER CODE END Mode_UC_Last*/
-  return;
-}
-
-void Custom_Mode_Send_Notification(void) /* Property Notification */
-{
-  uint8_t updateflag = 0;
-
-  /* USER CODE BEGIN Mode_NS_1*/
-
-  /* USER CODE END Mode_NS_1*/
-
-  if (updateflag != 0)
-  {
-    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, (uint8_t *)NotifyCharData);
-  }
-
-  /* USER CODE BEGIN Mode_NS_Last*/
-
-  /* USER CODE END Mode_NS_Last*/
+  /* USER CODE END Ft_packet_out_NS_Last*/
 
   return;
 }
 
-/* GNSS */
-void Custom_Gnss_pv_Update_Char(void) /* Property Read */
+/* Sensor_Data */
+void Custom_Sd_gnss_measurement_Update_Char(void) /* Property Read */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Gnss_pv_UC_1*/
+  /* USER CODE BEGIN Sd_gnss_measurement_UC_1*/
 
-  /* USER CODE END Gnss_pv_UC_1*/
+  /* USER CODE END Sd_gnss_measurement_UC_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SD_GNSS_MEASUREMENT, (uint8_t *)UpdateCharData);
   }
 
-  /* USER CODE BEGIN Gnss_pv_UC_Last*/
+  /* USER CODE BEGIN Sd_gnss_measurement_UC_Last*/
 
-  /* USER CODE END Gnss_pv_UC_Last*/
+  /* USER CODE END Sd_gnss_measurement_UC_Last*/
   return;
 }
 
-void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
+void Custom_Sd_gnss_measurement_Send_Notification(void) /* Property Notification */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Gnss_pv_NS_1*/
+  /* USER CODE BEGIN Sd_gnss_measurement_NS_1*/
 
-  /* USER CODE END Gnss_pv_NS_1*/
-
-  if (updateflag != 0)
-  {
-    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, (uint8_t *)NotifyCharData);
-  }
-
-  /* USER CODE BEGIN Gnss_pv_NS_Last*/
-
-  /* USER CODE END Gnss_pv_NS_Last*/
-
-  return;
-}
-
-void Custom_Gnss_control_Update_Char(void) /* Property Read */
-{
-  uint8_t updateflag = 0;
-
-  /* USER CODE BEGIN Gnss_control_UC_1*/
-
-  /* USER CODE END Gnss_control_UC_1*/
+  /* USER CODE END Sd_gnss_measurement_NS_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SD_GNSS_MEASUREMENT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Gnss_control_UC_Last*/
+  /* USER CODE BEGIN Sd_gnss_measurement_NS_Last*/
 
-  /* USER CODE END Gnss_control_UC_Last*/
-  return;
-}
-
-void Custom_Gnss_control_Send_Notification(void) /* Property Notification */
-{
-  uint8_t updateflag = 0;
-
-  /* USER CODE BEGIN Gnss_control_NS_1*/
-
-  /* USER CODE END Gnss_control_NS_1*/
-
-  if (updateflag != 0)
-  {
-    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)NotifyCharData);
-  }
-
-  /* USER CODE BEGIN Gnss_control_NS_Last*/
-
-  /* USER CODE END Gnss_control_NS_Last*/
+  /* USER CODE END Sd_gnss_measurement_NS_Last*/
 
   return;
 }
 
-/* Start */
-void Custom_Start_control_Update_Char(void) /* Property Read */
+void Custom_Sd_control_point_Update_Char(void) /* Property Read */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Start_control_UC_1*/
+  /* USER CODE BEGIN Sd_control_point_UC_1*/
 
-  /* USER CODE END Start_control_UC_1*/
+  /* USER CODE END Sd_control_point_UC_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SD_CONTROL_POINT, (uint8_t *)UpdateCharData);
   }
 
-  /* USER CODE BEGIN Start_control_UC_Last*/
+  /* USER CODE BEGIN Sd_control_point_UC_Last*/
 
-  /* USER CODE END Start_control_UC_Last*/
+  /* USER CODE END Sd_control_point_UC_Last*/
   return;
 }
 
-void Custom_Start_control_Send_Indication(void) /* Property Indication */
+void Custom_Sd_control_point_Send_Notification(void) /* Property Notification */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Start_control_IS_1*/
+  /* USER CODE BEGIN Sd_control_point_NS_1*/
 
-  /* USER CODE END Start_control_IS_1*/
+  /* USER CODE END Sd_control_point_NS_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_START_CONTROL, (uint8_t *)NotifyCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SD_CONTROL_POINT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Start_control_IS_Last*/
+  /* USER CODE BEGIN Sd_control_point_NS_Last*/
 
-  /* USER CODE END Start_control_IS_Last*/
+  /* USER CODE END Sd_control_point_NS_Last*/
 
   return;
 }
 
-void Custom_Start_result_Update_Char(void) /* Property Read */
+/* Starter_Pistol */
+void Custom_Sp_control_point_Update_Char(void) /* Property Read */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Start_result_UC_1*/
+  /* USER CODE BEGIN Sp_control_point_UC_1*/
 
-  /* USER CODE END Start_result_UC_1*/
+  /* USER CODE END Sp_control_point_UC_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, (uint8_t *)UpdateCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SP_CONTROL_POINT, (uint8_t *)UpdateCharData);
   }
 
-  /* USER CODE BEGIN Start_result_UC_Last*/
+  /* USER CODE BEGIN Sp_control_point_UC_Last*/
 
-  /* USER CODE END Start_result_UC_Last*/
+  /* USER CODE END Sp_control_point_UC_Last*/
   return;
 }
 
-void Custom_Start_result_Send_Indication(void) /* Property Indication */
+void Custom_Sp_control_point_Send_Indication(void) /* Property Indication */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Start_result_IS_1*/
+  /* USER CODE BEGIN Sp_control_point_IS_1*/
 
-  /* USER CODE END Start_result_IS_1*/
+  /* USER CODE END Sp_control_point_IS_1*/
 
   if (updateflag != 0)
   {
-    Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, (uint8_t *)NotifyCharData);
+    Custom_STM_App_Update_Char(CUSTOM_STM_SP_CONTROL_POINT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Start_result_IS_Last*/
+  /* USER CODE BEGIN Sp_control_point_IS_Last*/
 
-  /* USER CODE END Start_result_IS_Last*/
+  /* USER CODE END Sp_control_point_IS_Last*/
+
+  return;
+}
+
+void Custom_Sp_result_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Sp_result_UC_1*/
+
+  /* USER CODE END Sp_result_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_SP_RESULT, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Sp_result_UC_Last*/
+
+  /* USER CODE END Sp_result_UC_Last*/
+  return;
+}
+
+void Custom_Sp_result_Send_Indication(void) /* Property Indication */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Sp_result_IS_1*/
+
+  /* USER CODE END Sp_result_IS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_SP_RESULT, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Sp_result_IS_Last*/
+
+  /* USER CODE END Sp_result_IS_Last*/
+
+  return;
+}
+
+/* Device_State */
+void Custom_Ds_mode_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Ds_mode_UC_1*/
+
+  /* USER CODE END Ds_mode_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Ds_mode_UC_Last*/
+
+  /* USER CODE END Ds_mode_UC_Last*/
+  return;
+}
+
+void Custom_Ds_mode_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Ds_mode_NS_1*/
+
+  /* USER CODE END Ds_mode_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Ds_mode_NS_Last*/
+
+  /* USER CODE END Ds_mode_NS_Last*/
+
+  return;
+}
+
+void Custom_Ds_control_point_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Ds_control_point_UC_1*/
+
+  /* USER CODE END Ds_control_point_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_DS_CONTROL_POINT, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Ds_control_point_UC_Last*/
+
+  /* USER CODE END Ds_control_point_UC_Last*/
+  return;
+}
+
+void Custom_Ds_control_point_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Ds_control_point_NS_1*/
+
+  /* USER CODE END Ds_control_point_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_DS_CONTROL_POINT, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Ds_control_point_NS_Last*/
+
+  /* USER CODE END Ds_control_point_NS_Last*/
 
   return;
 }
@@ -672,12 +733,12 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
 
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-  SizeGnss_Pv = GNSS_BLE_Build(current, gnss_pv_packet);
+  uint8_t length = GNSS_BLE_Build(current, gnss_pv_packet);
 
-  if (Custom_App_Context.Gnss_pv_Notification_Status)
+  if (Custom_App_Context.Sd_gnss_measurement_Notification_Status)
   {
-    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_PV,
-            gnss_pv_packet, SizeGnss_Pv, 0);
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GNSS_MEASUREMENT,
+            gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
   }
 }
 
@@ -724,10 +785,10 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
   memcpy(&start_result_packet[6], &sec, sizeof(sec));
   memcpy(&start_result_packet[7], &ms, sizeof(ms));
 
-  if (Custom_App_Context.Start_result_Indication_Status)
+  if (Custom_App_Context.Sp_result_Indication_Status)
   {
-    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_START_RESULT,
-            start_result_packet, SizeStart_Result, 0);
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SP_RESULT,
+            start_result_packet, SizeSp_Result, 0, 0);
   }
 }
 
@@ -744,6 +805,6 @@ void Custom_Mode_Update(uint8_t newMode)
      * we still call Custom_STM_App_Update_Char so that the
      * characteristic value is always up-to-date when read.
      */
-    Custom_STM_App_Update_Char(CUSTOM_STM_MODE, &newMode);
+    Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, &newMode);
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
