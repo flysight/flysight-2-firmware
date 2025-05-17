@@ -220,23 +220,23 @@ Provides live GNSS data when FlySight is in Active Mode or Start Mode. Requires 
         *   Properties: **Write, Notify**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications. Also used to retrieve the current mask. Central enables notifications if responses are desired.
-        *   Max Length: 3 bytes (`SizeSd_Control_Point`).
+        *   Max Length: 20 bytes (`SizeSd_Control_Point`). Variable length.
         *   **Write Operations (Central to FlySight):**
             *   Byte 0: Opcode
                 *   `0x01` (`GNSS_BLE_OP_SET_MASK`): Set the data mask for `SD_GNSS_Measurement`.
-                    *   Byte 1: `new_mask` (uint8). A bitmask specifying which fields to include. Uses the same bit definitions as `current_mask` in `SD_GNSS_Measurement`.
+                    *   Byte 1: `new_mask` (uint8). A bitmask specifying which fields to include. Uses the same bit definitions as `current_mask` in `SD_GNSS_Measurement`. (Total length: 2 bytes)
                 *   `0x02` (`GNSS_BLE_OP_GET_MASK`): Request the current data mask.
-                    *   (No payload bytes after opcode)
+                    *   (No payload bytes after opcode. Total length: 1 byte)
         *   **Notify Responses (FlySight to Central, if notifications enabled):**
             *   Byte 0: Original Opcode written by Central.
             *   Byte 1: Status or Value
                 *   If Opcode was `GNSS_BLE_OP_SET_MASK`:
-                    *   `0x00` (`GNSS_BLE_STATUS_OK`): Mask set successfully.
-                    *   `0x01` (`GNSS_BLE_STATUS_BAD_LENGTH`): Incorrect payload length for SET_MASK.
+                    *   `0x00` (`GNSS_BLE_STATUS_OK`): Mask set successfully. (Total length: 2 bytes)
+                    *   `0x01` (`GNSS_BLE_STATUS_BAD_LENGTH`): Incorrect payload length for SET_MASK. (Total length: 2 bytes)
                 *   If Opcode was `GNSS_BLE_OP_GET_MASK`:
-                    *   The current `active_mask` (uint8) used by the firmware.
+                    *   The current `active_mask` (uint8) used by the firmware. (Total length: 2 bytes)
                 *   If Opcode was unknown:
-                    *   `0x02` (`GNSS_BLE_STATUS_BAD_OPCODE`): Opcode not recognized.
+                    *   `0x02` (`GNSS_BLE_STATUS_BAD_OPCODE`): Opcode not recognized. (Total length: 2 bytes)
 
 ### 3. Starter_Pistol Service
 
@@ -250,11 +250,11 @@ Used for synchronized start timing in specific scenarios (e.g., BASE race). Only
         *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: Sends control commands to the start pistol feature. Indications may provide feedback.
-        *   Length: 1 byte (`SizeSp_Control_Point`).
+        *   Max Length: 20 bytes (`SizeSp_Control_Point`). Variable length.
         *   **Write Operations (Central to FlySight):**
             *   Byte 0: Command
-                *   `0x00` (`FS_START_COMMAND_START`): Initiate the start sequence (countdown and tone).
-                *   `0x01` (`FS_START_COMMAND_CANCEL`): Cancel an ongoing start sequence.
+                *   `0x00` (`FS_START_COMMAND_START`): Initiate the start sequence (countdown and tone). (Total length: 1 byte)
+                *   `0x01` (`FS_START_COMMAND_CANCEL`): Cancel an ongoing start sequence. (Total length: 1 byte)
 
     *   **`SP_Result`**
         *   UUID: `00000004-8e22-4541-9d4c-21edae82ed19`
@@ -291,7 +291,7 @@ Provides information about the device's current operational state and allows for
         *   Properties: **Write, Notify**
         *   Permissions: Encrypted Read/Write required.
         *   Usage: (Planned/Partial) For controlling device state aspects, such as requesting a mode change or other device-level operations. Responses or status updates may be sent via notifications.
-        *   Length: 3 bytes (`SizeDs_Control_Point`).
+        *   Max Length: 20 bytes (`SizeDs_Control_Point`). Variable length.
 
 ### 5. Standard BLE Services
 
@@ -313,20 +313,22 @@ FlySight 2 also implements standard BLE services:
 
 ### Known UUIDs
 
-| Feature                 | Characteristic Name       | UUID                                         | Service            | Properties             |
-| :---------------------- | :------------------------ | :------------------------------------------- | :----------------- | :--------------------- |
-| File Transfer Service   |                           | `00000000-cc7a-482a-984a-7f2ed5b3e58f`       | File_Transfer      |                        |
-| File Transfer TX        | `FT_Packet_Out`           | `00000001-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | Notify                 |
-| File Transfer RX        | `FT_Packet_In`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | WriteWithoutResponse, Read |
-| Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        |
-| GNSS Measurement        | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           |
-| Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Notify          |
-| Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        |
-| Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        |
-| Starter Pistol Result   | `SP_Result`               | `00000004-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Read, Indicate         |
-| Device State Service    |                           | `00000003-cc7a-482a-984a-7f2ed5b3e58f`       | Device_State       |                        |
-| Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Notify           |
-| Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Notify          |
+| Feature                 | Characteristic Name       | UUID                                         | Service            | Properties             | Max Length (Bytes) |
+| :---------------------- | :------------------------ | :------------------------------------------- | :----------------- | :--------------------- | :----------------- |
+| File Transfer Service   |                           | `00000000-cc7a-482a-984a-7f2ed5b3e58f`       | File_Transfer      |                        | N/A                |
+| File Transfer TX        | `FT_Packet_Out`           | `00000001-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | Notify                 | 244 (Var)          |
+| File Transfer RX        | `FT_Packet_In`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | WriteWithoutResponse, Read | 244 (Var)          |
+| Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        | N/A                |
+| GNSS Measurement        | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 44 (Var)           |
+| Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Notify          | 20 (Var)           |
+| Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        | N/A                |
+| Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        | 20 (Var)           |
+| Starter Pistol Result   | `SP_Result`               | `00000004-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Read, Indicate         | 9 (Const)          |
+| Device State Service    |                           | `00000003-cc7a-482a-984a-7f2ed5b3e58f`       | Device_State       |                        | N/A                |
+| Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Notify           | 1 (Const)          |
+| Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Notify          | 20 (Var)           |
+
+*(Note: "Var" indicates variable length up to the specified maximum. "Const" indicates fixed length.)*
 
 ### File Transfer Command Opcodes
 

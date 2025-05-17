@@ -54,7 +54,7 @@ typedef struct
 
 typedef struct
 {
-  uint8_t data[1];
+  uint8_t data[20];
   uint8_t length;
 } Custom_Start_Packet_t;
 /* USER CODE END ET */
