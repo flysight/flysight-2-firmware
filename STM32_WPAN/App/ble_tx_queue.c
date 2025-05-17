@@ -34,6 +34,7 @@ typedef struct
 	Custom_STM_Char_Opcode_t opcode;
 	uint8_t data[244];
 	uint8_t length;
+	BLE_TX_Queue_callback_t callback;
 } BLE_TX_Queue_Packet_t;
 
 static BLE_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
@@ -73,7 +74,7 @@ uint8_t *BLE_TX_Queue_GetNextTxPacket(void)
 }
 
 void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
-		uint8_t length)
+		uint8_t length, BLE_TX_Queue_callback_t callback)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
@@ -82,6 +83,7 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 
 		packet->opcode = opcode;
 		packet->length = length;
+		packet->callback = callback;
 
 		++tx_write_index;
 		UTIL_SEQ_SetTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
@@ -93,13 +95,13 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 }
 
 void BLE_TX_Queue_SendTxPacket(Custom_STM_Char_Opcode_t opcode,
-		uint8_t *data, uint8_t length)
+		uint8_t *data, uint8_t length, BLE_TX_Queue_callback_t callback)
 {
 	uint8_t *tx_buffer;
 	if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
 	{
 		memcpy(tx_buffer, data, length);
-		BLE_TX_Queue_SendNextTxPacket(opcode, length);
+		BLE_TX_Queue_SendNextTxPacket(opcode, length, callback);
 	}
 }
 
@@ -127,8 +129,11 @@ static void BLE_TX_Queue_Transmit(void)
 		{
 			++tx_read_index;
 
-			// Call update task and transmit next packet
-			UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
+			// Call callback and transmit next packet
+			if (packet->callback)
+			{
+				packet->callback();
+			}
 			UTIL_SEQ_SetTask(1<<CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID, CFG_SCH_PRIO_1);
 		}
 
