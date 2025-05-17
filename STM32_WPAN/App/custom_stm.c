@@ -76,11 +76,11 @@ typedef struct{
 uint8_t SizeFt_Packet_Out = 244;
 uint8_t SizeFt_Packet_In = 244;
 uint8_t SizeSd_Gnss_Measurement = 44;
-uint8_t SizeSd_Control_Point = 3;
-uint8_t SizeSp_Control_Point = 1;
+uint8_t SizeSd_Control_Point = 20;
+uint8_t SizeSp_Control_Point = 20;
 uint8_t SizeSp_Result = 9;
 uint8_t SizeDs_Mode = 1;
-uint8_t SizeDs_Control_Point = 3;
+uint8_t SizeDs_Control_Point = 20;
 
 /**
  * START of Section BLE_DRIVER_CONTEXT
@@ -828,7 +828,7 @@ void SVCCTL_InitCustomSvc(void)
                           ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
-                          CHAR_VALUE_LEN_CONSTANT,
+                          CHAR_VALUE_LEN_VARIABLE,
                           &(CustomContext.CustomSd_Control_PointHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
@@ -891,7 +891,7 @@ void SVCCTL_InitCustomSvc(void)
                           ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
-                          CHAR_VALUE_LEN_CONSTANT,
+                          CHAR_VALUE_LEN_VARIABLE,
                           &(CustomContext.CustomSp_Control_PointHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
@@ -1006,7 +1006,7 @@ void SVCCTL_InitCustomSvc(void)
                           ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
-                          CHAR_VALUE_LEN_CONSTANT,
+                          CHAR_VALUE_LEN_VARIABLE,
                           &(CustomContext.CustomDs_Control_PointHdle));
   if (ret != BLE_STATUS_SUCCESS)
   {
