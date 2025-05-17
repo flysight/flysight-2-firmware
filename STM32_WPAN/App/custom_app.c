@@ -197,7 +197,8 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
         if (rsp_len && Custom_App_Context.Gnss_control_Notification_Status)
         {
           SizeGnss_Control = rsp_len;
-          Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, gnss_control_rsp);
+          BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_CONTROL,
+                  gnss_control_rsp, SizeGnss_Control);
         }
       }
       /* USER CODE END CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
@@ -613,12 +614,8 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 
   if (Custom_App_Context.Gnss_pv_Notification_Status)
   {
-    uint8_t *tx_buffer;
-    if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
-    {
-      memcpy(tx_buffer, gnss_pv_packet, SizeGnss_Pv);
-      BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_GNSS_PV, SizeGnss_Pv);
-    }
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_PV,
+            gnss_pv_packet, SizeGnss_Pv);
   }
 }
 
@@ -667,12 +664,8 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
 
   if (Custom_App_Context.Start_result_Indication_Status)
   {
-    uint8_t *tx_buffer;
-    if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
-    {
-      memcpy(tx_buffer, start_result_packet, SizeStart_Result);
-      BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_START_RESULT, SizeStart_Result);
-    }
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_START_RESULT,
+            start_result_packet, SizeStart_Result);
   }
 }
 

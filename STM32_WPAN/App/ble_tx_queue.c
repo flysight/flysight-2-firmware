@@ -92,6 +92,17 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 	}
 }
 
+void BLE_TX_Queue_SendTxPacket(Custom_STM_Char_Opcode_t opcode,
+		uint8_t *data, uint8_t length)
+{
+	uint8_t *tx_buffer;
+	if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
+	{
+		memcpy(tx_buffer, data, length);
+		BLE_TX_Queue_SendNextTxPacket(opcode, length);
+	}
+}
+
 static void BLE_TX_Queue_Transmit(void)
 {
 	static uint8_t tx_busy = 0;
