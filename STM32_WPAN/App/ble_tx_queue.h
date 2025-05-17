@@ -33,4 +33,7 @@ uint8_t *BLE_TX_Queue_GetNextTxPacket(void);
 void BLE_TX_Queue_SendNextTxPacket(
 		Custom_STM_Char_Opcode_t opcode, uint8_t length);
 
+void BLE_TX_Queue_SendTxPacket(
+		Custom_STM_Char_Opcode_t opcode, uint8_t *data, uint8_t length);
+
 #endif /* APP_BLE_TX_QUEUE_H_ */
