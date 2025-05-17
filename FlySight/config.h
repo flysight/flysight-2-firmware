@@ -29,6 +29,7 @@
 #define FS_CONFIG_MAX_ALARMS    20
 #define FS_CONFIG_MAX_WINDOWS   2
 #define FS_CONFIG_MAX_SPEECH    3
+#define FS_CONFIG_MAX_AL_LINES  4
 
 #define FS_CONFIG_MODEL_PORTABLE     0
 #define FS_CONFIG_MODEL_STATIONARY   2
@@ -61,6 +62,11 @@
 #define FS_CONFIG_UNITS_FEET    1
 #define FS_CONFIG_UNITS_NM      2
 
+typedef enum {
+    FS_UNIT_SYSTEM_METRIC = 0,
+    FS_UNIT_SYSTEM_IMPERIAL = 1
+} FS_Config_UnitSystem_t;
+
 #define FS_CONFIG_RATE_ONE_HZ   650
 #define FS_CONFIG_RATE_FLATLINE UINT16_MAX
 
@@ -83,6 +89,13 @@ typedef struct
 	uint8_t units;
 	int32_t decimals;
 } FS_Config_Speech_t;
+
+typedef struct
+{
+	uint8_t mode;
+	FS_Config_UnitSystem_t units;
+	int32_t decimals;
+} FS_Config_AL_Line_t;
 
 typedef struct
 {
@@ -157,6 +170,15 @@ typedef struct
 	uint16_t end_nav;
 	uint16_t max_dist;
 	uint16_t min_angle;
+
+	char     al_id[6];
+	uint8_t  al_mode;
+
+	FS_Config_AL_Line_t al_lines[FS_CONFIG_MAX_AL_LINES];
+	uint8_t  num_al_lines;
+
+	// Flag to control whether navigation modes are allowed
+	uint8_t  enable_nav;
 } FS_Config_Data_t;
 
 typedef enum {

@@ -25,10 +25,12 @@
 #include "app_common.h"
 #include "config.h"
 #include "ff.h"
+#include "state.h"
 
-#define CONFIG_FIRST_ALARM  0x01
-#define CONFIG_FIRST_WINDOW 0x02
-#define CONFIG_FIRST_SPEECH 0x04
+#define CONFIG_FIRST_ALARM   0x01
+#define CONFIG_FIRST_WINDOW  0x02
+#define CONFIG_FIRST_SPEECH  0x04
+#define CONFIG_FIRST_AL_LINE 0x08
 
 static FS_Config_Data_t config;
 static FIL configFile;
@@ -57,6 +59,9 @@ static const char defaultConfig[] =
 		"                 ;   2 = Glide ratio\n"
 		"                 ;   3 = Inverse glide ratio\n"
 		"                 ;   4 = Total speed\n"
+		"                 ;   5 = Direction to destination\n"
+		"                 ;   6 = Distance to destination\n"
+		"                 ;   7 = Direction to bearing\n"
 		"                 ;   11 = Dive angle\n"
 		"Min:       0     ; Lowest pitch value\n"
 		"                 ;   cm/s        in Mode 0, 1, or 4\n"
@@ -112,6 +117,9 @@ static const char defaultConfig[] =
 		"                 ;   2 = Glide ratio\n"
 		"                 ;   3 = Inverse glide ratio\n"
 		"                 ;   4 = Total speed\n"
+		"                 ;   5 = Direction to destination\n"
+		"                 ;   6 = Distance to destination\n"
+		"                 ;   7 = Direction to bearing\n"
 		"                 ;   11 = Dive angle\n"
 		"                 ;   12 = Altitude above DZ_Elev\n"
 		"Sp_Units:  1     ; Speech units\n"
@@ -200,7 +208,81 @@ static const char defaultConfig[] =
 		";          alarms will be audible.\n"
 		"\n"
 		"Win_Top:       0 ; Silence window top (m)\n"
-		"Win_Bottom:    0 ; Silence window bottom (m)\n";
+		"Win_Bottom:    0 ; Silence window bottom (m)\n"
+		"\n"
+		"; Navigation settings\n"
+		"\n"
+		"; Activating navigation features requires the UNIQUE DEVICE ID\n"
+		"; of this specific FlySight device to be entered below. This is\n"
+		"; a deliberate step to ensure users understand the potential\n"
+		"; implications of using navigation features.\n"
+		"\n"
+		"; BEFORE ENABLING THIS FEATURE, YOU MUST ACKNOWLEDGE THE\n"
+		"; FOLLOWING:\n"
+		"\n"
+		"; 1. NAVIGATION DATA IS FOR SUPPLEMENTARY INFORMATION ONLY. It\n"
+		";    should NEVER be your primary source of navigation or\n"
+		";    situational awareness.\n"
+		"\n"
+		"; 2. DO NOT USE THIS FEATURE FOR SAFETY-CRITICAL DECISIONS.\n"
+		";    Always prioritize visual confirmation, established safety\n"
+		";    procedures, and communication.\n"
+		"\n"
+		"; 3. Be aware that other users may independently configure\n"
+		";    similar navigation targets, potentially leading to\n"
+		";    convergent flight paths. This system provides NO collision\n"
+		";    avoidance.\n"
+		"\n"
+		"; 4. You are solely responsible for your flight path and safety.\n"
+		"\n"
+		"; ENTER YOUR FLYSIGHT'S UNIQUE DEVICE ID BELOW TO ACTIVATE\n"
+		"; NAVIGATION FEATURES:\n"
+		"\n"
+		"Device_ID: 000000000000000000000000\n"
+		"\n"
+		"Lat:       510442700    ; Latitude (deg * 10,000,000)\n"
+		"Lon:       -1140620190  ; Longitude (deg * 10,000,000)\n"
+		"Bearing:   0            ; Bearing (deg)\n"
+		"End_Nav:   1500         ; Minimum altitude (m)\n"
+		"Max_Dist:  10000        ; Maximum distance (m)\n"
+		"Min_Angle: 5            ; Minimum angle for direction (deg)\n"
+		"\n"
+		"; ActiveLook interface\n"
+		"\n"
+		"AL_ID:    000000 ; ActiveLook device ID\n"
+		"AL_Mode:       1 ; ActiveLook mode\n"
+		"                     0 = Not active\n"
+		"                     1 = Default mode\n"
+		"\n"
+		"AL_Line:       0 ; ActiveLook line value\n"
+		"                 ;   0 = Horizontal speed\n"
+		"                 ;   1 = Vertical speed\n"
+		"                 ;   2 = Glide ratio\n"
+		"                 ;   3 = Inverse glide ratio\n"
+		"                 ;   4 = Total speed\n"
+		"                 ;   5 = Direction to destination\n"
+		"                 ;   6 = Distance to destination\n"
+		"                 ;   7 = Direction to bearing\n"
+		"                 ;   11 = Dive angle\n"
+		"                 ;   12 = Altitude above DZ_Elev\n"
+		"                 ;   13 = Course\n"
+		"AL_Units:      0 ; ActiveLook units\n"
+		"                 ;   0 = km/h or m\n"
+		"                 ;   1 = mph or feet\n"
+		"AL_Dec:        1 ; ActiveLook precision\n"
+		"                 ;   Decimal places\n"
+		"\n"
+		"AL_Line:       1 ; Vertical speed\n"
+		"AL_Units:      0 ; km/h\n"
+		"AL_Dec:        1 ; Decimal places\n"
+		"\n"
+		"AL_Line:       2 ; Glide ratio\n"
+		"AL_Units:      0 ; No units\n"
+		"AL_Dec:        2 ; Decimal places\n"
+		"\n"
+		"AL_Line:      13 ; Course\n"
+		"AL_Units:      0 ; Degrees\n"
+		"AL_Dec:        0 ; Decimal places\n";
 
 void FS_Config_Init(void)
 {
@@ -222,7 +304,6 @@ void FS_Config_Init(void)
 
 	config.sp_rate       = 0;
 	config.sp_volume     = 0;
-
 	config.num_speech    = 0;
 
 	config.threshold     = 1000;
@@ -272,6 +353,23 @@ void FS_Config_Init(void)
 	config.end_nav        = 0;
 	config.max_dist       = 10000;
 	config.min_angle      = 5;
+
+	*(config.al_id) = '\0';
+	config.al_mode        = 1;
+	config.num_al_lines   = 0;
+
+	// IMPORTANT: Navigation disabled by default
+	config.enable_nav     = 0;
+}
+
+static void FS_Config_WriteHex_32(char *result, const uint32_t *data, uint32_t count)
+{
+	uint32_t i;
+
+	for (i = 0; i < count; ++i)
+	{
+		sprintf(result + 8 * i, "%08lx", data[i]);
+	}
 }
 
 FS_Config_Result_t FS_Config_Read(const char *filename)
@@ -362,6 +460,8 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Max_Dist",  config.max_dist,     val, val >= 0 && val <= 10000);
 		HANDLE_VALUE("Min_Angle", config.min_angle,    val, val >= 0 && val <= 360);
 
+		HANDLE_VALUE("AL_Mode",   config.al_mode,      val, val >= 0 && val <= 1);
+
 		#undef HANDLE_VALUE
 
 		if (!strcmp(name, "Init_File"))
@@ -430,6 +530,49 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		if (!strcmp(name, "Sp_Dec") && config.num_speech <= FS_CONFIG_MAX_SPEECH)
 		{
 			config.speech[config.num_speech - 1].decimals = val;
+		}
+
+		if (!strcmp(name, "AL_Line") && config.num_al_lines < FS_CONFIG_MAX_AL_LINES)
+		{
+			if (!(flags & CONFIG_FIRST_AL_LINE))
+			{
+				config.num_al_lines = 0;
+				flags |= CONFIG_FIRST_AL_LINE;
+			}
+
+			++config.num_al_lines;
+			config.al_lines[config.num_al_lines - 1].mode = val;
+			config.al_lines[config.num_al_lines - 1].units = FS_UNIT_SYSTEM_IMPERIAL;
+			config.al_lines[config.num_al_lines - 1].decimals = 1;
+		}
+		if (!strcmp(name, "AL_Units") && config.num_al_lines <= FS_CONFIG_MAX_AL_LINES)
+		{
+			config.al_lines[config.num_al_lines - 1].units = val;
+		}
+		if (!strcmp(name, "AL_Dec") && config.num_al_lines <= FS_CONFIG_MAX_AL_LINES)
+		{
+			config.al_lines[config.num_al_lines - 1].decimals = val;
+		}
+
+		if (!strcmp(name, "AL_ID"))
+		{
+			result[6] = '\0';
+			strncpy(config.al_id, result, sizeof(config.al_id));
+		}
+
+		// Compare config Device_ID with actual hardware device ID.
+		// If it matches, enable navigation.
+		if (!strcmp(name, "Device_ID"))
+		{
+			// Build 24-hex-digit string from the hardware ID
+			const uint32_t *hwId = FS_State_Get()->device_id; // 3 x 32-bit
+			char hwIdString[25];  // 24 hex digits + null
+			FS_Config_WriteHex_32(hwIdString, hwId, 3);
+
+			if (!strcmp(result, hwIdString))
+			{
+				config.enable_nav = 1;
+			}
 		}
 	}
 

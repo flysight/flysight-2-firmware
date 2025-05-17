@@ -47,9 +47,8 @@ typedef enum
   APP_BLE_FAST_ADV,
   APP_BLE_LP_ADV,
   APP_BLE_SCAN,
-  APP_BLE_LP_CONNECTING,
-  APP_BLE_CONNECTED_SERVER,
-  APP_BLE_CONNECTED_CLIENT
+  APP_BLE_CONNECTING,
+  APP_BLE_CONNECTED
 } APP_BLE_ConnStatus_t;
 
 /* USER CODE BEGIN ET */
@@ -74,6 +73,7 @@ typedef enum
 /* Exported functions ---------------------------------------------*/
 void APP_BLE_Init(void);
 APP_BLE_ConnStatus_t APP_BLE_Get_Server_Connection_Status(void);
+APP_BLE_ConnStatus_t APP_BLE_Get_Client_Connection_Status(uint16_t Connection_Handle);
 
 /* USER CODE BEGIN EF */
 void APP_BLE_RequestPairing(void (*Callback)(void));

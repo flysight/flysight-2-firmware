@@ -187,7 +187,13 @@
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
 /* USER CODE BEGIN Specific_Parameters */
-
+#define SCAN_P (0x320)
+#define SCAN_L (0x320)
+#define CONN_P1		(CONN_P(200))
+#define CONN_P2		(CONN_P(1000))
+#define SUPERV_TIMEOUT (400)
+#define CONN_L1   (CONN_L(10))
+#define CONN_L2   (CONN_L(10))
 /* USER CODE END Specific_Parameters */
 
 /******************************************************************************
@@ -197,7 +203,7 @@
  * Maximum number of simultaneous connections that the device will support.
  * Valid values are from 1 to 8
  */
-#define CFG_BLE_NUM_LINK            1
+#define CFG_BLE_NUM_LINK            2
 
 /**
  * Maximum number of Services that can be stored in the GATT database.
@@ -678,6 +684,9 @@ typedef enum
     CFG_TASK_BLE_TX_QUEUE_TRANSMIT_ID,
     CFG_TASK_FS_CRS_UPDATE_ID,
     CFG_TASK_FS_START_UPDATE_ID,
+    CFG_TASK_START_SCAN_ID,
+    CFG_TASK_CONN_DEV_1_ID,
+    CFG_TASK_DISCONN_DEV_1_ID,
   /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;
@@ -696,6 +705,7 @@ typedef enum
     CFG_TASK_FS_AUDIO_CONTROL_PRODUCER_ID,
     CFG_TASK_FS_AUDIO_CONTROL_CONSUMER_ID,
     CFG_TASK_FS_CONFIG_UPDATE_ID,
+    CFG_TASK_FS_ACTIVELOOK_ID,
   /* USER CODE END CFG_Task_Id_With_NO_HCI_Cmd_t */
   CFG_LAST_TASK_ID_WITH_NO_HCICMD                                            /**< Shall be LAST in the list */
 } CFG_Task_Id_With_NO_HCI_Cmd_t;

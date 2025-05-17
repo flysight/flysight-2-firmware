@@ -23,6 +23,7 @@
 
 #include "main.h"
 #include "active_control.h"
+#include "activelook.h"
 #include "app_common.h"
 #include "app_fatfs.h"
 #include "audio.h"
@@ -66,6 +67,12 @@ void FS_ActiveMode_Init(void)
 	if (f_chdir("/config") == FR_OK)
 	{
 		FS_Config_Read(FS_State_Get()->config_filename);
+	}
+
+	if (FS_Config_Get()->al_mode != 0)
+	{
+		/* Initialize ActiveLook interface */
+		FS_ActiveLook_Init();
 	}
 
 	if (FS_Config_Get()->enable_logging)
@@ -176,6 +183,12 @@ void FS_ActiveMode_Init(void)
 
 void FS_ActiveMode_DeInit(void)
 {
+	if (FS_Config_Get()->al_mode != 0)
+	{
+		/* De-initialize ActiveLook interface */
+		FS_ActiveLook_DeInit();
+	}
+
 	/* Disable controller */
 	FS_ActiveControl_DeInit();
 
