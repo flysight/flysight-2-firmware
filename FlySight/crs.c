@@ -116,7 +116,8 @@ static void FS_CRS_SendPacket(uint8_t command, uint8_t *payload, uint8_t length)
 	{
 		tx_buffer[0] = command;
 		memcpy(&tx_buffer[1], payload, length);
-		BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, length + 1, FS_CRS_TxCallback);
+		BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_FT_PACKET_OUT, length + 1,
+				&SizeFt_Packet_Out, FS_CRS_TxCallback);
 	}
 }
 
@@ -384,7 +385,8 @@ static FS_CRS_State_t FS_CRS_State_Dir(void)
 			tx_buffer[10] = fno.fattrib;
 			memcpy(&tx_buffer[11], fno.fname, sizeof(fno.fname));
 
-			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 24, FS_CRS_TxCallback);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_FT_PACKET_OUT, 24,
+					&SizeFt_Packet_Out, FS_CRS_TxCallback);
 
 			if (fno.fname[0] == 0)
 			{
@@ -470,7 +472,8 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 		if (f_eof(&file))
 		{
 			// Send empty buffer to signal end of file
-			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, 2, FS_CRS_TxCallback);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_FT_PACKET_OUT, 2,
+					&SizeFt_Packet_Out, FS_CRS_TxCallback);
 			last_packet = ++next_packet;
 		}
 		else if (f_read(&file, &tx_buffer[2], FRAME_LENGTH, &br) == FR_OK)
@@ -482,7 +485,8 @@ static FS_CRS_State_t FS_CRS_State_Read(void)
 			}
 
 			// Send data
-			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_CRS_TX, br + 2, FS_CRS_TxCallback);
+			BLE_TX_Queue_SendNextTxPacket(CUSTOM_STM_FT_PACKET_OUT, br + 2,
+					&SizeFt_Packet_Out, FS_CRS_TxCallback);
 			++next_packet;
 		}
 		else
