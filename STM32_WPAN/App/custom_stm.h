@@ -28,7 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ble_types.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -39,6 +39,7 @@ typedef enum
   CUSTOM_STM_CRS_RX,
   /* GNSS */
   CUSTOM_STM_GNSS_PV,
+  CUSTOM_STM_GNSS_CONTROL,
   /* Start */
   CUSTOM_STM_START_CONTROL,
   CUSTOM_STM_START_RESULT,
@@ -56,6 +57,10 @@ typedef enum
   CUSTOM_STM_GNSS_PV_READ_EVT,
   CUSTOM_STM_GNSS_PV_NOTIFY_ENABLED_EVT,
   CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT,
+  /* GNSS_Control */
+  CUSTOM_STM_GNSS_CONTROL_WRITE_EVT,
+  CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT,
+  CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT,
   /* Start_Control */
   CUSTOM_STM_START_CONTROL_WRITE_EVT,
   CUSTOM_STM_START_CONTROL_INDICATE_ENABLED_EVT,
@@ -92,6 +97,7 @@ typedef struct
 extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
 extern uint8_t SizeGnss_Pv;
+extern uint8_t SizeGnss_Control;
 extern uint8_t SizeStart_Control;
 extern uint8_t SizeStart_Result;
 

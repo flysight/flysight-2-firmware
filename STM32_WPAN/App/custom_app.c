@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+#include <ble_tx_queue.h>
 #include "main.h"
 #include "app_common.h"
 #include "dbg_trace.h"
@@ -31,6 +32,7 @@
 /* USER CODE BEGIN Includes */
 #include "crs.h"
 #include "start_control.h"
+#include "gnss_ble.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,11 +42,12 @@ typedef struct
   uint8_t               Crs_tx_Notification_Status;
   /* GNSS */
   uint8_t               Gnss_pv_Notification_Status;
+  uint8_t               Gnss_control_Notification_Status;
   /* Start */
   uint8_t               Start_control_Indication_Status;
   uint8_t               Start_result_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
-  uint8_t               Crs_tx_Flow_Status;
+
   /* USER CODE END CUSTOM_APP_Context_t */
 
   uint16_t              ConnectionHandle;
@@ -80,13 +83,11 @@ uint8_t UpdateCharData[247];
 uint8_t NotifyCharData[247];
 
 /* USER CODE BEGIN PV */
-static Custom_CRS_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
-static uint32_t tx_read_index, tx_write_index;
-
 static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
-static uint8_t gnss_pv_packet[29];
+static uint8_t gnss_pv_packet[GNSS_BLE_MAX_LEN];
+static uint8_t gnss_control_rsp[4];
 
 static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
 static uint32_t start_read_index, start_write_index;
@@ -95,8 +96,10 @@ static uint8_t start_result_packet[9];
 
 static uint8_t connected_flag = 0;
 
-extern uint8_t SizeCrs_Tx;
 extern uint8_t SizeCrs_Rx;
+
+extern uint8_t SizeGnss_Pv;
+extern uint8_t SizeGnss_Control;
 
 static uint8_t timeout_timer_id;
 /* USER CODE END PV */
@@ -108,6 +111,8 @@ static void Custom_Crs_tx_Send_Notification(void);
 /* GNSS */
 static void Custom_Gnss_pv_Update_Char(void);
 static void Custom_Gnss_pv_Send_Notification(void);
+static void Custom_Gnss_control_Update_Char(void);
+static void Custom_Gnss_control_Send_Notification(void);
 /* Start */
 static void Custom_Start_control_Update_Char(void);
 static void Custom_Start_control_Send_Indication(void);
@@ -118,10 +123,7 @@ static void Custom_Start_result_Send_Indication(void);
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_CRS_Transmit(void);
-static void Custom_GNSS_Transmit(void);
 static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_Start_Transmit(void);
 static void Custom_App_Timeout(void);
 /* USER CODE END PFP */
 
@@ -141,7 +143,6 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     case CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       Custom_App_Context.Crs_tx_Notification_Status = 1;
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
       /* USER CODE END CUSTOM_STM_CRS_TX_NOTIFY_ENABLED_EVT */
       break;
 
@@ -183,6 +184,36 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
       Custom_App_Context.Gnss_pv_Notification_Status = 0;
       /* USER CODE END CUSTOM_STM_GNSS_PV_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_CONTROL_WRITE_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+      {
+        uint8_t rsp_len = GNSS_BLE_HandleCtrlWrite(
+                              pNotification->DataTransfered.pPayload,
+                              pNotification->DataTransfered.Length,
+                              gnss_control_rsp);
+
+        if (rsp_len && Custom_App_Context.Gnss_control_Notification_Status)
+        {
+          SizeGnss_Control = rsp_len;
+          BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_CONTROL,
+                  gnss_control_rsp, SizeGnss_Control, 0);
+        }
+      }
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_WRITE_EVT */
+    break;
+
+    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Gnss_control_Notification_Status = 1;
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Gnss_control_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_GNSS_CONTROL_NOTIFY_DISABLED_EVT */
       break;
 
     /* Start */
@@ -283,12 +314,9 @@ void Custom_APP_Notification(Custom_App_ConnHandle_Not_evt_t *pNotification)
 void Custom_APP_Init(void)
 {
   /* USER CODE BEGIN CUSTOM_APP_Init */
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_CRS_Transmit);
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_GNSS_Transmit);
-  UTIL_SEQ_RegTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, UTIL_SEQ_RFU, Custom_Start_Transmit);
+  BLE_TX_Queue_Init();
 
   Custom_App_Context.Crs_tx_Notification_Status = 0;
-  Custom_App_Context.Crs_tx_Flow_Status = 1;
   Custom_App_Context.Gnss_pv_Notification_Status = 0;
   Custom_App_Context.Start_control_Indication_Status = 0;
   Custom_App_Context.Start_result_Indication_Status = 0;
@@ -301,8 +329,7 @@ void Custom_APP_Init(void)
 /* USER CODE BEGIN FD */
 void Custom_APP_TxPoolAvailableNotification(void)
 {
-  Custom_App_Context.Crs_tx_Flow_Status = 1;
-  UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+  BLE_TX_Queue_TxPoolAvailableNotification();
 }
 
 uint8_t Custom_APP_IsConnected(void)
@@ -397,6 +424,45 @@ void Custom_Gnss_pv_Send_Notification(void) /* Property Notification */
   return;
 }
 
+void Custom_Gnss_control_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_control_UC_1*/
+
+  /* USER CODE END Gnss_control_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_control_UC_Last*/
+
+  /* USER CODE END Gnss_control_UC_Last*/
+  return;
+}
+
+void Custom_Gnss_control_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Gnss_control_NS_1*/
+
+  /* USER CODE END Gnss_control_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_CONTROL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Gnss_control_NS_Last*/
+
+  /* USER CODE END Gnss_control_NS_Last*/
+
+  return;
+}
+
 /* Start */
 void Custom_Start_control_Update_Char(void) /* Property Read */
 {
@@ -480,9 +546,6 @@ void Custom_Start_result_Send_Indication(void) /* Property Indication */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
 {
   // Reset buffer indices
-  tx_read_index = 0;
-  tx_write_index = 0;
-
   rx_read_index = 0;
   rx_write_index = 0;
 
@@ -533,65 +596,6 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
   HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
 }
 
-static void Custom_CRS_Transmit(void)
-{
-  static uint8_t tx_busy = 0;
-  Custom_CRS_Packet_t *packet;
-  tBleStatus status;
-
-  if (!tx_busy
-      && (tx_read_index < tx_write_index)
-      && Custom_App_Context.Crs_tx_Notification_Status
-      && Custom_App_Context.Crs_tx_Flow_Status)
-  {
-    tx_busy = 1;
-
-	packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
-	SizeCrs_Tx = packet->length;
-
-	status = Custom_STM_App_Update_Char(CUSTOM_STM_CRS_TX, packet->data);
-	if (status == BLE_STATUS_INSUFFICIENT_RESOURCES)
-	{
-      Custom_App_Context.Crs_tx_Flow_Status = 0;
-	}
-	else
-	{
-      ++tx_read_index;
-
-      // Call update task and transmit next packet
-      UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
-      UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-	}
-
-    tx_busy = 0;
-  }
-}
-
-Custom_CRS_Packet_t *Custom_CRS_GetNextTxPacket(void)
-{
-  Custom_CRS_Packet_t *ret = 0;
-
-  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
-  {
-	ret = &tx_buffer[tx_write_index % FS_CRS_WINDOW_LENGTH];
-  }
-
-  return ret;
-}
-
-void Custom_CRS_SendNextTxPacket(void)
-{
-  if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
-  {
-    ++tx_write_index;
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_CRS_TRANSMIT_ID, CFG_SCH_PRIO_1);
-  }
-  else
-  {
-    APP_DBG_MSG("Custom_CRS_SendNextTxPacket: buffer overflow\n");
-  }
-}
-
 Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
 {
   Custom_CRS_Packet_t *ret = 0;
@@ -604,25 +608,14 @@ Custom_CRS_Packet_t *Custom_CRS_GetNextRxPacket(void)
   return ret;
 }
 
-static void Custom_GNSS_Transmit(void)
-{
-  Custom_STM_App_Update_Char(CUSTOM_STM_GNSS_PV, gnss_pv_packet);
-}
-
 void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
 {
-  memset(&gnss_pv_packet[0], 0xb0, 1);
-  memcpy(&gnss_pv_packet[1], &(current->iTOW), sizeof(current->iTOW));
-  memcpy(&gnss_pv_packet[5], &(current->lon), sizeof(current->lon));
-  memcpy(&gnss_pv_packet[9], &(current->lat), sizeof(current->lat));
-  memcpy(&gnss_pv_packet[13], &(current->hMSL), sizeof(current->hMSL));
-  memcpy(&gnss_pv_packet[17], &(current->velN), sizeof(current->velN));
-  memcpy(&gnss_pv_packet[21], &(current->velE), sizeof(current->velE));
-  memcpy(&gnss_pv_packet[25], &(current->velD), sizeof(current->velD));
+  SizeGnss_Pv = GNSS_BLE_Build(current, gnss_pv_packet);
 
   if (Custom_App_Context.Gnss_pv_Notification_Status)
   {
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_GNSS_TRANSMIT_ID, CFG_SCH_PRIO_1);
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_GNSS_PV,
+            gnss_pv_packet, SizeGnss_Pv, 0);
   }
 }
 
@@ -657,11 +650,6 @@ Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void)
   return ret;
 }
 
-static void Custom_Start_Transmit(void)
-{
-  Custom_STM_App_Update_Char(CUSTOM_STM_START_RESULT, start_result_packet);
-}
-
 void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
                          uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms)
 {
@@ -676,7 +664,8 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
 
   if (Custom_App_Context.Start_result_Indication_Status)
   {
-    UTIL_SEQ_SetTask(1<<CFG_TASK_CUSTOM_START_TRANSMIT_ID, CFG_SCH_PRIO_1);
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_START_RESULT,
+            start_result_packet, SizeStart_Result, 0);
   }
 }
 
