@@ -21,6 +21,8 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
+#include <string.h>
+
 #include "gnss_ble.h"
 
 static uint8_t s_mask = 0xB0u;
@@ -77,31 +79,4 @@ uint8_t GNSS_BLE_Build(const FS_GNSS_Data_t *src, uint8_t *dst)
     }
 
     return (uint8_t)(p - dst);                        /* total payload length */
-}
-
-uint8_t GNSS_BLE_HandleCtrlWrite(const uint8_t *buf, uint8_t len, uint8_t *rsp)
-{
-    if (len == 0u) return 0u;
-
-    const uint8_t op = buf[0];
-
-    switch (op)
-    {
-        case GNSS_BLE_OP_SET_MASK:
-            if (len != 2u) {
-                rsp[0] = op; rsp[1] = GNSS_BLE_STATUS_BAD_LENGTH;
-                return 2u;
-            }
-            GNSS_BLE_SetMask(buf[1]);
-            rsp[0] = op; rsp[1] = GNSS_BLE_STATUS_OK;
-            return 2u;
-
-        case GNSS_BLE_OP_GET_MASK:
-            rsp[0] = op; rsp[1] = GNSS_BLE_GetMask();
-            return 2u;
-
-        default:
-            rsp[0] = op; rsp[1] = GNSS_BLE_STATUS_BAD_OPCODE;
-            return 2u;
-    }
 }

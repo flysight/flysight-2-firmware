@@ -21,31 +21,25 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef GNSS_BLE_H_
-#define GNSS_BLE_H_
+#ifndef DEVICE_STATE_H_
+#define DEVICE_STATE_H_
 
 #include <stdint.h>
-#include "gnss.h"
 
-/* ------------------------------------------------------------------ */
-/* Packet layout control                                              */
-/* ------------------------------------------------------------------ */
-#define GNSS_BLE_MAX_LEN            44u
+/**
+ * @brief Handles commands written to the Device State (DS) Control Point characteristic.
+ *
+ * @param payload Pointer to the incoming command payload (first byte is cmd_opcode).
+ * @param length Length of the payload.
+ * @param conn_handle Connection handle.
+ * @param notification_enabled_flag Flag indicating if notifications are enabled for the DS Control Point.
+ */
+void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t length,
+                                             uint16_t conn_handle, uint8_t notification_enabled_flag);
 
-/* Bit-layout of mask byte (MSB first) */
-#define GNSS_BLE_BIT_TOW            0x80u
-#define GNSS_BLE_BIT_WEEK           0x40u
-#define GNSS_BLE_BIT_POSITION       0x20u
-#define GNSS_BLE_BIT_VELOCITY       0x10u
-#define GNSS_BLE_BIT_ACCURACY       0x08u
-#define GNSS_BLE_BIT_NUM_SV         0x04u
+/**
+ * @brief Initializes the Device State service module.
+ */
+void DeviceState_Init(void);
 
-/* ------------------------------------------------------------------ */
-/* Public API                                                         */
-/* ------------------------------------------------------------------ */
-void    GNSS_BLE_Init(void);
-uint8_t GNSS_BLE_GetMask(void);
-void    GNSS_BLE_SetMask(uint8_t mask);
-uint8_t GNSS_BLE_Build(const FS_GNSS_Data_t *src, uint8_t *dst);
-
-#endif /* GNSS_BLE_H_ */
+#endif /* DEVICE_STATE_H_ */
