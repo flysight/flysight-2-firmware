@@ -43,13 +43,13 @@ typedef struct
   uint8_t               Ft_packet_out_Notification_Status;
   /* Sensor_Data */
   uint8_t               Sd_gnss_measurement_Notification_Status;
-  uint8_t               Sd_control_point_Notification_Status;
+  uint8_t               Sd_control_point_Indication_Status;
   /* Starter_Pistol */
   uint8_t               Sp_control_point_Indication_Status;
   uint8_t               Sp_result_Indication_Status;
   /* Device_State */
-  uint8_t               Ds_mode_Notification_Status;
-  uint8_t               Ds_control_point_Notification_Status;
+  uint8_t               Ds_mode_Indication_Status;
+  uint8_t               Ds_control_point_Indication_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -114,7 +114,7 @@ static void Custom_Ft_packet_out_Send_Notification(void);
 static void Custom_Sd_gnss_measurement_Update_Char(void);
 static void Custom_Sd_gnss_measurement_Send_Notification(void);
 static void Custom_Sd_control_point_Update_Char(void);
-static void Custom_Sd_control_point_Send_Notification(void);
+static void Custom_Sd_control_point_Send_Indication(void);
 /* Starter_Pistol */
 static void Custom_Sp_control_point_Update_Char(void);
 static void Custom_Sp_control_point_Send_Indication(void);
@@ -122,9 +122,9 @@ static void Custom_Sp_result_Update_Char(void);
 static void Custom_Sp_result_Send_Indication(void);
 /* Device_State */
 static void Custom_Ds_mode_Update_Char(void);
-static void Custom_Ds_mode_Send_Notification(void);
+static void Custom_Ds_mode_Send_Indication(void);
 static void Custom_Ds_control_point_Update_Char(void);
-static void Custom_Ds_control_point_Send_Notification(void);
+static void Custom_Ds_control_point_Send_Indication(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
@@ -201,7 +201,7 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
                               pNotification->DataTransfered.Length,
                               gnss_control_rsp);
 
-        if (rsp_len && Custom_App_Context.Sd_control_point_Notification_Status)
+        if (rsp_len && Custom_App_Context.Sd_control_point_Indication_Status)
         {
           BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_CONTROL_POINT,
                   gnss_control_rsp, rsp_len, &SizeSd_Control_Point, 0);
@@ -210,16 +210,16 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT */
       break;
 
-    case CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Sd_control_point_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+    case CUSTOM_STM_SD_CONTROL_POINT_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Sd_control_point_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_INDICATE_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Sd_control_point_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Sd_control_point_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
       break;
 
     /* Starter_Pistol */
@@ -270,16 +270,16 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_DS_MODE_READ_EVT */
       break;
 
-    case CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT */
-      Custom_App_Context.Ds_mode_Notification_Status = 1;
-      /* USER CODE END CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT */
+    case CUSTOM_STM_DS_MODE_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_INDICATE_ENABLED_EVT */
+      Custom_App_Context.Ds_mode_Indication_Status = 1;
+      /* USER CODE END CUSTOM_STM_DS_MODE_INDICATE_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT */
-      Custom_App_Context.Ds_mode_Notification_Status = 0;
-      /* USER CODE END CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_DS_MODE_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_MODE_INDICATE_DISABLED_EVT */
+      Custom_App_Context.Ds_mode_Indication_Status = 0;
+      /* USER CODE END CUSTOM_STM_DS_MODE_INDICATE_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT:
@@ -288,16 +288,16 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT */
       break;
 
-    case CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+    case CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT */
 
-      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT */
+      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT */
       break;
 
-    case CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT:
-      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+    case CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT */
 
-      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT */
+      /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT */
       break;
 
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
@@ -487,22 +487,22 @@ void Custom_Sd_control_point_Update_Char(void) /* Property Read */
   return;
 }
 
-void Custom_Sd_control_point_Send_Notification(void) /* Property Notification */
+void Custom_Sd_control_point_Send_Indication(void) /* Property Indication */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Sd_control_point_NS_1*/
+  /* USER CODE BEGIN Sd_control_point_IS_1*/
 
-  /* USER CODE END Sd_control_point_NS_1*/
+  /* USER CODE END Sd_control_point_IS_1*/
 
   if (updateflag != 0)
   {
     Custom_STM_App_Update_Char(CUSTOM_STM_SD_CONTROL_POINT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Sd_control_point_NS_Last*/
+  /* USER CODE BEGIN Sd_control_point_IS_Last*/
 
-  /* USER CODE END Sd_control_point_NS_Last*/
+  /* USER CODE END Sd_control_point_IS_Last*/
 
   return;
 }
@@ -606,22 +606,22 @@ void Custom_Ds_mode_Update_Char(void) /* Property Read */
   return;
 }
 
-void Custom_Ds_mode_Send_Notification(void) /* Property Notification */
+void Custom_Ds_mode_Send_Indication(void) /* Property Indication */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Ds_mode_NS_1*/
+  /* USER CODE BEGIN Ds_mode_IS_1*/
 
-  /* USER CODE END Ds_mode_NS_1*/
+  /* USER CODE END Ds_mode_IS_1*/
 
   if (updateflag != 0)
   {
     Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Ds_mode_NS_Last*/
+  /* USER CODE BEGIN Ds_mode_IS_Last*/
 
-  /* USER CODE END Ds_mode_NS_Last*/
+  /* USER CODE END Ds_mode_IS_Last*/
 
   return;
 }
@@ -645,22 +645,22 @@ void Custom_Ds_control_point_Update_Char(void) /* Property Read */
   return;
 }
 
-void Custom_Ds_control_point_Send_Notification(void) /* Property Notification */
+void Custom_Ds_control_point_Send_Indication(void) /* Property Indication */
 {
   uint8_t updateflag = 0;
 
-  /* USER CODE BEGIN Ds_control_point_NS_1*/
+  /* USER CODE BEGIN Ds_control_point_IS_1*/
 
-  /* USER CODE END Ds_control_point_NS_1*/
+  /* USER CODE END Ds_control_point_IS_1*/
 
   if (updateflag != 0)
   {
     Custom_STM_App_Update_Char(CUSTOM_STM_DS_CONTROL_POINT, (uint8_t *)NotifyCharData);
   }
 
-  /* USER CODE BEGIN Ds_control_point_NS_Last*/
+  /* USER CODE BEGIN Ds_control_point_IS_Last*/
 
-  /* USER CODE END Ds_control_point_NS_Last*/
+  /* USER CODE END Ds_control_point_IS_Last*/
 
   return;
 }

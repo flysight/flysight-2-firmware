@@ -281,43 +281,44 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
             /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2 */
 
             /* USER CODE END CUSTOM_STM_Service_2_Char_2 */
+
             switch (attribute_modified->Attr_Data[0])
             {
               /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_attribute_modified */
 
               /* USER CODE END CUSTOM_STM_Service_2_Char_2_attribute_modified */
 
-              /* Disabled Notification management */
-              case (!(COMSVC_Notification)):
+              /* Disabled Indication management */
+              case (!(COMSVC_Indication)):
                 /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_Disabled_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_2_Char_2_Disabled_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_DISABLED_EVT;
+                /* USER CODE END CUSTOM_STM_Service_2_Char_2_attribute_modified */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT;
                 Custom_STM_App_Notification(&Notification);
                 /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_Disabled_END */
 
                 /* USER CODE END CUSTOM_STM_Service_2_Char_2_Disabled_END */
                 break;
 
-              /* Enabled Notification management */
-              case COMSVC_Notification:
-                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_COMSVC_Notification_BEGIN */
+                /* Enabled Indication management */
+              case COMSVC_Indication:
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_COMSVC_Indication_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_2_Char_2_COMSVC_Notification_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_CONTROL_POINT_NOTIFY_ENABLED_EVT;
-                Custom_STM_App_Notification(&Notification);
-                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_COMSVC_Notification_END */
+              /* USER CODE END CUSTOM_STM_Service_2_Char_2_COMSVC_Indication_BEGIN */
+              Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_CONTROL_POINT_INDICATE_ENABLED_EVT;
+              Custom_STM_App_Notification(&Notification);
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_COMSVC_Indication_END */
 
-                /* USER CODE END CUSTOM_STM_Service_2_Char_2_COMSVC_Notification_END */
-                break;
+              /* USER CODE END CUSTOM_STM_Service_2_Char_2_COMSVC_Indication_END */
+              break;
 
               default:
-                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_default */
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_2_default */
 
-                /* USER CODE END CUSTOM_STM_Service_2_Char_2_default */
+              /* USER CODE END CUSTOM_STM_Service_2_Char_2_default */
               break;
             }
-          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSD_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomSp_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
           {
@@ -415,43 +416,44 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
             /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1 */
 
             /* USER CODE END CUSTOM_STM_Service_4_Char_1 */
+
             switch (attribute_modified->Attr_Data[0])
             {
               /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_attribute_modified */
 
               /* USER CODE END CUSTOM_STM_Service_4_Char_1_attribute_modified */
 
-              /* Disabled Notification management */
-              case (!(COMSVC_Notification)):
+              /* Disabled Indication management */
+              case (!(COMSVC_Indication)):
                 /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_Disabled_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_1_Disabled_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_MODE_NOTIFY_DISABLED_EVT;
+                /* USER CODE END CUSTOM_STM_Service_4_Char_1_attribute_modified */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_MODE_INDICATE_DISABLED_EVT;
                 Custom_STM_App_Notification(&Notification);
                 /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_Disabled_END */
 
                 /* USER CODE END CUSTOM_STM_Service_4_Char_1_Disabled_END */
                 break;
 
-              /* Enabled Notification management */
-              case COMSVC_Notification:
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_COMSVC_Notification_BEGIN */
+                /* Enabled Indication management */
+              case COMSVC_Indication:
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_COMSVC_Indication_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_1_COMSVC_Notification_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_MODE_NOTIFY_ENABLED_EVT;
-                Custom_STM_App_Notification(&Notification);
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_COMSVC_Notification_END */
+              /* USER CODE END CUSTOM_STM_Service_4_Char_1_COMSVC_Indication_BEGIN */
+              Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_MODE_INDICATE_ENABLED_EVT;
+              Custom_STM_App_Notification(&Notification);
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_COMSVC_Indication_END */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_1_COMSVC_Notification_END */
-                break;
+              /* USER CODE END CUSTOM_STM_Service_4_Char_1_COMSVC_Indication_END */
+              break;
 
               default:
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_default */
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_1_default */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_1_default */
+              /* USER CODE END CUSTOM_STM_Service_4_Char_1_default */
               break;
             }
-          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomDs_ModeHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomDS_ModeHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomDs_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
           {
@@ -459,43 +461,44 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
             /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2 */
 
             /* USER CODE END CUSTOM_STM_Service_4_Char_2 */
+
             switch (attribute_modified->Attr_Data[0])
             {
               /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_attribute_modified */
 
               /* USER CODE END CUSTOM_STM_Service_4_Char_2_attribute_modified */
 
-              /* Disabled Notification management */
-              case (!(COMSVC_Notification)):
+              /* Disabled Indication management */
+              case (!(COMSVC_Indication)):
                 /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_Disabled_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_2_Disabled_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_DISABLED_EVT;
+                /* USER CODE END CUSTOM_STM_Service_4_Char_2_attribute_modified */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT;
                 Custom_STM_App_Notification(&Notification);
                 /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_Disabled_END */
 
                 /* USER CODE END CUSTOM_STM_Service_4_Char_2_Disabled_END */
                 break;
 
-              /* Enabled Notification management */
-              case COMSVC_Notification:
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_COMSVC_Notification_BEGIN */
+                /* Enabled Indication management */
+              case COMSVC_Indication:
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_COMSVC_Indication_BEGIN */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_2_COMSVC_Notification_BEGIN */
-                Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_CONTROL_POINT_NOTIFY_ENABLED_EVT;
-                Custom_STM_App_Notification(&Notification);
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_COMSVC_Notification_END */
+              /* USER CODE END CUSTOM_STM_Service_4_Char_2_COMSVC_Indication_BEGIN */
+              Notification.Custom_Evt_Opcode = CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT;
+              Custom_STM_App_Notification(&Notification);
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_COMSVC_Indication_END */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_2_COMSVC_Notification_END */
-                break;
+              /* USER CODE END CUSTOM_STM_Service_4_Char_2_COMSVC_Indication_END */
+              break;
 
               default:
-                /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_default */
+              /* USER CODE BEGIN CUSTOM_STM_Service_4_Char_2_default */
 
-                /* USER CODE END CUSTOM_STM_Service_4_Char_2_default */
+              /* USER CODE END CUSTOM_STM_Service_4_Char_2_default */
               break;
             }
-          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomDs_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomDS_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomFt_Packet_InHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
@@ -824,7 +827,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomSensor_DataHdle,
                           UUID_TYPE_128, &uuid,
                           SizeSd_Control_Point,
-                          CHAR_PROP_WRITE | CHAR_PROP_NOTIFY,
+                          CHAR_PROP_WRITE | CHAR_PROP_INDICATE,
                           ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
@@ -976,7 +979,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomDevice_StateHdle,
                           UUID_TYPE_128, &uuid,
                           SizeDs_Mode,
-                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          CHAR_PROP_READ | CHAR_PROP_INDICATE,
                           ATTR_PERMISSION_ENCRY_READ,
                           GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
                           0x10,
@@ -1002,7 +1005,7 @@ void SVCCTL_InitCustomSvc(void)
   ret = aci_gatt_add_char(CustomContext.CustomDevice_StateHdle,
                           UUID_TYPE_128, &uuid,
                           SizeDs_Control_Point,
-                          CHAR_PROP_WRITE | CHAR_PROP_NOTIFY,
+                          CHAR_PROP_WRITE | CHAR_PROP_INDICATE,
                           ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
                           GATT_NOTIFY_ATTRIBUTE_WRITE,
                           0x10,
