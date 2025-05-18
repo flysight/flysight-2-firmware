@@ -22,6 +22,7 @@
 ****************************************************************************/
 
 #include <stdbool.h>
+#include <string.h>
 
 #include "main.h"
 #include "app_common.h"
@@ -35,6 +36,9 @@
 #include "state.h"
 #include "stm32_seq.h"
 #include "time.h"
+#include "custom_stm.h"
+#include "ble_tx_queue.h"
+#include "control_point_protocol.h"
 
 #define LED_BLINK_MSEC      900
 #define LED_BLINK_TICKS     (LED_BLINK_MSEC*1000/CFG_TS_TICK_VAL)
@@ -44,11 +48,9 @@
 
 #define TONE_MAX_PITCH 1760
 
-typedef enum
-{
-	FS_START_COMMAND_START  = 0x00,
-	FS_START_COMMAND_CANCEL = 0x01
-} FS_Start_Command_t;
+// Starter Pistol (SP) Control Point command opcodes
+#define SP_CMD_START_COUNTDOWN  0x01 // Payload: (none)
+#define SP_CMD_CANCEL_COUNTDOWN 0x02 // Payload: (none)
 
 static uint8_t led_timer_id;
 static uint8_t count_timer_id;
@@ -64,6 +66,8 @@ static volatile enum {
 
 static uint8_t countdown;
 static FS_GNSS_Int_t gnss_int;
+
+extern uint8_t SizeSp_Control_Point;
 
 void FS_StartControl_DataReady_Callback(void);
 void FS_StartControl_TimeReady_Callback(bool validTime);
@@ -221,8 +225,6 @@ void FS_StartControl_Update(void)
 	uint8_t sec;
 	uint16_t ms;
 
-	Custom_Start_Packet_t *packet;
-
 	if (state == FS_CONTROL_INACTIVE) return;
 
 	if (state == FS_CONTROL_UPDATE)
@@ -249,30 +251,91 @@ void FS_StartControl_Update(void)
 
 		state = FS_CONTROL_IDLE;
 	}
+}
 
-	while ((packet = Custom_Start_GetNextControlPacket()))
+static uint8_t FS_StartControl_InitiateCommand(uint8_t cmd_opcode)
+{
+	// Handle commands
+	switch (cmd_opcode)
 	{
-		if (packet->length > 0)
+	case SP_CMD_START_COUNTDOWN:
+		if (state == FS_CONTROL_IDLE)
 		{
-			// Handle commands
-			switch (packet->data[0])
-			{
-			case FS_START_COMMAND_START:
-				if (state == FS_CONTROL_IDLE)
-				{
-					countdown = 6;
-					state = FS_CONTROL_COUNTING;
-					HW_TS_Start(count_timer_id, COUNT_TICKS);
-				}
-				break;
-			case FS_START_COMMAND_CANCEL:
-				if (state == FS_CONTROL_COUNTING)
-				{
-					HW_TS_Stop(count_timer_id);
-					state = FS_CONTROL_IDLE;
-				}
-				break;
-			}
+			countdown = 6;
+			state = FS_CONTROL_COUNTING;
+			HW_TS_Start(count_timer_id, COUNT_TICKS);
+			return CP_STATUS_SUCCESS;
 		}
+        else if (state == FS_CONTROL_COUNTING)
+        {
+            return CP_STATUS_BUSY;
+        }
+        else
+        {
+            return CP_STATUS_OPERATION_NOT_PERMITTED;
+        }
+	case SP_CMD_CANCEL_COUNTDOWN:
+		if (state == FS_CONTROL_COUNTING)
+		{
+			HW_TS_Stop(count_timer_id);
+			state = FS_CONTROL_IDLE;
+			return CP_STATUS_SUCCESS;
+		}
+        else if (state == FS_CONTROL_IDLE)
+        {
+            return CP_STATUS_SUCCESS; // No active countdown to cancel
+        }
+        else
+        {
+            return CP_STATUS_OPERATION_NOT_PERMITTED;
+        }
+    default:
+        return CP_STATUS_CMD_NOT_SUPPORTED;
 	}
+}
+
+void FS_StartControl_Handle_SP_ControlPointWrite(
+		const uint8_t *payload, uint8_t length,
+		uint16_t conn_handle, uint8_t indication_enabled_flag)
+{
+    (void)conn_handle; // Mark as unused
+
+    uint8_t received_cmd_opcode = 0xFF;
+    uint8_t status = CP_STATUS_ERROR_UNKNOWN;
+    // SP commands do not return optional data in the ACK, so no response_data_buf needed here.
+
+    if (length < 1)
+    {
+        status = CP_STATUS_INVALID_PARAMETER;
+    }
+    else
+    {
+        received_cmd_opcode = payload[0]; // This is an SP_CMD_...
+        // const uint8_t *params = &payload[1]; // No params for current SP commands
+        uint8_t params_len = length - 1;
+
+        if (params_len != 0) // Current SP commands don't take parameters
+        {
+            status = CP_STATUS_INVALID_PARAMETER;
+        }
+        else
+        {
+            status = FS_StartControl_InitiateCommand(received_cmd_opcode);
+        }
+    }
+
+    if (indication_enabled_flag)
+    {
+        uint8_t final_response_packet[3]; // Response is always 3 bytes for SP acks
+        final_response_packet[0] = CP_RESPONSE_ID;
+        final_response_packet[1] = received_cmd_opcode;
+        final_response_packet[2] = status;
+
+        SizeSp_Control_Point = 3;
+        BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SP_CONTROL_POINT,
+                                  final_response_packet,
+                                  3,
+                                  &SizeSp_Control_Point,
+                                  0);
+    }
 }

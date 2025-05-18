@@ -21,31 +21,21 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef GNSS_BLE_H_
-#define GNSS_BLE_H_
+#ifndef APP_CONTROL_POINT_PROTOCOL_H_
+#define APP_CONTROL_POINT_PROTOCOL_H_
 
 #include <stdint.h>
-#include "gnss.h"
 
-/* ------------------------------------------------------------------ */
-/* Packet layout control                                              */
-/* ------------------------------------------------------------------ */
-#define GNSS_BLE_MAX_LEN            44u
+#define CP_RESPONSE_ID (0xF0) // Identifier for a response packet
 
-/* Bit-layout of mask byte (MSB first) */
-#define GNSS_BLE_BIT_TOW            0x80u
-#define GNSS_BLE_BIT_WEEK           0x40u
-#define GNSS_BLE_BIT_POSITION       0x20u
-#define GNSS_BLE_BIT_VELOCITY       0x10u
-#define GNSS_BLE_BIT_ACCURACY       0x08u
-#define GNSS_BLE_BIT_NUM_SV         0x04u
+// Common Status Codes for Responses
+#define CP_STATUS_SUCCESS                   (0x01)
+#define CP_STATUS_CMD_NOT_SUPPORTED         (0x02)
+#define CP_STATUS_INVALID_PARAMETER         (0x03)
+#define CP_STATUS_OPERATION_FAILED          (0x04)
+#define CP_STATUS_OPERATION_NOT_PERMITTED   (0x05)
+#define CP_STATUS_BUSY                      (0x06)
 
-/* ------------------------------------------------------------------ */
-/* Public API                                                         */
-/* ------------------------------------------------------------------ */
-void    GNSS_BLE_Init(void);
-uint8_t GNSS_BLE_GetMask(void);
-void    GNSS_BLE_SetMask(uint8_t mask);
-uint8_t GNSS_BLE_Build(const FS_GNSS_Data_t *src, uint8_t *dst);
+#define MAX_CP_OPTIONAL_RESPONSE_DATA_LEN 17 // Max optional data in a response
 
-#endif /* GNSS_BLE_H_ */
+#endif /* APP_CONTROL_POINT_PROTOCOL_H_ */

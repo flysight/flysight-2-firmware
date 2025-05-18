@@ -34,6 +34,9 @@
 #include "gnss_ble.h"
 #include "mode.h"
 #include "ble_tx_queue.h"
+#include "sensor_data.h"
+#include "device_state.h"
+#include "control_point_protocol.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -91,10 +94,6 @@ static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t gnss_pv_packet[GNSS_BLE_MAX_LEN];
-static uint8_t gnss_control_rsp[4];
-
-static Custom_Start_Packet_t start_buffer[FS_START_WINDOW_LENGTH+1];
-static uint32_t start_read_index, start_write_index;
 
 static uint8_t start_result_packet[9];
 
@@ -130,7 +129,6 @@ static void Custom_Ds_control_point_Send_Indication(void);
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
 static void Custom_CRS_OnDisconnect(void);
 static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotification);
-static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification);
 static void Custom_App_Timeout(void);
 /* USER CODE END PFP */
 
@@ -195,18 +193,11 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT */
-      {
-        uint8_t rsp_len = GNSS_BLE_HandleCtrlWrite(
-                              pNotification->DataTransfered.pPayload,
-                              pNotification->DataTransfered.Length,
-                              gnss_control_rsp);
-
-        if (rsp_len && Custom_App_Context.Sd_control_point_Indication_Status)
-        {
-          BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_CONTROL_POINT,
-                  gnss_control_rsp, rsp_len, &SizeSd_Control_Point, 0);
-        }
-      }
+      SensorData_Handle_SD_ControlPointWrite(
+          pNotification->DataTransfered.pPayload,
+          pNotification->DataTransfered.Length,
+          pNotification->ConnectionHandle,
+          Custom_App_Context.Sd_control_point_Indication_Status);
       /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_WRITE_EVT */
       break;
 
@@ -225,7 +216,11 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
     /* Starter_Pistol */
     case CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT */
-      Custom_Start_OnControlWrite(pNotification);
+      FS_StartControl_Handle_SP_ControlPointWrite(
+          pNotification->DataTransfered.pPayload,
+          pNotification->DataTransfered.Length,
+          pNotification->ConnectionHandle,
+          Custom_App_Context.Sp_control_point_Indication_Status);
       /* USER CODE END CUSTOM_STM_SP_CONTROL_POINT_WRITE_EVT */
       break;
 
@@ -284,19 +279,23 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
 
     case CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT */
-
+      DeviceState_Handle_DS_ControlPointWrite(
+          pNotification->DataTransfered.pPayload,
+          pNotification->DataTransfered.Length,
+          pNotification->ConnectionHandle,
+          Custom_App_Context.Ds_control_point_Indication_Status);
       /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT */
       break;
 
     case CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT */
-
+      Custom_App_Context.Ds_control_point_Indication_Status = 1;
       /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT */
       break;
 
     case CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT:
       /* USER CODE BEGIN CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT */
-
+      Custom_App_Context.Ds_control_point_Indication_Status = 0;
       /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT */
       break;
 
@@ -360,10 +359,24 @@ void Custom_APP_Init(void)
   /* USER CODE BEGIN CUSTOM_APP_Init */
   BLE_TX_Queue_Init();
 
+  SensorData_Init();
+  DeviceState_Init();
+  // Starter Pistol is initialized by the main mode logic when entering that mode.
+
+  /* File_Transfer */
   Custom_App_Context.Ft_packet_out_Notification_Status = 0;
+
+  /* Sensor_Data */
   Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
+  Custom_App_Context.Sd_control_point_Indication_Status = 0;
+
+  /* Starter_Pistol */
   Custom_App_Context.Sp_control_point_Indication_Status = 0;
   Custom_App_Context.Sp_result_Indication_Status = 0;
+
+  /* Device_State */
+  Custom_App_Context.Ds_mode_Indication_Status = 0;
+  Custom_App_Context.Ds_control_point_Indication_Status = 0;
 
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timeout_timer_id, hw_ts_SingleShot, Custom_App_Timeout);
   /* USER CODE END CUSTOM_APP_Init */
@@ -672,9 +685,6 @@ static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
   rx_read_index = 0;
   rx_write_index = 0;
 
-  start_read_index = 0;
-  start_write_index = 0;
-
   // Update state
   connected_flag = 1;
 
@@ -740,37 +750,6 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
     BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GNSS_MEASUREMENT,
             gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
   }
-}
-
-static void Custom_Start_OnControlWrite(Custom_STM_App_Notification_evt_t *pNotification)
-{
-  Custom_Start_Packet_t *packet;
-
-  if (start_write_index < start_read_index + FS_START_WINDOW_LENGTH)
-  {
-	packet = &start_buffer[(start_write_index++) % FS_START_WINDOW_LENGTH];
-	packet->length = pNotification->DataTransfered.Length;
-    memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
-
-	// Call update task
-	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_START_UPDATE_ID, CFG_SCH_PRIO_1);
-  }
-  else
-  {
-    APP_DBG_MSG("Custom_Start_OnControlWrite: buffer overflow\n");
-  }
-}
-
-Custom_Start_Packet_t *Custom_Start_GetNextControlPacket(void)
-{
-  Custom_Start_Packet_t *ret = 0;
-
-  if (start_read_index < start_write_index)
-  {
-	ret = &start_buffer[(start_read_index++) % FS_START_WINDOW_LENGTH];
-  }
-
-  return ret;
 }
 
 void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,

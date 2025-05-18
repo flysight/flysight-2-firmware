@@ -24,10 +24,15 @@
 #ifndef START_CONTROL_H_
 #define START_CONTROL_H_
 
-#define FS_START_WINDOW_LENGTH 2
+#include <stdint.h>
 
 void FS_StartControl_RegisterTasks(void);
 void FS_StartControl_Init(void);
 void FS_StartControl_DeInit(void);
+
+// Function to handle writes to the SP Control Point
+void FS_StartControl_Handle_SP_ControlPointWrite(
+		const uint8_t *payload, uint8_t length,
+		uint16_t conn_handle, uint8_t indication_enabled_flag);
 
 #endif /* START_CONTROL_H_ */
