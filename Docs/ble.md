@@ -60,7 +60,7 @@ FlySight 2 employs BLE security features (bonding and whitelisting) to prevent u
 
 ### Device States and BLE Availability
 
-The FlySight 2's operational mode affects BLE service availability, primarily due to resource contention (SD card access). BLE connection itself is generally possible in most states if the device is whitelisted and advertising. The current device mode can be read (and notified) via the `DS_Mode` characteristic in the `Device_State` service.
+The FlySight 2's operational mode affects BLE service availability, primarily due to resource contention (SD card access). BLE connection itself is generally possible in most states if the device is whitelisted and advertising. The current device mode can be read (and indicated) via the `DS_Mode` characteristic in the `Device_State` service.
 
 *   **Idle Mode (LED Off):** Default low-power state. BLE is active (slow advertising). Full BLE functionality (File Transfer, Real-time Data subscription, State Control) is available. This is the **required** mode for file system operations via BLE.
 *   **Active Mode (Green LED):** GNSS active, logging, audio feedback. Entered via a ~1s power button press from Idle.
@@ -88,6 +88,26 @@ The FlySight 2's operational mode affects BLE service availability, primarily du
     *   Use this data to filter scans specifically for FlySight 2 devices and identify those ready for initial pairing.
 
 ## BLE Services and Characteristics
+
+### Control Point Protocol (Common for SD, SP, DS Control Points)
+
+Control Point characteristics in the Sensor_Data, Starter_Pistol, and Device_State services follow a common request/response pattern.
+
+*   **Request (Central to FlySight):**
+    *   Write to the respective Control Point characteristic.
+    *   Format: `[Command Opcode (uint8)] [Optional Parameters...]`
+*   **Response (FlySight to Central):**
+    *   Sent via an **Indication** on the same Control Point characteristic (client must enable indications and send an ACK for each indication received).
+    *   Format: `[Response ID (0xF0)] [Request Opcode (echoed)] [Status (uint8)] [Optional Response Data...]`
+    *   **Status Codes (`CP_STATUS_*`):**
+        *   `0x01`: Success (`CP_STATUS_SUCCESS`)
+        *   `0x02`: Command Not Supported (`CP_STATUS_CMD_NOT_SUPPORTED`)
+        *   `0x03`: Invalid Parameter (`CP_STATUS_INVALID_PARAMETER`)
+        *   `0x04`: Operation Failed (`CP_STATUS_OPERATION_FAILED`)
+        *   `0x05`: Operation Not Permitted (`CP_STATUS_OPERATION_NOT_PERMITTED`)
+        *   `0x06`: Busy (`CP_STATUS_BUSY`)
+        *   Other values: Error Unknown or specific error.
+    *   Max length of `Optional Response Data` is 17 bytes (`MAX_CP_OPTIONAL_RESPONSE_DATA_LEN`).
 
 ### 1. File_Transfer Service
 
@@ -217,26 +237,26 @@ Provides live GNSS data when FlySight is in Active Mode or Start Mode. Requires 
 
     *   **`SD_Control_Point`**
         *   UUID: `00000006-8e22-4541-9d4c-21edae82ed19`
-        *   Properties: **Write, Notify**
+        *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications. Also used to retrieve the current mask. Central enables notifications if responses are desired.
+        *   Usage: Used to control which data fields are included in the `SD_GNSS_Measurement` characteristic notifications. Also used to retrieve the current mask. Central enables indications if responses are desired.
         *   Max Length: 20 bytes (`SizeSd_Control_Point`). Variable length.
         *   **Write Operations (Central to FlySight):**
             *   Byte 0: Opcode
-                *   `0x01` (`GNSS_BLE_OP_SET_MASK`): Set the data mask for `SD_GNSS_Measurement`.
-                    *   Byte 1: `new_mask` (uint8). A bitmask specifying which fields to include. Uses the same bit definitions as `current_mask` in `SD_GNSS_Measurement`. (Total length: 2 bytes)
-                *   `0x02` (`GNSS_BLE_OP_GET_MASK`): Request the current data mask.
-                    *   (No payload bytes after opcode. Total length: 1 byte)
-        *   **Notify Responses (FlySight to Central, if notifications enabled):**
-            *   Byte 0: Original Opcode written by Central.
-            *   Byte 1: Status or Value
-                *   If Opcode was `GNSS_BLE_OP_SET_MASK`:
-                    *   `0x00` (`GNSS_BLE_STATUS_OK`): Mask set successfully. (Total length: 2 bytes)
-                    *   `0x01` (`GNSS_BLE_STATUS_BAD_LENGTH`): Incorrect payload length for SET_MASK. (Total length: 2 bytes)
-                *   If Opcode was `GNSS_BLE_OP_GET_MASK`:
-                    *   The current `active_mask` (uint8) used by the firmware. (Total length: 2 bytes)
-                *   If Opcode was unknown:
-                    *   `0x02` (`GNSS_BLE_STATUS_BAD_OPCODE`): Opcode not recognized. (Total length: 2 bytes)
+                *   `0x01` (`SD_CMD_SET_GNSS_BLE_MASK`): Set the data mask for `SD_GNSS_Measurement`.
+                    *   Payload: `[new_mask (uint8)]`. (Total length: 2 bytes)
+                *   `0x02` (`SD_CMD_GET_GNSS_BLE_MASK`): Request the current data mask.
+                    *   Payload: (None). (Total length: 1 byte)
+        *   **Indication Responses (FlySight to Central, if indications enabled):**
+            *   Format: `[0xF0 (CP_RESPONSE_ID)] [Request Opcode] [Status] [Optional Data]`
+            *   For `SD_CMD_SET_GNSS_BLE_MASK (0x01)`:
+                *   Success: `[0xF0] [0x01] [0x01 (CP_STATUS_SUCCESS)]`
+                *   Invalid Param: `[0xF0] [0x01] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For `SD_CMD_GET_GNSS_BLE_MASK (0x02)`:
+                *   Success: `[0xF0] [0x02] [0x01 (CP_STATUS_SUCCESS)] [current_mask (uint8)]`
+                *   Invalid Param: `[0xF0] [0x02] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For unknown command:
+                *   `[0xF0] [Received Opcode] [0x02 (CP_STATUS_CMD_NOT_SUPPORTED)]`
 
 ### 3. Starter_Pistol Service
 
@@ -249,12 +269,27 @@ Used for synchronized start timing in specific scenarios (e.g., BASE race). Only
         *   UUID: `00000003-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: Sends control commands to the start pistol feature. Indications may provide feedback.
+        *   Usage: Sends control commands to the start pistol feature. Indications provide feedback.
         *   Max Length: 20 bytes (`SizeSp_Control_Point`). Variable length.
         *   **Write Operations (Central to FlySight):**
-            *   Byte 0: Command
-                *   `0x00` (`FS_START_COMMAND_START`): Initiate the start sequence (countdown and tone). (Total length: 1 byte)
-                *   `0x01` (`FS_START_COMMAND_CANCEL`): Cancel an ongoing start sequence. (Total length: 1 byte)
+            *   Byte 0: Opcode
+                *   `0x01` (`SP_CMD_START_COUNTDOWN`): Initiate the start sequence (countdown and tone).
+                    *   Payload: (None). (Total length: 1 byte)
+                *   `0x02` (`SP_CMD_CANCEL_COUNTDOWN`): Cancel an ongoing start sequence.
+                    *   Payload: (None). (Total length: 1 byte)
+        *   **Indication Responses (FlySight to Central, if indications enabled):**
+            *   Format: `[0xF0 (CP_RESPONSE_ID)] [Request Opcode] [Status]` (No optional data for these commands)
+            *   For `SP_CMD_START_COUNTDOWN (0x01)`:
+                *   Success: `[0xF0] [0x01] [0x01 (CP_STATUS_SUCCESS)]`
+                *   Busy: `[0xF0] [0x01] [0x06 (CP_STATUS_BUSY)]`
+                *   Not Permitted: `[0xF0] [0x01] [0x05 (CP_STATUS_OPERATION_NOT_PERMITTED)]`
+                *   Invalid Param (if payload was not empty): `[0xF0] [0x01] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For `SP_CMD_CANCEL_COUNTDOWN (0x02)`:
+                *   Success: `[0xF0] [0x02] [0x01 (CP_STATUS_SUCCESS)]`
+                *   Not Permitted: `[0xF0] [0x02] [0x05 (CP_STATUS_OPERATION_NOT_PERMITTED)]`
+                *   Invalid Param (if payload was not empty): `[0xF0] [0x02] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For unknown command:
+                *   `[0xF0] [Received Opcode] [0x02 (CP_STATUS_CMD_NOT_SUPPORTED)]`
 
     *   **`SP_Result`**
         *   UUID: `00000004-8e22-4541-9d4c-21edae82ed19`
@@ -272,9 +307,9 @@ Provides information about the device's current operational state and allows for
 
     *   **`DS_Mode`**
         *   UUID: `00000005-8e22-4541-9d4c-21edae82ed19`
-        *   Properties: **Read, Notify**
+        *   Properties: **Read, Indicate**
         *   Permissions: Encrypted Read required.
-        *   Usage: Exposes the current operational mode of the FlySight 2. Central can read this or subscribe to notifications to be informed of mode changes.
+        *   Usage: Exposes the current operational mode of the FlySight 2. Central can read this or subscribe to indications to be informed of mode changes.
         *   Length: 1 byte (`SizeDs_Mode`).
         *   **Mode Values (corresponds to `FS_Mode_State_t` enum):**
             | Value | Mode Name        | Description                                     |
@@ -288,10 +323,16 @@ Provides information about the device's current operational state and allows for
 
     *   **`DS_Control_Point`**
         *   UUID: `00000007-8e22-4541-9d4c-21edae82ed19`
-        *   Properties: **Write, Notify**
+        *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: (Planned/Partial) For controlling device state aspects, such as requesting a mode change or other device-level operations. Responses or status updates may be sent via notifications.
+        *   Usage: This characteristic is intended for future device state control commands. Currently, no specific commands are implemented. Writing any command will likely result in a `CP_STATUS_CMD_NOT_SUPPORTED` response.
         *   Max Length: 20 bytes (`SizeDs_Control_Point`). Variable length.
+        *   **Write Operations (Central to FlySight):**
+            *   Currently, no commands are defined.
+        *   **Indication Responses (FlySight to Central, if indications enabled):**
+            *   Format: `[0xF0 (CP_RESPONSE_ID)] [Request Opcode] [Status]`
+            *   For any command written:
+                *   `[0xF0] [Received Opcode] [0x02 (CP_STATUS_CMD_NOT_SUPPORTED)]`
 
 ### 5. Standard BLE Services
 
@@ -320,13 +361,13 @@ FlySight 2 also implements standard BLE services:
 | File Transfer RX        | `FT_Packet_In`            | `00000002-8e22-4541-9d4c-21edae82ed19`       | File_Transfer      | WriteWithoutResponse, Read | 244 (Var)          |
 | Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        | N/A                |
 | GNSS Measurement        | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 44 (Var)           |
-| Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Notify          | 20 (Var)           |
+| Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Indicate        | 20 (Var)           |
 | Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        | N/A                |
 | Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        | 20 (Var)           |
 | Starter Pistol Result   | `SP_Result`               | `00000004-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Read, Indicate         | 9 (Const)          |
 | Device State Service    |                           | `00000003-cc7a-482a-984a-7f2ed5b3e58f`       | Device_State       |                        | N/A                |
-| Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Notify           | 1 (Const)          |
-| Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Notify          | 20 (Var)           |
+| Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Indicate         | 1 (Const)          |
+| Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Indicate        | 20 (Var)           |
 
 *(Note: "Var" indicates variable length up to the specified maximum. "Const" indicates fixed length.)*
 
