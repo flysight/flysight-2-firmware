@@ -35,6 +35,7 @@
 #define CP_STATUS_OPERATION_FAILED          (0x04)
 #define CP_STATUS_OPERATION_NOT_PERMITTED   (0x05)
 #define CP_STATUS_BUSY                      (0x06)
+#define CP_STATUS_ERROR_UNKNOWN             (0x07)
 
 #define MAX_CP_OPTIONAL_RESPONSE_DATA_LEN 17 // Max optional data in a response
 
