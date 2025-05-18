@@ -82,8 +82,8 @@ void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t len
                 if (params_len != 0) {
                     status = CP_STATUS_INVALID_PARAMETER;
                 } else {
-                    strncpy((char*)response_data_buf, GIT_TAG, MAX_CP_OPTIONAL_RESPONSE_DATA_LEN);
-                    response_data_buf[MAX_CP_OPTIONAL_RESPONSE_DATA_LEN] = '\0'; // Ensure null termination
+                    strncpy((char*)response_data_buf, GIT_TAG, MAX_CP_OPTIONAL_RESPONSE_DATA_LEN - 1);
+                    response_data_buf[MAX_CP_OPTIONAL_RESPONSE_DATA_LEN - 1] = '\0'; // Ensure null termination
                     response_data_len = strlen((char*)response_data_buf);
                     status = CP_STATUS_SUCCESS;
                 }
