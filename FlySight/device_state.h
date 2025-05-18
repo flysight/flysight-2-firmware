@@ -21,23 +21,25 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef APP_BLE_TX_QUEUE_H_
-#define APP_BLE_TX_QUEUE_H_
+#ifndef DEVICE_STATE_H_
+#define DEVICE_STATE_H_
 
-#include "custom_stm.h"
+#include <stdint.h>
 
-typedef void (*BLE_TX_Queue_callback_t)(void);
+/**
+ * @brief Handles commands written to the Device State (DS) Control Point characteristic.
+ *
+ * @param payload Pointer to the incoming command payload (first byte is cmd_opcode).
+ * @param length Length of the payload.
+ * @param conn_handle Connection handle.
+ * @param notification_enabled_flag Flag indicating if notifications are enabled for the DS Control Point.
+ */
+void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t length,
+                                             uint16_t conn_handle, uint8_t notification_enabled_flag);
 
-void BLE_TX_Queue_Init(void);
-void BLE_TX_Queue_TxPoolAvailableNotification(void);
+/**
+ * @brief Initializes the Device State service module.
+ */
+void DeviceState_Init(void);
 
-uint8_t *BLE_TX_Queue_GetNextTxPacket(void);
-void BLE_TX_Queue_SendNextTxPacket(
-		Custom_STM_Char_Opcode_t opcode, uint8_t length,
-		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
-
-void BLE_TX_Queue_SendTxPacket(
-		Custom_STM_Char_Opcode_t opcode, uint8_t *data, uint8_t length,
-		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
-
-#endif /* APP_BLE_TX_QUEUE_H_ */
+#endif /* DEVICE_STATE_H_ */

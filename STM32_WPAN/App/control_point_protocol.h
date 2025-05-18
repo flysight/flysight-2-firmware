@@ -21,23 +21,22 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef APP_BLE_TX_QUEUE_H_
-#define APP_BLE_TX_QUEUE_H_
+#ifndef APP_CONTROL_POINT_PROTOCOL_H_
+#define APP_CONTROL_POINT_PROTOCOL_H_
 
-#include "custom_stm.h"
+#include <stdint.h>
 
-typedef void (*BLE_TX_Queue_callback_t)(void);
+#define CP_RESPONSE_ID (0xF0) // Identifier for a response packet
 
-void BLE_TX_Queue_Init(void);
-void BLE_TX_Queue_TxPoolAvailableNotification(void);
+// Common Status Codes for Responses
+#define CP_STATUS_SUCCESS                   (0x01)
+#define CP_STATUS_CMD_NOT_SUPPORTED         (0x02)
+#define CP_STATUS_INVALID_PARAMETER         (0x03)
+#define CP_STATUS_OPERATION_FAILED          (0x04)
+#define CP_STATUS_OPERATION_NOT_PERMITTED   (0x05)
+#define CP_STATUS_BUSY                      (0x06)
+#define CP_STATUS_ERROR_UNKNOWN             (0x07)
 
-uint8_t *BLE_TX_Queue_GetNextTxPacket(void);
-void BLE_TX_Queue_SendNextTxPacket(
-		Custom_STM_Char_Opcode_t opcode, uint8_t length,
-		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
+#define MAX_CP_OPTIONAL_RESPONSE_DATA_LEN 17 // Max optional data in a response
 
-void BLE_TX_Queue_SendTxPacket(
-		Custom_STM_Char_Opcode_t opcode, uint8_t *data, uint8_t length,
-		uint8_t *size_ptr, BLE_TX_Queue_callback_t callback);
-
-#endif /* APP_BLE_TX_QUEUE_H_ */
+#endif /* APP_CONTROL_POINT_PROTOCOL_H_ */

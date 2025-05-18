@@ -34,14 +34,13 @@ typedef struct
 	Custom_STM_Char_Opcode_t opcode;
 	uint8_t data[244];
 	uint8_t length;
+	uint8_t *size_ptr;
 	BLE_TX_Queue_callback_t callback;
 } BLE_TX_Queue_Packet_t;
 
 static BLE_TX_Queue_Packet_t tx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t tx_read_index, tx_write_index;
 static uint8_t tx_flow_status;
-
-extern uint8_t SizeCrs_Tx;
 
 static void BLE_TX_Queue_Transmit(void);
 
@@ -74,7 +73,7 @@ uint8_t *BLE_TX_Queue_GetNextTxPacket(void)
 }
 
 void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
-		uint8_t length, BLE_TX_Queue_callback_t callback)
+		uint8_t length, uint8_t *size_ptr, BLE_TX_Queue_callback_t callback)
 {
 	if (tx_write_index < tx_read_index + FS_CRS_WINDOW_LENGTH)
 	{
@@ -83,6 +82,7 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 
 		packet->opcode = opcode;
 		packet->length = length;
+		packet->size_ptr = size_ptr;
 		packet->callback = callback;
 
 		++tx_write_index;
@@ -95,13 +95,13 @@ void BLE_TX_Queue_SendNextTxPacket(Custom_STM_Char_Opcode_t opcode,
 }
 
 void BLE_TX_Queue_SendTxPacket(Custom_STM_Char_Opcode_t opcode,
-		uint8_t *data, uint8_t length, BLE_TX_Queue_callback_t callback)
+		uint8_t *data, uint8_t length, uint8_t *size_ptr, BLE_TX_Queue_callback_t callback)
 {
 	uint8_t *tx_buffer;
 	if ((tx_buffer = BLE_TX_Queue_GetNextTxPacket()))
 	{
 		memcpy(tx_buffer, data, length);
-		BLE_TX_Queue_SendNextTxPacket(opcode, length, callback);
+		BLE_TX_Queue_SendNextTxPacket(opcode, length, size_ptr, callback);
 	}
 }
 
@@ -118,7 +118,10 @@ static void BLE_TX_Queue_Transmit(void)
 		tx_busy = 1;
 
 		packet = &tx_buffer[tx_read_index % FS_CRS_WINDOW_LENGTH];
-		SizeCrs_Tx = packet->length;
+		if (packet->size_ptr)
+		{
+			*(packet->size_ptr) = packet->length;
+		}
 
 		status = Custom_STM_App_Update_Char(packet->opcode, packet->data);
 		if (status == BLE_STATUS_INSUFFICIENT_RESOURCES)

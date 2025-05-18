@@ -25,13 +25,7 @@
 #define GNSS_BLE_H_
 
 #include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include "gnss.h"          /* FS_GNSS_Data_t */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "gnss.h"
 
 /* ------------------------------------------------------------------ */
 /* Packet layout control                                              */
@@ -47,28 +41,11 @@ extern "C" {
 #define GNSS_BLE_BIT_NUM_SV         0x04u
 
 /* ------------------------------------------------------------------ */
-/* Control-point opcodes / status                                     */
-/* ------------------------------------------------------------------ */
-#define GNSS_BLE_OP_SET_MASK        0x01u
-#define GNSS_BLE_OP_GET_MASK        0x02u
-
-#define GNSS_BLE_STATUS_OK          0x00u
-#define GNSS_BLE_STATUS_BAD_LENGTH  0x01u
-#define GNSS_BLE_STATUS_BAD_OPCODE  0x02u
-
-/* ------------------------------------------------------------------ */
 /* Public API                                                         */
 /* ------------------------------------------------------------------ */
 void    GNSS_BLE_Init(void);
 uint8_t GNSS_BLE_GetMask(void);
 void    GNSS_BLE_SetMask(uint8_t mask);
-
 uint8_t GNSS_BLE_Build(const FS_GNSS_Data_t *src, uint8_t *dst);
-
-uint8_t GNSS_BLE_HandleCtrlWrite(const uint8_t *buf, uint8_t len, uint8_t *rsp);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* GNSS_BLE_H_ */
