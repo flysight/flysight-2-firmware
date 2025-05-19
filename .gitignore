@@ -4,9 +4,9 @@
 
 # Build folders
 Debug/
-Disable_BLE/
 Release/
 Binary/
+Deploy/Firmware_As_Built/*
 
 # Created in prebuild scrip
 /FlySight/version.h
