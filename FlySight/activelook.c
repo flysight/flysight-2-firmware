@@ -9,9 +9,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define ACTIVELOOK_UPDATE_MSEC    1000
-#define ACTIVELOOK_UPDATE_RATE    (ACTIVELOOK_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
-
 /*----- State machine states -----*/
 typedef enum
 {
@@ -241,7 +238,7 @@ static void FS_ActiveLook_Task(void)
         s_state = AL_STATE_READY;
 
     	/* Start update timer */
-    	HW_TS_Start(timer_id, ACTIVELOOK_UPDATE_RATE);
+    	HW_TS_Start(timer_id, FS_Config_Get()->al_rate * 1000 / CFG_TS_TICK_VAL);
         break;
     }
 

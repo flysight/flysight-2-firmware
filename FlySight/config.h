@@ -173,6 +173,7 @@ typedef struct
 
 	char     al_id[6];
 	uint8_t  al_mode;
+	uint32_t al_rate;
 
 	FS_Config_AL_Line_t al_lines[FS_CONFIG_MAX_AL_LINES];
 	uint8_t  num_al_lines;
