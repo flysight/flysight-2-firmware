@@ -31,6 +31,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "gnss.h"
+#include "vbat.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -90,6 +91,8 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
                          uint8_t hour, uint8_t min, uint8_t sec, uint16_t ms);
 
 void Custom_Mode_Update(uint8_t newMode);
+
+void Custom_VBAT_Update(const FS_VBAT_Data_t *current);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

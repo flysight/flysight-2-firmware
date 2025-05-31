@@ -40,6 +40,8 @@ typedef struct{
   uint16_t  CustomDevice_StateHdle;                    /**< Device_State handle */
   uint16_t  CustomDs_ModeHdle;                  /**< DS_Mode handle */
   uint16_t  CustomDs_Control_PointHdle;                  /**< DS_Control_Point handle */
+  uint16_t  CustomBatteryHdle;                    /**< Battery handle */
+  uint16_t  CustomBattery_LevelHdle;                  /**< Battery_Level handle */
 /* USER CODE BEGIN Context */
   /* Place holder for Characteristic Descriptors Handle*/
 
@@ -81,6 +83,7 @@ uint8_t SizeSp_Control_Point = 20;
 uint8_t SizeSp_Result = 9;
 uint8_t SizeDs_Mode = 1;
 uint8_t SizeDs_Control_Point = 20;
+uint8_t SizeBattery_Level = 1;
 
 /**
  * START of Section BLE_DRIVER_CONTEXT
@@ -500,6 +503,50 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
             }
           }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomDS_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomBattery_LevelHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1 */
+
+            /* USER CODE END CUSTOM_STM_Service_5_Char_1 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_5_Char_1_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_5_Char_1_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_5_Char_1_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_5_Char_1_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_5_Char_1_COMSVC_Notification_END */
+                break;
+
+              default:
+                /* USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_default */
+
+                /* USER CODE END CUSTOM_STM_Service_5_Char_1_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomBattery_LevelHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomFt_Packet_InHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
@@ -586,6 +633,19 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
 
             /*USER CODE END CUSTOM_STM_Service_4_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
           } /* if (read_req->Attribute_Handle == (CustomContext.CustomDs_ModeHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomBattery_LevelHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_BATTERY_LEVEL_READ_EVT;
+            Notification.ConnectionHandle = read_req->Connection_Handle;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_5_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_5_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_5_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomBattery_LevelHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
           /* USER CODE BEGIN EVT_BLUE_GATT_READ_PERMIT_REQ_END */
 
           /* USER CODE END EVT_BLUE_GATT_READ_PERMIT_REQ_END */
@@ -1025,6 +1085,67 @@ void SVCCTL_InitCustomSvc(void)
 
   /* USER CODE END SVCCTL_Init_Service4_Char2 */
 
+  /**
+   *          Battery
+   *
+   * Max_Attribute_Records = 1 + 2*1 + 1*no_of_char_with_notify_or_indicate_property + 1*no_of_char_with_broadcast_property
+   * service_max_attribute_record = 1 for Battery +
+   *                                2 for Battery_Level +
+   *                                1 for Battery_Level configuration descriptor +
+   *                              = 4
+   *
+   * This value doesn't take into account number of descriptors manually added
+   * In case of descriptors added, please update the max_attr_record value accordingly in the next SVCCTL_InitService User Section
+   */
+  max_attr_record = 4;
+
+  /* USER CODE BEGIN SVCCTL_InitService */
+  /* max_attr_record to be updated if descriptors have been added */
+
+  /* USER CODE END SVCCTL_InitService */
+
+  uuid.Char_UUID_16 = 0x180f;
+  ret = aci_gatt_add_service(UUID_TYPE_16,
+                             (Service_UUID_t *) &uuid,
+                             PRIMARY_SERVICE,
+                             max_attr_record,
+                             &(CustomContext.CustomBatteryHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_service command: Battery, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_service command: Battery \n\r");
+  }
+
+  /**
+   *  Battery_Level
+   */
+  uuid.Char_UUID_16 = 0x2a19;
+  ret = aci_gatt_add_char(CustomContext.CustomBatteryHdle,
+                          UUID_TYPE_16, &uuid,
+                          SizeBattery_Level,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_CONSTANT,
+                          &(CustomContext.CustomBattery_LevelHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : BATTERY_LEVEL, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : BATTERY_LEVEL \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service5_Char1/ */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service5_Char1 */
+
   /* USER CODE BEGIN SVCCTL_InitCustomSvc_2 */
 
   /* USER CODE END SVCCTL_InitCustomSvc_2 */
@@ -1198,6 +1319,25 @@ tBleStatus Custom_STM_App_Update_Char(Custom_STM_Char_Opcode_t CharOpcode, uint8
       /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_4_Char_2*/
 
       /* USER CODE END CUSTOM_STM_App_Update_Service_4_Char_2*/
+      break;
+
+    case CUSTOM_STM_BATTERY_LEVEL:
+      ret = aci_gatt_update_char_value(CustomContext.CustomBatteryHdle,
+                                       CustomContext.CustomBattery_LevelHdle,
+                                       0, /* charValOffset */
+                                       SizeBattery_Level, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value BATTERY_LEVEL command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value BATTERY_LEVEL command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_5_Char_1*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_5_Char_1*/
       break;
 
     default:

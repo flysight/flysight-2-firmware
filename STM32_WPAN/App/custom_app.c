@@ -53,6 +53,8 @@ typedef struct
   /* Device_State */
   uint8_t               Ds_mode_Indication_Status;
   uint8_t               Ds_control_point_Indication_Status;
+  /* Battery */
+  uint8_t               Battery_level_Notification_Status;
   /* USER CODE BEGIN CUSTOM_APP_Context_t */
 
   /* USER CODE END CUSTOM_APP_Context_t */
@@ -103,6 +105,8 @@ extern uint8_t SizeSd_Gnss_Measurement;
 extern uint8_t SizeSd_Control_Point;
 
 static uint8_t timeout_timer_id;
+
+static uint8_t current_battery_level_percent = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -124,6 +128,9 @@ static void Custom_Ds_mode_Update_Char(void);
 static void Custom_Ds_mode_Send_Indication(void);
 static void Custom_Ds_control_point_Update_Char(void);
 static void Custom_Ds_control_point_Send_Indication(void);
+/* Battery */
+static void Custom_Battery_level_Update_Char(void);
+static void Custom_Battery_level_Send_Notification(void);
 
 /* USER CODE BEGIN PFP */
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification);
@@ -299,6 +306,33 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE END CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT */
       break;
 
+    /* Battery */
+    case CUSTOM_STM_BATTERY_LEVEL_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_BATTERY_LEVEL_READ_EVT */
+      APP_DBG_MSG("CUSTOM_STM_BATTERY_LEVEL_READ_EVT received\n");
+      // The actual calculation and update should happen when FS_VBAT_ValueReady_Callback runs,
+      // or we need a way to trigger FS_VBAT_ValueReady_Callback or get the latest value here.
+      // For simplicity, let's assume current_battery_level_percent is up-to-date.
+      Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, &current_battery_level_percent);
+      /* USER CODE END CUSTOM_STM_BATTERY_LEVEL_READ_EVT */
+      break;
+
+    case CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT */
+      APP_DBG_MSG("CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT received\n");
+      Custom_App_Context.Battery_level_Notification_Status = 1;
+      // Optionally, send the current level immediately upon enabling notifications
+      Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, &current_battery_level_percent);
+      /* USER CODE END CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT */
+      APP_DBG_MSG("CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT received\n");
+      Custom_App_Context.Battery_level_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT */
+      break;
+
     case CUSTOM_STM_NOTIFICATION_COMPLETE_EVT:
       /* USER CODE BEGIN CUSTOM_STM_NOTIFICATION_COMPLETE_EVT */
 
@@ -377,6 +411,10 @@ void Custom_APP_Init(void)
   /* Device_State */
   Custom_App_Context.Ds_mode_Indication_Status = 0;
   Custom_App_Context.Ds_control_point_Indication_Status = 0;
+
+  /* Battery Service */
+  Custom_App_Context.Battery_level_Notification_Status = 0;
+  current_battery_level_percent = 0;
 
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timeout_timer_id, hw_ts_SingleShot, Custom_App_Timeout);
   /* USER CODE END CUSTOM_APP_Init */
@@ -678,6 +716,46 @@ void Custom_Ds_control_point_Send_Indication(void) /* Property Indication */
   return;
 }
 
+/* Battery */
+void Custom_Battery_level_Update_Char(void) /* Property Read */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Battery_level_UC_1*/
+
+  /* USER CODE END Battery_level_UC_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, (uint8_t *)UpdateCharData);
+  }
+
+  /* USER CODE BEGIN Battery_level_UC_Last*/
+
+  /* USER CODE END Battery_level_UC_Last*/
+  return;
+}
+
+void Custom_Battery_level_Send_Notification(void) /* Property Notification */
+{
+  uint8_t updateflag = 0;
+
+  /* USER CODE BEGIN Battery_level_NS_1*/
+
+  /* USER CODE END Battery_level_NS_1*/
+
+  if (updateflag != 0)
+  {
+    Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, (uint8_t *)NotifyCharData);
+  }
+
+  /* USER CODE BEGIN Battery_level_NS_Last*/
+
+  /* USER CODE END Battery_level_NS_Last*/
+
+  return;
+}
+
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
 {
@@ -786,4 +864,36 @@ void Custom_Mode_Update(uint8_t newMode)
      */
     Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, &newMode);
 }
+
+static uint8_t calculate_battery_percentage(uint16_t voltage_mv) {
+    const uint16_t MIN_VOLTAGE_MV = 3300; // Example for LiPo empty
+    const uint16_t MAX_VOLTAGE_MV = 4200; // Example for LiPo full
+    int32_t percentage;
+
+    if (voltage_mv <= MIN_VOLTAGE_MV) {
+        percentage = 0;
+    } else if (voltage_mv >= MAX_VOLTAGE_MV) {
+        percentage = 100;
+    } else {
+        percentage = ((int32_t)voltage_mv - MIN_VOLTAGE_MV) * 100 / (MAX_VOLTAGE_MV - MIN_VOLTAGE_MV);
+    }
+    return (uint8_t)percentage;
+}
+
+void Custom_VBAT_Update(const FS_VBAT_Data_t *current)
+{
+	uint8_t new_battery_level = calculate_battery_percentage(current->voltage);
+
+	// Update the global/context variable
+	// This ensures that read requests get the most recent value
+	current_battery_level_percent = new_battery_level;
+
+	// If notifications are enabled for the Battery Level characteristic, send an update
+	if (Custom_App_Context.Battery_level_Notification_Status == 1)
+	{
+		// APP_DBG_MSG("Sending battery level notification: %d%%\n", new_battery_level);
+		Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, &new_battery_level);
+	}
+}
+
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
