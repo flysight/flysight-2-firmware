@@ -255,52 +255,89 @@ void FS_Log_UpdateMag(void)
 	++magRdI;
 }
 
+// Helper function to normalize nanoseconds and adjust time accordingly
+void normalizeGNSSTime(const FS_GNSS_Data_t *data,
+                       uint16_t *norm_year, uint8_t *norm_month, uint8_t *norm_day,
+                       uint8_t *norm_hour, uint8_t *norm_min, uint8_t *norm_sec,
+                       int32_t *norm_millis)
+{
+    // Convert original time to epoch seconds
+    uint32_t epoch_seconds = mk_gmtime(data->year, data->month, data->day,
+                                       data->hour, data->min, data->sec);
+
+    // Convert nanoseconds to milliseconds (rounded)
+    *norm_millis = (data->nano + 500000) / 1000000;
+
+    // Handle negative milliseconds by borrowing from seconds
+    if (*norm_millis >= 1000) {
+        *norm_millis -= 1000;
+        ++epoch_seconds;
+    }
+    else if (*norm_millis < 0) {
+        *norm_millis += 1000;
+        --epoch_seconds;
+    }
+
+    // Convert back to date/time components
+    gmtime_r(epoch_seconds, norm_year, norm_month, norm_day,
+             norm_hour, norm_min, norm_sec);
+}
+
+// Modified logging function
 void FS_Log_UpdateGNSS(void)
 {
-	char row[150];
-	UINT bw;
+    char row[150];
+    UINT bw;
 
-	if (!(enable_flags & FS_LOG_ENABLE_GNSS))
-	{
-		Error_Handler();
-	}
+    if (!(enable_flags & FS_LOG_ENABLE_GNSS))
+    {
+        Error_Handler();
+    }
 
-	// Get current data point
-	FS_GNSS_Data_t *data = &gnssBuf[gnssRdI % GNSS_COUNT];
+    // Get current data point
+    FS_GNSS_Data_t *data = &gnssBuf[gnssRdI % GNSS_COUNT];
 
-	// Write to disk
-	char *ptr = row + sizeof(row);
+    // Normalize the time components
+    uint16_t norm_year;
+    uint8_t norm_month, norm_day, norm_hour, norm_min, norm_sec;
+    int32_t norm_millis;
 
-	*(--ptr) = '\n';
-	ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\r');
-	ptr = writeInt32ToBuf(ptr, data->sAcc,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velD,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velE,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->velN,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->hMSL,    3, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->lon,     7, 1, ',');
-	ptr = writeInt32ToBuf(ptr, data->lat,     7, 1, ',');
-	*(--ptr) = ',';
-	ptr = writeInt32ToBuf(ptr, (data->nano + 500000) / 1000000, 3, 0, 'Z');
-	ptr = writeInt32ToBuf(ptr, data->sec,     2, 0, '.');
-	ptr = writeInt32ToBuf(ptr, data->min,     2, 0, ':');
-	ptr = writeInt32ToBuf(ptr, data->hour,    2, 0, ':');
-	ptr = writeInt32ToBuf(ptr, data->day,     2, 0, 'T');
-	ptr = writeInt32ToBuf(ptr, data->month,   2, 0, '-');
-	ptr = writeInt32ToBuf(ptr, data->year,    4, 0, '-');
-	*(--ptr) = ',';
-	*(--ptr) = 'S';
-	*(--ptr) = 'S';
-	*(--ptr) = 'N';
-	*(--ptr) = 'G';
-	*(--ptr) = '$';
+    normalizeGNSSTime(data, &norm_year, &norm_month, &norm_day,
+                      &norm_hour, &norm_min, &norm_sec, &norm_millis);
 
-	f_write(&gnssFile, ptr, row + sizeof(row) - ptr, &bw);
+    // Write to disk using normalized values
+    char *ptr = row + sizeof(row);
 
-	// Increment read index
-	++gnssRdI;
+    *(--ptr) = '\n';
+    ptr = writeInt32ToBuf(ptr, data->numSV,   0, 0, '\r');
+    ptr = writeInt32ToBuf(ptr, data->sAcc,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->vAcc,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->hAcc,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->velD,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->velE,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->velN,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->hMSL,    3, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->lon,     7, 1, ',');
+    ptr = writeInt32ToBuf(ptr, data->lat,     7, 1, ',');
+    *(--ptr) = ',';
+    ptr = writeInt32ToBuf(ptr, norm_millis,   3, 0, 'Z');
+    ptr = writeInt32ToBuf(ptr, norm_sec,      2, 0, '.');
+    ptr = writeInt32ToBuf(ptr, norm_min,      2, 0, ':');
+    ptr = writeInt32ToBuf(ptr, norm_hour,     2, 0, ':');
+    ptr = writeInt32ToBuf(ptr, norm_day,      2, 0, 'T');
+    ptr = writeInt32ToBuf(ptr, norm_month,    2, 0, '-');
+    ptr = writeInt32ToBuf(ptr, norm_year,     4, 0, '-');
+    *(--ptr) = ',';
+    *(--ptr) = 'S';
+    *(--ptr) = 'S';
+    *(--ptr) = 'N';
+    *(--ptr) = 'G';
+    *(--ptr) = '$';
+
+    f_write(&gnssFile, ptr, row + sizeof(row) - ptr, &bw);
+
+    // Increment read index
+    ++gnssRdI;
 }
 
 void FS_Log_UpdateTime(void)
