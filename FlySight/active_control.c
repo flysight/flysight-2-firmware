@@ -284,8 +284,13 @@ void FS_VBAT_ValueReady_Callback(void)
 {
 	if (state != FS_CONTROL_ACTIVE) return;
 
+	const FS_VBAT_Data_t *vbat_data = FS_VBAT_GetData();
+
 	// Save to log file
-	FS_Log_WriteVBATData(FS_VBAT_GetData());
+	FS_Log_WriteVBATData(vbat_data);
+
+	// Update BLE characteristic
+	Custom_VBAT_Update(vbat_data);
 }
 
 void FS_ActiveControl_SetHealthStatus(bool isSystemHealthy)

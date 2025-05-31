@@ -46,6 +46,8 @@ typedef enum
   /* Device_State */
   CUSTOM_STM_DS_MODE,
   CUSTOM_STM_DS_CONTROL_POINT,
+  /* Battery */
+  CUSTOM_STM_BATTERY_LEVEL,
 } Custom_STM_Char_Opcode_t;
 
 typedef enum
@@ -80,6 +82,10 @@ typedef enum
   CUSTOM_STM_DS_CONTROL_POINT_WRITE_EVT,
   CUSTOM_STM_DS_CONTROL_POINT_INDICATE_ENABLED_EVT,
   CUSTOM_STM_DS_CONTROL_POINT_INDICATE_DISABLED_EVT,
+  /* Battery_Level */
+  CUSTOM_STM_BATTERY_LEVEL_READ_EVT,
+  CUSTOM_STM_BATTERY_LEVEL_NOTIFY_ENABLED_EVT,
+  CUSTOM_STM_BATTERY_LEVEL_NOTIFY_DISABLED_EVT,
   CUSTOM_STM_NOTIFICATION_COMPLETE_EVT,
 
   CUSTOM_STM_BOOT_REQUEST_EVT
@@ -113,6 +119,7 @@ extern uint8_t SizeSp_Control_Point;
 extern uint8_t SizeSp_Result;
 extern uint8_t SizeDs_Mode;
 extern uint8_t SizeDs_Control_Point;
+extern uint8_t SizeBattery_Level;
 
 /* USER CODE BEGIN EC */
 
