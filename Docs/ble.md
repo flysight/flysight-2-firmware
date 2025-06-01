@@ -339,7 +339,13 @@ Provides information about the device's current operational state and allows for
 FlySight 2 also implements standard BLE services:
 
 *   **Device Information Service (DIS - 0x180A):** Provides Manufacturer Name ("Bionic Avionics Inc."), Model Number ("FlySight 2"), Firmware Revision (`GIT_TAG`), etc.
-*   **Battery Service (BAS - 0x180F):** (Planned) Will expose battery level via the standard Battery Level characteristic (0x2A19).
+*   **Battery Service (BAS - UUID `0x180F`):**
+    *   FlySight 2 exposes its own battery level through this standard service.
+    *   **Battery Level Characteristic (UUID `0x2A19`):**
+        *   **Properties:** Read, Notify.
+        *   **Permissions:** Encrypted Read.
+        *   **Format:** `uint8` representing the battery level as a percentage (0-100%).
+        *   **Usage:** Client applications can read this characteristic to get the current battery level of the FlySight 2. Notifications can be enabled on this characteristic to receive updates once per second.
 
 ## Implementation Notes & Best Practices
 
@@ -368,6 +374,8 @@ FlySight 2 also implements standard BLE services:
 | Device State Service    |                           | `00000003-cc7a-482a-984a-7f2ed5b3e58f`       | Device_State       |                        | N/A                |
 | Device Mode             | `DS_Mode`                 | `00000005-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Read, Indicate         | 1 (Const)          |
 | Device State Control    | `DS_Control_Point`        | `00000007-8e22-4541-9d4c-21edae82ed19`       | Device_State       | Write, Indicate        | 20 (Var)           |
+| Battery Service         |                           | `0x180F`                                     | Battery            |                        | N/A                |
+| Battery Level           | `Battery_Level`           | `0x2A19`                                     | Battery            | Read, Notify           | 1 (Const)          |
 
 *(Note: "Var" indicates variable length up to the specified maximum. "Const" indicates fixed length.)*
 
