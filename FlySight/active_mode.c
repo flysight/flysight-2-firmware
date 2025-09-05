@@ -248,7 +248,8 @@ void FS_ActiveMode_DeInit(void)
 		// Disable ADC
 		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
 		{
-			Error_Handler();
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("ADC de-initialization failed");
 		}
 	}
 
