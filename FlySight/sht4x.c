@@ -75,7 +75,7 @@ static uint8_t CRC8(const uint8_t *data, int length)
     return crc; // Final remainder is the CRC result
 }
 
-FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
+HAL_StatusTypeDef FS_SHT4X_Init(FS_Hum_Data_t *data)
 {
 	HAL_StatusTypeDef result;
 
@@ -86,20 +86,20 @@ FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
 	buf[0] = SHT4X_READ_SERIAL_NUMBER;
 	if (FS_Sensor_Transmit(SHT4X_ADDR, buf, 1) != HAL_OK)
 	{
-		return FS_HUM_ERROR;
+		return HAL_ERROR;
 	}
 
 	// Read serial number
 	if (FS_Sensor_Receive(SHT4X_ADDR, buf, 6) != HAL_OK)
 	{
-		return FS_HUM_ERROR;
+		return HAL_ERROR;
 	}
 
 	// Check serial number CRC
 	if ((CRC8(&buf[0], 2) != buf[2])
 			|| (CRC8(&buf[3], 2) != buf[5]))
 	{
-		return FS_HUM_ERROR;
+		return HAL_ERROR;
 	}
 
 	// Software reset
@@ -110,10 +110,10 @@ FS_Hum_Result_t FS_SHT4X_Init(FS_Hum_Data_t *data)
 	}
 	while (result != HAL_OK);
 
-	return FS_HUM_OK;
+	return HAL_OK;
 }
 
-void FS_SHT4X_Start(void)
+HAL_StatusTypeDef FS_SHT4X_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 
@@ -141,12 +141,16 @@ void FS_SHT4X_Start(void)
 	default:
 		Error_Handler(); // Should never be called
 	}
+
+	return HAL_OK;
 }
 
-void FS_SHT4X_Stop(void)
+HAL_StatusTypeDef FS_SHT4X_Stop(void)
 {
 	// Delete measurement timer
 	HW_TS_Delete(timer_id);
+
+	return HAL_OK;
 }
 
 static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
@@ -157,20 +161,27 @@ static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 	measure_busy = 0;
 
 	// Read raw measurements
-	if (measure_ready && (result == HAL_OK))
+	if (measure_ready)
 	{
-		if ((CRC8(&buf[0], 2) == buf[2])
-				&& (CRC8(&buf[3], 2) == buf[5]))
+		if (result == HAL_OK)
 		{
-			// Compute temperature
-			val = (int16_t) ((buf[0] << 8) | buf[1]);
-			humData->temperature = -450 + (int32_t) 1750 * val / 0xffff;
+			if ((CRC8(&buf[0], 2) == buf[2])
+					&& (CRC8(&buf[3], 2) == buf[5]))
+			{
+				// Compute temperature
+				val = (int16_t) ((buf[0] << 8) | buf[1]);
+				humData->temperature = -450 + (int32_t) 1750 * val / 0xffff;
 
-			// Compute humidity
-			val = (int16_t) ((buf[3] << 8) | buf[4]);
-			humData->humidity = -60 + (int32_t) 1250 * val / 0xffff;
+				// Compute humidity
+				val = (int16_t) ((buf[3] << 8) | buf[4]);
+				humData->humidity = -60 + (int32_t) 1250 * val / 0xffff;
 
-			FS_Hum_DataReady_Callback();
+				FS_Hum_DataReady_Callback();
+			}
+		}
+		else
+		{
+			FS_Log_WriteEvent("Error reading from humidity sensor");
 		}
 	}
 

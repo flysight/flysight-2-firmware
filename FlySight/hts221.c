@@ -64,7 +64,7 @@ static uint8_t dataBuf[4];
 
 static FS_Hum_Data_t *humData;
 
-FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
+HAL_StatusTypeDef FS_HTS221_Init(FS_Hum_Data_t *data)
 {
 	uint8_t buf[4];
 
@@ -77,13 +77,13 @@ FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
 	// Read WHO_AM_I register value
 	if (FS_Sensor_Read(HTS221_ADDR, HTS221_REG_WHO_AM_I, buf, 1) != HAL_OK)
 	{
-		return FS_HUM_ERROR;
+		return HAL_ERROR;
 	}
 
 	// Check WHO_AM_I register value
 	if (buf[0] != 0xbc)
 	{
-		return FS_HUM_ERROR;
+		return HAL_ERROR;
 	}
 
 	// Software reset
@@ -159,10 +159,10 @@ FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data)
 	}
 	while (result != HAL_OK);
 
-	return FS_HUM_OK;
+	return HAL_OK;
 }
 
-void FS_HTS221_Start(void)
+HAL_StatusTypeDef FS_HTS221_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
@@ -173,27 +173,44 @@ void FS_HTS221_Start(void)
 	// Configure data ready on DRDY pin
 	buf[0] = 0x04;
 	if (FS_Sensor_Write(HTS221_ADDR, HTS221_REG_CTRL_REG3, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_4);
+		return HAL_ERROR;
+	}
 
 	// Active mode; Output data rate 12.5 Hz; block data update
 	buf[0] = 0x84 | config->hum_odr;
 	if (FS_Sensor_Write(HTS221_ADDR, HTS221_REG_CTRL_REG1, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_4);
+		return HAL_ERROR;
+	}
+
+	return HAL_OK;
 }
 
-void FS_HTS221_Stop(void)
+HAL_StatusTypeDef FS_HTS221_Stop(void)
 {
 	uint8_t buf[1];
+
+	// Disable EXTI pin
+    LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_4);
 
 	// Disable data ready on DRDY pin
 	buf[0] = 0x00;
 	if (FS_Sensor_Write(HTS221_ADDR, HTS221_REG_CTRL_REG3, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		return HAL_ERROR;
+	}
 
 	// Power down mode
 	buf[0] = 0x00;
 	if (FS_Sensor_Write(HTS221_ADDR, HTS221_REG_CTRL_REG1, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		return HAL_ERROR;
+	}
+
+	return HAL_OK;
 }
 
 static void FS_HTS221_Read_Callback(HAL_StatusTypeDef result)
@@ -220,6 +237,10 @@ static void FS_HTS221_Read_Callback(HAL_StatusTypeDef result)
 		humData->temperature = (n / d + T0_degC_x8_u16 * 10) / 8;
 
 		FS_Hum_DataReady_Callback();
+	}
+	else
+	{
+		FS_Log_WriteEvent("Error reading from humidity sensor");
 	}
 }
 
