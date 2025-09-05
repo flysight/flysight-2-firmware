@@ -110,8 +110,8 @@ void FS_ActiveMode_Init(void)
 		// Run the ADC calibration in single-ended mode
 		if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
 		{
-			// Calibration Error
-			Error_Handler();
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("ADC calibration failed");
 		}
 	}
 
