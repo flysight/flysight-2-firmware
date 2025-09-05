@@ -126,14 +126,14 @@ void FS_Mag_Init(void)
 	magState = MAG_STATE_READY;
 }
 
-void FS_Mag_Start(void)
+HAL_StatusTypeDef FS_Mag_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	if (magState != MAG_STATE_READY)
 	{
-		return;
+		return HAL_ERROR;
 	}
 
 	// Enable EXTI pin
@@ -145,7 +145,7 @@ void FS_Mag_Start(void)
 	{
 		FS_Log_WriteEvent("Couldn't start magnetometer");
 		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_6);
-		return;
+		return HAL_ERROR;
 	}
 
 	// Configure block data update and data ready on INT_DRDY pin
@@ -154,10 +154,11 @@ void FS_Mag_Start(void)
 	{
 		FS_Log_WriteEvent("Couldn't start magnetometer");
 		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_6);
-		return;
+		return HAL_ERROR;
 	}
 
 	magState = MAG_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 void FS_Mag_Stop(void)

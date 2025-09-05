@@ -25,6 +25,7 @@
 #include "app_common.h"
 #include "config.h"
 #include "hum.h"
+#include "log.h"
 #include "sensor.h"
 #include "sht4x.h"
 

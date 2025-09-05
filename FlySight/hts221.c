@@ -26,6 +26,7 @@
 #include "config.h"
 #include "hts221.h"
 #include "hum.h"
+#include "log.h"
 #include "sensor.h"
 
 #define HTS221_ADDR               0xbe

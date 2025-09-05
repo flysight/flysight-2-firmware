@@ -32,7 +32,7 @@ typedef struct
 } FS_Baro_Data_t;
 
 void FS_Baro_Init(void);
-void FS_Baro_Start(void);
+HAL_StatusTypeDef FS_Baro_Start(void);
 void FS_Baro_Stop(void);
 void FS_Baro_Read(void);
 const FS_Baro_Data_t *FS_Baro_GetData(void);

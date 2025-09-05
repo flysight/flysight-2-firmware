@@ -287,3 +287,11 @@ void FS_VBAT_ValueReady_Callback(void)
 	// Save to log file
 	FS_Log_WriteVBATData(FS_VBAT_GetData());
 }
+
+void FS_ActiveControl_SetHealthStatus(bool isSystemHealthy)
+{
+	if (state != FS_CONTROL_ACTIVE) return;
+
+	// Set LED color based on system health from initialization
+	FS_LED_SetColour(isSystemHealthy ? FS_LED_GREEN : FS_LED_RED);
+}

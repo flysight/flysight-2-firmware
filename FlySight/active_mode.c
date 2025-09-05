@@ -45,6 +45,7 @@ extern ADC_HandleTypeDef hadc1;
 void FS_ActiveMode_Init(void)
 {
 	uint8_t enable_flags;
+	bool isSystemHealthy = true;
 
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
@@ -152,19 +153,31 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_baro)
 	{
 		/* Start barometer */
-		FS_Baro_Start();
+		if (FS_Baro_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Barometer start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_hum)
 	{
 		/* Start humidity and temperature */
-		FS_Hum_Start();
+		if (FS_Hum_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Humidity sensor start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_mag)
 	{
 		/* Start magnetometer */
-		FS_Mag_Start();
+		if (FS_Mag_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Magnetometer start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
@@ -172,6 +185,9 @@ void FS_ActiveMode_Init(void)
 		/* Start reading sensors */
 		FS_Sensor_Start();
 	}
+
+	/* Set the final health status */
+	FS_ActiveControl_SetHealthStatus(isSystemHealthy);
 }
 
 void FS_ActiveMode_DeInit(void)

@@ -81,20 +81,21 @@ void FS_Hum_Init(void)
 	humState = HUM_STATE_READY;
 }
 
-void FS_Hum_Start(void)
+HAL_StatusTypeDef FS_Hum_Start(void)
 {
 	if (humState != HUM_STATE_READY)
 	{
-		return;
+		return HAL_ERROR;
 	}
 
 	if ((*humInterface.Start)() != HAL_OK)
 	{
 		FS_Log_WriteEvent("Couldn't start humidity sensor");
-		return;
+		return HAL_ERROR;
 	}
 
 	humState = HUM_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 void FS_Hum_Stop(void)

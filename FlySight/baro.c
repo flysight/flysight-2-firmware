@@ -129,14 +129,14 @@ void FS_Baro_Init(void)
 	baroState = BARO_STATE_READY;
 }
 
-void FS_Baro_Start(void)
+HAL_StatusTypeDef FS_Baro_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
 	if (baroState != BARO_STATE_READY)
 	{
-		return;
+		return HAL_ERROR;
 	}
 
 	// Enable EXTI pin
@@ -148,7 +148,7 @@ void FS_Baro_Start(void)
 	{
 		FS_Log_WriteEvent("Couldn't start barometer");
 		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_13);
-		return;
+		return HAL_ERROR;
 	}
 
 	// Configure data ready on INT_DRDY pin
@@ -157,10 +157,11 @@ void FS_Baro_Start(void)
 	{
 		FS_Log_WriteEvent("Couldn't start barometer");
 		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_13);
-		return;
+		return HAL_ERROR;
 	}
 
 	baroState = BARO_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 void FS_Baro_Stop(void)
