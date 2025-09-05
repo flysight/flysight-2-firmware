@@ -174,6 +174,8 @@ void FS_Mag_Stop(void)
 	{
 		FS_Log_WriteEvent("Couldn't stop magnetometer");
 	}
+
+	magState = MAG_STATE_READY;
 }
 
 static void FS_Mag_Read_Callback_1(HAL_StatusTypeDef result)

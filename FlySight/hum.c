@@ -104,6 +104,8 @@ void FS_Hum_Stop(void)
 	{
 		FS_Log_WriteEvent("Couldn't stop humidity sensor");
 	}
+
+	humState = HUM_STATE_READY;
 }
 
 void FS_Hum_Read(void)

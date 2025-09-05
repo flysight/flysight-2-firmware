@@ -177,6 +177,8 @@ void FS_Baro_Stop(void)
 	{
 		FS_Log_WriteEvent("Couldn't stop barometer");
 	}
+
+	baroState = BARO_STATE_READY;
 }
 
 static void FS_Baro_Read_Callback(HAL_StatusTypeDef result)
