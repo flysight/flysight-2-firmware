@@ -32,7 +32,6 @@
 #include "button.h"
 #include "crs.h"
 #include "gnss.h"
-#include "hts221.h"
 #include "hum.h"
 #include "imu.h"
 #include "led.h"
@@ -1157,7 +1156,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     FS_Baro_Read();
     break;
   case HUM_DRDY_Pin:
-    FS_HTS221_Read();
+    FS_Hum_Read();
     break;
   case MAG_INT_Pin:
     FS_Mag_Read();

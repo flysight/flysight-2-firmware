@@ -126,6 +126,15 @@ typedef enum
 
 static uint8_t enable_flags;
 
+typedef enum
+{
+    LOG_STATE_UNINITIALIZED,
+    LOG_STATE_ACTIVE,
+    LOG_STATE_FAILED
+} FS_Log_State_t;
+
+static FS_Log_State_t logState = LOG_STATE_UNINITIALIZED;
+
 static void FS_Log_Timer(void)
 {
 	// Call update task
@@ -606,7 +615,7 @@ static FRESULT delete_node (
 	return fr;
 }
 
-void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
+HAL_StatusTypeDef FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 {
 	FILINFO fno;
 
@@ -676,7 +685,8 @@ void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 		sprintf(path, "/temp/%04lu/track.csv", temp_folder);
 		if (f_open(&gnssFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
-			Error_Handler();
+			logState = LOG_STATE_FAILED;
+			return HAL_ERROR;
 		}
 
 		FS_Log_WriteCommonHeader(&gnssFile);
@@ -692,7 +702,8 @@ void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 		sprintf(path, "/temp/%04lu/raw.ubx", temp_folder);
 		if (f_open(&rawFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
-			Error_Handler();
+			logState = LOG_STATE_FAILED;
+			return HAL_ERROR;
 		}
 		f_sync(&rawFile);
 	}
@@ -703,7 +714,8 @@ void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 		sprintf(path, "/temp/%04lu/sensor.csv", temp_folder);
 		if (f_open(&sensorFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
-			Error_Handler();
+			logState = LOG_STATE_FAILED;
+			return HAL_ERROR;
 		}
 
 		FS_Log_WriteCommonHeader(&sensorFile);
@@ -729,7 +741,8 @@ void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 		sprintf(path, "/temp/%04lu/event.csv", temp_folder);
 		if (f_open(&eventFile, path, FA_WRITE|FA_CREATE_ALWAYS) != FR_OK)
 		{
-			Error_Handler();
+			logState = LOG_STATE_FAILED;
+			return HAL_ERROR;
 		}
 
 		FS_Log_WriteCommonHeader(&eventFile);
@@ -746,6 +759,9 @@ void FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 	// Initialize update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Log_Timer);
 	HW_TS_Start(timer_id, LOG_UPDATE_RATE);
+
+	logState = LOG_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 static void FS_Log_AdjustDateTime(uint16_t *year, uint8_t *month, uint8_t *day,
@@ -772,10 +788,13 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	char oldPath[50];
     FILINFO fno;
 
-	// Delete timer
-	HW_TS_Delete(timer_id);
+	if (logState == LOG_STATE_ACTIVE)
+	{
+		// Delete timer
+		HW_TS_Delete(timer_id);
+	}
 
-	if (enable_flags & FS_LOG_ENABLE_EVENT)
+	if ((logState == LOG_STATE_ACTIVE) && (enable_flags & FS_LOG_ENABLE_EVENT))
 	{
 		// Add event log entries for buffer info
 		FS_Log_WriteEvent("----------");
@@ -820,7 +839,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		f_close(&eventFile);
 	}
 
-	if (validDateTime)
+	if ((logState == LOG_STATE_ACTIVE) && validDateTime)
 	{
 		// Get date/time
 		year = saved_data.year;
@@ -854,12 +873,15 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		// Rename temporary folder
 		f_rename(oldPath, path);
 	}
+
+	// Return the logging module to its initial state for the next session.
+	logState = LOG_STATE_UNINITIALIZED;
 }
 
 void FS_Log_WriteBaroData(const FS_Baro_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (baroWrI < baroRdI + BARO_COUNT)
 	{
@@ -882,8 +904,8 @@ void FS_Log_WriteBaroData(const FS_Baro_Data_t *current)
 
 void FS_Log_WriteHumData(const FS_Hum_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (humWrI < humRdI + HUM_COUNT)
 	{
@@ -906,8 +928,8 @@ void FS_Log_WriteHumData(const FS_Hum_Data_t *current)
 
 void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (magWrI < magRdI + MAG_COUNT)
 	{
@@ -930,8 +952,8 @@ void FS_Log_WriteMagData(const FS_Mag_Data_t *current)
 
 void FS_Log_WriteGNSSData(const FS_GNSS_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_GNSS))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_GNSS)) return;
 
 	if (current->gpsFix == 3)
 	{
@@ -967,8 +989,8 @@ void FS_Log_UpdatePath(const FS_GNSS_Data_t *current)
 
 void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (timeWrI < timeRdI + TIME_COUNT)
 	{
@@ -991,8 +1013,8 @@ void FS_Log_WriteGNSSTime(const FS_GNSS_Time_t *current)
 
 void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_RAW))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_RAW)) return;
 
 	if (FS_Config_Get()->enable_raw)
 	{
@@ -1018,8 +1040,8 @@ void FS_Log_WriteGNSSRaw(const FS_GNSS_Raw_t *current)
 
 void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (imuWrI < imuRdI + IMU_COUNT)
 	{
@@ -1042,8 +1064,8 @@ void FS_Log_WriteIMUData(const FS_IMU_Data_t *current)
 
 void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current)
 {
-	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_SENSOR)) return;
 
 	if (vbatWrI < vbatRdI + VBAT_COUNT)
 	{
@@ -1073,8 +1095,8 @@ void FS_Log_WriteEvent(const char *format, ...)
 
 	va_list args;
 
-	if (!(enable_flags & FS_LOG_ENABLE_EVENT))
-		return;
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_EVENT)) return;
 
 	// Write to disk
 	ptr = row + sizeof(row);

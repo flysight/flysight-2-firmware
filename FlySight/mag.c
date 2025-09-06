@@ -26,6 +26,7 @@
 #include "main.h"
 #include "app_common.h"
 #include "config.h"
+#include "log.h"
 #include "mag.h"
 #include "sensor.h"
 
@@ -35,6 +36,8 @@
 #define MAG_REG_CFG_REG_C     (0x62 | 0x80)
 #define MAG_REG_OUTX_L_REG    (0x68 | 0x80)
 #define MAG_TEMP_OUT_L_REG    (0x6e | 0x80)
+
+#define MAG_INIT_TIMEOUT 1000
 
 typedef enum {
 	MAG_ODR_10  = 0,
@@ -47,47 +50,91 @@ static uint8_t dataBuf[8];
 static bool magDataGood;
 static FS_Mag_Data_t magData;
 
+typedef enum {
+    MAG_STATE_UNINITIALIZED = 0,
+    MAG_STATE_INIT_FAILED,
+    MAG_STATE_READY,
+    MAG_STATE_ACTIVE
+} FS_Mag_State_t;
+
+static FS_Mag_State_t magState = MAG_STATE_UNINITIALIZED;
+
 void FS_Mag_Init(void)
 {
 	uint8_t buf[1];
 	HAL_StatusTypeDef result;
+	uint32_t timeout;
 
 	// Software reset
+	timeout = HAL_GetTick() + MAG_INIT_TIMEOUT;
 	do
 	{
 		buf[0] = 0x20;
 		result = FS_Sensor_Write(MAG_ADDR, MAG_REG_CFG_REG_A, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			magState = MAG_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while (result != HAL_OK);
 
 	// Wait for reset
+	timeout = HAL_GetTick() + MAG_INIT_TIMEOUT;
 	do
 	{
 		result = FS_Sensor_Read(MAG_ADDR, MAG_REG_CFG_REG_A, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			magState = MAG_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while ((result != HAL_OK) || (buf[0] & 0x20));
 
 	// Check WHO_AM_I register value
+	timeout = HAL_GetTick() + MAG_INIT_TIMEOUT;
 	do
 	{
 		result = FS_Sensor_Read(MAG_ADDR, MAG_REG_WHO_AM_I, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			magState = MAG_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while (result != HAL_OK);
 	if (buf[0] != 0x40)
-		Error_Handler();
+	{
+		magState = MAG_STATE_INIT_FAILED;
+		return;
+	}
 
 	// Throw out first temperature measurement
+	timeout = HAL_GetTick() + MAG_INIT_TIMEOUT;
 	do
 	{
 		result = FS_Sensor_Read(MAG_ADDR, MAG_REG_OUTX_L_REG, dataBuf, 8);
+		if (HAL_GetTick() > timeout)
+		{
+			magState = MAG_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while (result != HAL_OK);
+
+	magState = MAG_STATE_READY;
 }
 
-void FS_Mag_Start(void)
+HAL_StatusTypeDef FS_Mag_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
+
+	if (magState != MAG_STATE_READY)
+	{
+		return HAL_ERROR;
+	}
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_6);
@@ -95,22 +142,40 @@ void FS_Mag_Start(void)
 	// Temperature compensation; output data rate 10 Hz; continuous mode
 	buf[0] = (config->mag_odr << 2) | 0x80;
 	if (FS_Sensor_Write(MAG_ADDR, MAG_REG_CFG_REG_A, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		FS_Log_WriteEvent("Couldn't start magnetometer");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_6);
+		return HAL_ERROR;
+	}
 
 	// Configure block data update and data ready on INT_DRDY pin
 	buf[0] = 0x11;
 	if (FS_Sensor_Write(MAG_ADDR, MAG_REG_CFG_REG_C, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		FS_Log_WriteEvent("Couldn't start magnetometer");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_6);
+		return HAL_ERROR;
+	}
+
+	magState = MAG_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 void FS_Mag_Stop(void)
 {
 	uint8_t buf[1];
 
+	// Disable EXTI pin
+    LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_6);
+
 	// Software reset
 	buf[0] = 0x20;
 	if (FS_Sensor_Write(MAG_ADDR, MAG_REG_CFG_REG_A, buf, 1) != HAL_OK)
-		Error_Handler();
+	{
+		FS_Log_WriteEvent("Couldn't stop magnetometer");
+	}
+
+	magState = MAG_STATE_READY;
 }
 
 static void FS_Mag_Read_Callback_1(HAL_StatusTypeDef result)
@@ -122,6 +187,10 @@ static void FS_Mag_Read_Callback_1(HAL_StatusTypeDef result)
 		magData.z = -(((int16_t) ((dataBuf[5] << 8) | dataBuf[4])) * (int32_t) 3) / 2;
 		magDataGood = true;
 	}
+	else
+	{
+		FS_Log_WriteEvent("Error reading from magnetometer");
+	}
 }
 
 static void FS_Mag_Read_Callback_2(HAL_StatusTypeDef result)
@@ -132,10 +201,19 @@ static void FS_Mag_Read_Callback_2(HAL_StatusTypeDef result)
 
 		FS_Mag_DataReady_Callback();
 	}
+	else
+	{
+		FS_Log_WriteEvent("Error reading from magnetometer");
+	}
 }
 
 void FS_Mag_Read(void)
 {
+	if (magState != MAG_STATE_ACTIVE)
+	{
+		return;
+	}
+
 	magData.time = HAL_GetTick();
 	magDataGood = false;
 

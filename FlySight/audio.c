@@ -56,6 +56,9 @@
 #define AUDIO_UPDATE_MSEC 40
 #define AUDIO_UPDATE_RATE (AUDIO_UPDATE_MSEC*1000/CFG_TS_TICK_VAL)
 
+#define AUDIO_OP_TIMEOUT    100
+#define AUDIO_RETRY_TIMEOUT 1000
+
 static const int16_t sineTable[] =
 {
 		 0,   1607,   3211,   4807,   6392,   7961,   9511,  11038,
@@ -137,28 +140,39 @@ void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 	}
 }
 
-static void FS_Audio_SetVolume(uint8_t volume)
+static HAL_StatusTypeDef FS_Audio_SetVolume(uint8_t volume)
 {
+	uint8_t buf[1];
+	HAL_StatusTypeDef result;
+	uint32_t timeout;
+
 	if (audioVolume != volume)
 	{
-		uint8_t buf[1];
-
 		/* Set volume */
-		buf[0] = volume;
-		if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_VOLUME, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+		timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+		do
 		{
-			Error_Handler();
+			buf[0] = volume;
+			result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_VOLUME, 1, buf, 1, AUDIO_OP_TIMEOUT);
+			if (HAL_GetTick() > timeout)
+			{
+				FS_Log_WriteEvent("Couldn't set audio volume");
+				return HAL_ERROR;
+			}
 		}
+		while (result != HAL_OK);
 
 		audioVolume = volume;
 	}
+
+	return HAL_OK;
 }
 
-void FS_Audio_Init(void)
+HAL_StatusTypeDef FS_Audio_Init(void)
 {
-	uint32_t tickstart;
-
 	uint8_t buf[1];
+	HAL_StatusTypeDef result;
+	uint32_t timeout;
 
 	// Reset state
 	updateCount = 0;
@@ -171,76 +185,121 @@ void FS_Audio_Init(void)
 	MX_I2C1_Init();
 
 	/* Mute audio outputs */
-	buf[0] = (0x3f << 0);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_VOLUME, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (0x3f << 0);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_VOLUME, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	audioVolume = 0x3f;
 
 	/* Set stereo mode */
-	buf[0] = 0;
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_GENERAL, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = 0;
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_GENERAL, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Set IC = 0x0 (SF = 1) */
-	buf[0] = (0x0 << 2);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_CLOCK, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (0x0 << 2);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_CLOCK, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Set CP = 0x09 */
-	buf[0] = (0x09 << 0);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_CHARGE_PUMP, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (0x09 << 0);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_CHARGE_PUMP, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Set INT = 1 */
-	buf[0] = (1 << 7);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_LRCLK_MSB, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (1 << 7);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_LRCLK_MSB, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Set LSB = 32 */
-	buf[0] = 32;
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_LRCLK_LSB, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = 32;
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_LRCLK_LSB, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Set slave mode, I2S, 16 bits */
-	buf[0] = (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (1 << 3) | (0 << 2) | (0 << 0);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_DIGITAL_AUDIO, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (0 << 7) | (0 << 6) | (0 << 5) | (0 << 4) | (1 << 3) | (0 << 2) | (0 << 0);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_DIGITAL_AUDIO, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Enable MCLK, charge pump, headphone output and DAC */
-	buf[0] = (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 0);
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_ENABLE, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 0);
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_ENABLE, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			return HAL_ERROR;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Enable PLLSAI1 */
 	__HAL_RCC_PLLSAI1_ENABLE();
 
-	/* Get start tick */
-	tickstart = HAL_GetTick();
-
 	/* Wait until PLLSAI1 is ready */
+	timeout = HAL_GetTick() + PLLSAI1_TIMEOUT_VALUE;
 	while (LL_RCC_PLLSAI1_IsReady() != 1U)
 	{
-		if ((HAL_GetTick() - tickstart) > PLLSAI1_TIMEOUT_VALUE)
+		if (HAL_GetTick() > timeout)
 		{
-			// TODO: Handle timeout
-			Error_Handler();
+			return HAL_ERROR;
 		}
 	}
 
@@ -255,29 +314,43 @@ void FS_Audio_Init(void)
 
 	// Initialize audio update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Audio_Timer);
+
+	return HAL_OK;
 }
 
 void FS_Audio_DeInit(void)
 {
 	uint8_t buf[1];
+	HAL_StatusTypeDef result;
+	uint32_t timeout;
 
 	// Stop audio output
 	FS_Audio_Stop();
 
 	/* Disable MCLK, charge pump, headphone output and DAC */
-	buf[0] = 0;
-	if (HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_ENABLE, 1, buf, 1, HAL_MAX_DELAY) != HAL_OK)
+	timeout = HAL_GetTick() + AUDIO_RETRY_TIMEOUT;
+	do
 	{
-		Error_Handler();
+		buf[0] = 0;
+		result = HAL_I2C_Mem_Write(&hi2c1, MAX9850_ADDR, MAX9850_REG_ENABLE, 1, buf, 1, AUDIO_OP_TIMEOUT);
+		if (HAL_GetTick() > timeout)
+		{
+			FS_Log_WriteEvent("Couldn't disable audio DAC");
+			break;
+		}
 	}
+	while (result != HAL_OK);
 
 	/* Disable I2C1 */
-	HAL_I2C_DeInit(&hi2c1);
+	if (HAL_I2C_DeInit(&hi2c1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't de-initialize I2C1");
+	}
 
 	/* Disable SAI1 */
 	if (HAL_SAI_DeInit(&hsai_BlockA1) != HAL_OK)
 	{
-		Error_Handler();
+		FS_Log_WriteEvent("Couldn't de-initialize SAI1");
 	}
 
 	// Delete audio update timer

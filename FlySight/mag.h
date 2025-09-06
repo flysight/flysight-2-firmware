@@ -34,7 +34,7 @@ typedef struct
 } FS_Mag_Data_t;
 
 void FS_Mag_Init(void);
-void FS_Mag_Start(void);
+HAL_StatusTypeDef FS_Mag_Start(void);
 void FS_Mag_Stop(void);
 void FS_Mag_Read(void);
 const FS_Mag_Data_t *FS_Mag_GetData(void);

@@ -25,33 +25,44 @@
 #include "app_common.h"
 #include "hts221.h"
 #include "hum.h"
+#include "log.h"
 #include "sht4x.h"
 
-#define TIMEOUT 1000
+#define HUM_INIT_TIMEOUT 1000
 
 typedef struct
 {
-	void (*Start)(void);
-	void (*Stop)(void);
+	HAL_StatusTypeDef (*Start)(void);
+	HAL_StatusTypeDef (*Stop)(void);
 } FS_Hum_Interface_t;
 
 static FS_Hum_Interface_t humInterface;
 static FS_Hum_Data_t humData;
 
+typedef enum {
+    HUM_STATE_UNINITIALIZED = 0,
+    HUM_STATE_INIT_FAILED,
+    HUM_STATE_READY,
+    HUM_STATE_ACTIVE
+} FS_Hum_State_t;
+
+static FS_Hum_State_t humState = HUM_STATE_UNINITIALIZED;
+
 void FS_Hum_Init(void)
 {
-	uint32_t ms;
+	uint32_t timeout;
 
-	ms = HAL_GetTick();
+	timeout = HAL_GetTick() + HUM_INIT_TIMEOUT;
 	while (1)
 	{
-		if (HAL_GetTick() - ms > TIMEOUT)
+		if (HAL_GetTick() > timeout)
 		{
-			Error_Handler();
+			humState = HUM_STATE_INIT_FAILED;
+			return;
 		}
 
 		// Check for SHT4x
-		if (FS_SHT4X_Init(&humData) == FS_HUM_OK)
+		if (FS_SHT4X_Init(&humData) == HAL_OK)
 		{
 			humInterface.Start = &FS_SHT4X_Start;
 			humInterface.Stop = &FS_SHT4X_Stop;
@@ -59,23 +70,52 @@ void FS_Hum_Init(void)
 		}
 
 		// Check for HTS221
-		if (FS_HTS221_Init(&humData) == FS_HUM_OK)
+		if (FS_HTS221_Init(&humData) == HAL_OK)
 		{
 			humInterface.Start = &FS_HTS221_Start;
 			humInterface.Stop = &FS_HTS221_Stop;
 			break;
 		}
 	}
+
+	humState = HUM_STATE_READY;
 }
 
-void FS_Hum_Start(void)
+HAL_StatusTypeDef FS_Hum_Start(void)
 {
-	(*humInterface.Start)();
+	if (humState != HUM_STATE_READY)
+	{
+		return HAL_ERROR;
+	}
+
+	if ((*humInterface.Start)() != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start humidity sensor");
+		return HAL_ERROR;
+	}
+
+	humState = HUM_STATE_ACTIVE;
+	return HAL_OK;
 }
 
 void FS_Hum_Stop(void)
 {
-	(*humInterface.Stop)();
+	if ((*humInterface.Stop)() != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't stop humidity sensor");
+	}
+
+	humState = HUM_STATE_READY;
+}
+
+void FS_Hum_Read(void)
+{
+	if (humState != HUM_STATE_ACTIVE)
+	{
+		return;
+	}
+
+	FS_HTS221_Read();
 }
 
 const FS_Hum_Data_t *FS_Hum_GetData(void)

@@ -26,9 +26,9 @@
 
 #include "hum.h"
 
-FS_Hum_Result_t FS_HTS221_Init(FS_Hum_Data_t *data);
-void FS_HTS221_Start(void);
-void FS_HTS221_Stop(void);
+HAL_StatusTypeDef FS_HTS221_Init(FS_Hum_Data_t *data);
+HAL_StatusTypeDef FS_HTS221_Start(void);
+HAL_StatusTypeDef FS_HTS221_Stop(void);
 void FS_HTS221_Read(void);
 
 #endif /* HTS221_H_ */

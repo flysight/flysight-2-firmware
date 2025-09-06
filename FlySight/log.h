@@ -38,7 +38,7 @@
 #define FS_LOG_ENABLE_EVENT  0x08
 #define FS_LOG_ENABLE_ALL    0xff
 
-void FS_Log_Init(uint32_t sessionId, uint8_t flags);
+HAL_StatusTypeDef FS_Log_Init(uint32_t sessionId, uint8_t flags);
 void FS_Log_DeInit(uint32_t sessionId);
 
 void FS_Log_WriteBaroData(const FS_Baro_Data_t *current);

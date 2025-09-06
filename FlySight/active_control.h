@@ -24,7 +24,10 @@
 #ifndef ACTIVE_CONTROL_H_
 #define ACTIVE_CONTROL_H_
 
+#include <stdbool.h>
+
 void FS_ActiveControl_Init(void);
 void FS_ActiveControl_DeInit(void);
+void FS_ActiveControl_SetHealthStatus(bool isSystemHealthy);
 
 #endif /* ACTIVE_CONTROL_H_ */

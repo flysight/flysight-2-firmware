@@ -45,6 +45,7 @@ extern ADC_HandleTypeDef hadc1;
 void FS_ActiveMode_Init(void)
 {
 	uint8_t enable_flags;
+	bool isSystemHealthy = true;
 
 	/* Initialize FatFS */
 	FS_ResourceManager_RequestResource(FS_RESOURCE_FATFS);
@@ -74,7 +75,6 @@ void FS_ActiveMode_Init(void)
 		enable_flags = FS_LOG_ENABLE_EVENT;
 		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_GNSS;
 		if (FS_Config_Get()->enable_baro) enable_flags |= FS_LOG_ENABLE_SENSOR;
-		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_hum)  enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_imu)  enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_mag)  enable_flags |= FS_LOG_ENABLE_SENSOR;
@@ -82,7 +82,12 @@ void FS_ActiveMode_Init(void)
 		if (FS_Config_Get()->enable_raw)  enable_flags |= FS_LOG_ENABLE_RAW;
 
 		// Enable logging
-		FS_Log_Init(FS_State_Get()->temp_folder, enable_flags);
+		if (FS_Log_Init(FS_State_Get()->temp_folder, enable_flags) != HAL_OK)
+		{
+			isSystemHealthy = false;
+			// We cannot log this failure, as logging init itself has failed.
+			// The red LED will be the indicator.
+		}
 
 		// Log timer usage adjusted for:
 		//   - FS_ActiveControl_Init (1)
@@ -95,7 +100,11 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_audio)
 	{
 		/* Initialize audio */
-		FS_Audio_Init();
+		if (FS_Audio_Init() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Audio init failed");
+		}
 
 		// Enable audio control
 		FS_AudioControl_Init();
@@ -109,8 +118,8 @@ void FS_ActiveMode_Init(void)
 		// Run the ADC calibration in single-ended mode
 		if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
 		{
-			// Calibration Error
-			Error_Handler();
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("ADC calibration failed");
 		}
 	}
 
@@ -129,7 +138,11 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_imu)
 	{
 		/* Start IMU */
-		FS_IMU_Start();
+		if (FS_IMU_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("IMU start failed");
+		}
 	}
 
 	/* Enable USART */
@@ -152,19 +165,31 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_baro)
 	{
 		/* Start barometer */
-		FS_Baro_Start();
+		if (FS_Baro_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Barometer start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_hum)
 	{
 		/* Start humidity and temperature */
-		FS_Hum_Start();
+		if (FS_Hum_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Humidity sensor start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_mag)
 	{
 		/* Start magnetometer */
-		FS_Mag_Start();
+		if (FS_Mag_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Magnetometer start failed");
+		}
 	}
 
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
@@ -172,6 +197,9 @@ void FS_ActiveMode_Init(void)
 		/* Start reading sensors */
 		FS_Sensor_Start();
 	}
+
+	/* Set the final health status */
+	FS_ActiveControl_SetHealthStatus(isSystemHealthy);
 }
 
 void FS_ActiveMode_DeInit(void)
@@ -232,7 +260,7 @@ void FS_ActiveMode_DeInit(void)
 		// Disable ADC
 		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
 		{
-			Error_Handler();
+			FS_Log_WriteEvent("ADC de-initialization failed");
 		}
 	}
 
