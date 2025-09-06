@@ -417,6 +417,10 @@ static uint32_t updateLastCall;
 static uint32_t updateMaxInterval;
 static uint32_t bufferUsed;
 
+// Error logging
+static volatile bool gnss_is_initializing = 0;
+static volatile uint32_t uart_error_code;
+
 // UART handle
 extern UART_HandleTypeDef huart1;
 
@@ -430,10 +434,43 @@ static void (*int_ready_callback)(void) = NULL;
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-	if (huart->ErrorCode & HAL_UART_ERROR_ORE)
+	uart_error_code = huart->ErrorCode;
+
+	// During initialization, a framing error is expected due to the baud rate switch.
+	// We should ignore it and continue.
+	if (gnss_is_initializing && (uart_error_code & HAL_UART_ERROR_FE))
 	{
+		return;
+	}
+
+	// Check for common, recoverable data errors (Overrun, Noise, Framing)
+	if (uart_error_code & (HAL_UART_ERROR_ORE | HAL_UART_ERROR_NE | HAL_UART_ERROR_FE))
+	{
+		// These are non-fatal. We will try to recover.
+		// Immediately restart the DMA transfer to continue receiving data.
+		if (HAL_UART_Receive_DMA(&huart1, gnssRxData.whole, GNSS_RX_BUF_LEN) == HAL_OK)
+		{
+			// If restart was successful, schedule a task to log the error message later.
+			UTIL_SEQ_SetTask(1 << CFG_TASK_FS_GNSS_LOG_ERROR_ID, CFG_SCH_PRIO_1);
+		}
+		else
+		{
+			// The recovery mechanism itself has failed. This is a critical, unrecoverable fault.
+			// The UART is now in an unknown state and cannot receive data.
+			Error_Handler();
+		}
+	}
+	else
+	{
+		// Any other error (especially HAL_UART_ERROR_DMA) is considered critical and unrecoverable.
+		// Halt the system. The error code can be inspected in a debug session.
 		Error_Handler();
 	}
+}
+
+static void FS_GNSS_LogError(void)
+{
+	FS_Log_WriteEvent("GNSS UART fatal error: 0x%lX", uart_error_code);
 }
 
 static uint8_t FS_GNSS_GetChar(void)
@@ -840,6 +877,9 @@ void FS_GNSS_Init(void)
 	updateMaxInterval = 0;
 	bufferUsed = 0;
 
+	// Set initialization flag
+	gnss_is_initializing = true;
+
 	do
 	{
 		while (huart1.gState == HAL_UART_STATE_BUSY_TX);
@@ -886,8 +926,12 @@ void FS_GNSS_Init(void)
 	// Configure UBX messages
 	FS_GNSS_InitMessages();
 
-	// Initialize GNSS task
+	// Clear initialization flag
+	gnss_is_initializing = false;
+
+	// Initialize GNSS tasks
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, UTIL_SEQ_RFU, FS_GNSS_Update);
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_LOG_ERROR_ID, UTIL_SEQ_RFU, FS_GNSS_LogError);
 
 	// Initialize GNSS update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_GNSS_Timer);
