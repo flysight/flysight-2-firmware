@@ -75,7 +75,6 @@ void FS_ActiveMode_Init(void)
 		enable_flags = FS_LOG_ENABLE_EVENT;
 		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_GNSS;
 		if (FS_Config_Get()->enable_baro) enable_flags |= FS_LOG_ENABLE_SENSOR;
-		if (FS_Config_Get()->enable_gnss) enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_hum)  enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_imu)  enable_flags |= FS_LOG_ENABLE_SENSOR;
 		if (FS_Config_Get()->enable_mag)  enable_flags |= FS_LOG_ENABLE_SENSOR;
@@ -135,7 +134,11 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_imu)
 	{
 		/* Start IMU */
-		FS_IMU_Start();
+		if (FS_IMU_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("IMU start failed");
+		}
 	}
 
 	/* Enable USART */
@@ -253,7 +256,6 @@ void FS_ActiveMode_DeInit(void)
 		// Disable ADC
 		if (HAL_ADC_DeInit(&hadc1) != HAL_OK)
 		{
-			isSystemHealthy = false;
 			FS_Log_WriteEvent("ADC de-initialization failed");
 		}
 	}

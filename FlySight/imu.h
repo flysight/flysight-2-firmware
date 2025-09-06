@@ -40,7 +40,7 @@ void FS_IMU_TransferComplete(void);
 void FS_IMU_TransferError(void);
 
 void FS_IMU_Init(void);
-void FS_IMU_Start(void);
+HAL_StatusTypeDef FS_IMU_Start(void);
 void FS_IMU_Stop(void);
 void FS_IMU_Read(void);
 const FS_IMU_Data_t *FS_IMU_GetData(void);

@@ -27,9 +27,11 @@
 #include "app_common.h"
 #include "config.h"
 #include "imu.h"
+#include "log.h"
 #include "stm32_seq.h"
 
-#define TIMEOUT 100
+#define IMU_OP_TIMEOUT   100
+#define IMU_INIT_TIMEOUT 1000
 
 #define CS_HIGH()	{ HAL_GPIO_WritePin(IMU_NCS_GPIO_Port, IMU_NCS_Pin, GPIO_PIN_SET); }
 #define CS_LOW()	{ HAL_GPIO_WritePin(IMU_NCS_GPIO_Port, IMU_NCS_Pin, GPIO_PIN_RESET); }
@@ -97,6 +99,16 @@ static FS_IMU_Data_t imuData;
 static volatile bool handleRead  = false;
 static volatile bool dataWaiting = false;
 static volatile bool busy = false;
+static volatile uint32_t overrun_count;
+
+typedef enum {
+    IMU_STATE_UNINITIALIZED = 0,
+    IMU_STATE_INIT_FAILED,
+    IMU_STATE_READY,
+    IMU_STATE_ACTIVE
+} FS_IMU_State_t;
+
+static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
 
 extern SPI_HandleTypeDef hspi1;
 
@@ -116,116 +128,148 @@ void FS_IMU_TransferError(void)
 static HAL_StatusTypeDef FS_IMU_ReadRegister(uint8_t addr, uint8_t *data, uint16_t size)
 {
 	HAL_StatusTypeDef result;
-	uint32_t ms;
 
 	/* Set read flag */
 	addr |= 0x80;
 
-	ms = HAL_GetTick();
-	do
+	CS_LOW();
+	result = HAL_SPI_Transmit(&hspi1, &addr, 1, IMU_OP_TIMEOUT);
+	if (result == HAL_OK)
 	{
-		if (HAL_GetTick() - ms > TIMEOUT)
-		{
-			Error_Handler();
-		}
-
-		CS_LOW();
-		result = HAL_SPI_Transmit(&hspi1, &addr, 1, TIMEOUT);
-		if (result == HAL_OK)
-		{
-			result = HAL_SPI_Receive(&hspi1, data, size, TIMEOUT);
-		}
-		CS_HIGH();
+		result = HAL_SPI_Receive(&hspi1, data, size, IMU_OP_TIMEOUT);
 	}
-	while (result != HAL_OK);
+	CS_HIGH();
 
-    return HAL_OK;
+    return result;
 }
 
 static HAL_StatusTypeDef FS_IMU_WriteRegister(uint8_t addr, uint8_t *data, uint16_t size)
 {
 	HAL_StatusTypeDef result;
-	uint32_t ms;
 
-	ms = HAL_GetTick();
-	do
+	CS_LOW();
+	result = HAL_SPI_Transmit(&hspi1, &addr, 1, IMU_OP_TIMEOUT);
+	if (result == HAL_OK)
 	{
-		if (HAL_GetTick() - ms > TIMEOUT)
-		{
-			Error_Handler();
-		}
-
-		CS_LOW();
-		result = HAL_SPI_Transmit(&hspi1, &addr, 1, TIMEOUT);
-		if (result == HAL_OK)
-		{
-			result = HAL_SPI_Transmit(&hspi1, data, size, TIMEOUT);
-		}
-		CS_HIGH();
+		result = HAL_SPI_Transmit(&hspi1, data, size, IMU_OP_TIMEOUT);
 	}
-	while (result != HAL_OK);
+	CS_HIGH();
 
-	return HAL_OK;
+	return result;
 }
 
 void FS_IMU_Init(void)
 {
 	uint8_t buf[1];
 	HAL_StatusTypeDef result;
+	uint32_t timeout;
 
 	// Software reset
+	timeout = HAL_GetTick() + IMU_INIT_TIMEOUT;
 	do
 	{
 		buf[0] = 0x01;
 		result = FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			imuState = IMU_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while (result != HAL_OK);
 
 	// Wait for reset
+	timeout = HAL_GetTick() + IMU_INIT_TIMEOUT;
 	do
 	{
 		result = FS_IMU_ReadRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			imuState = IMU_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while ((result != HAL_OK) || (buf[0] & 0x01));
 
 	// Check WHO_AM_I register value
+	timeout = HAL_GetTick() + IMU_INIT_TIMEOUT;
 	do
 	{
 		result = FS_IMU_ReadRegister(LSM6DSO_REG_WHO_AM_I, buf, 1);
+		if (HAL_GetTick() > timeout)
+		{
+			imuState = IMU_STATE_INIT_FAILED;
+			return;
+		}
 	}
 	while (result != HAL_OK);
 	if (buf[0] != 0x6c)
-		Error_Handler();
+	{
+		imuState = IMU_STATE_INIT_FAILED;
+		return;
+	}
+
+	imuState = IMU_STATE_READY;
 }
 
-void FS_IMU_Start(void)
+HAL_StatusTypeDef FS_IMU_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 	uint32_t primask_bit;
+
+	if (imuState != IMU_STATE_READY)
+	{
+		return HAL_ERROR;
+	}
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_9);
 
 	// Accelerometer Data Ready interrupt on INT1
 	buf[0] = 0x01;
-	FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, buf, 1);
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, buf, 1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start IMU");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+		return HAL_ERROR;
+	}
 
 	// Set accelerometer ODR and FS
 	buf[0] = (config->accel_odr << 4) | (config->accel_fs << 2);
-	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL1_XL, buf, 1);
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL1_XL, buf, 1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start IMU");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+		return HAL_ERROR;
+	}
 
 	// Set gyro ODR and FS
 	buf[0] = (config->gyro_odr << 4) | (config->gyro_fs << 2);
-	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL2_G, buf, 1);
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL2_G, buf, 1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start IMU");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+		return HAL_ERROR;
+	}
 
 	// Set BDU and push-pull on INT1
 	buf[0] = 0x44;
-	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start IMU");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+		return HAL_ERROR;
+	}
 
 	// Disable I2C
 	buf[0] = 0x04;
-	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL4_C, buf, 1);
+	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL4_C, buf, 1) != HAL_OK)
+	{
+		FS_Log_WriteEvent("Couldn't start IMU");
+		LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+		return HAL_ERROR;
+	}
 
 	switch (config->accel_fs)
 	{
@@ -243,7 +287,10 @@ void FS_IMU_Start(void)
 	case GYRO_FS_2000: gyroFactor = 2000 * 1000; break;
 	}
 
-	// Enable asyncrhonous reads
+	overrun_count = 0;
+	imuState = IMU_STATE_ACTIVE;
+
+	// Enable asynchronous reads
 	primask_bit = __get_PRIMASK();
 	__disable_irq();
 
@@ -256,6 +303,8 @@ void FS_IMU_Start(void)
 	{
 		FS_IMU_BeginRead();
 	}
+
+	return HAL_OK;
 }
 
 void FS_IMU_Stop(void)
@@ -276,12 +325,23 @@ void FS_IMU_Stop(void)
 
 	// Software reset
 	buf[0] = 0x01;
-	if (FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1) != HAL_OK)
-		Error_Handler();
+	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+
+	if (overrun_count > 0)
+	{
+		FS_Log_WriteEvent("IMU data overruns: %lu", overrun_count);
+	}
+
+	imuState = IMU_STATE_READY;
 }
 
 void FS_IMU_Read(void)
 {
+	if (imuState != IMU_STATE_ACTIVE)
+	{
+		return;
+	}
+
 	imuData.time = HAL_GetTick();
 
 	if (handleRead)
@@ -302,7 +362,11 @@ static void FS_IMU_BeginRead(void)
 	dataBuf[0] = LSM6DSO_OUT_TEMP_L_REG | 0x80;
 
 	if (busy)
-		Error_Handler();
+	{
+		/* Handle data overrun */
+		++overrun_count;
+		return;
+	}
 
 	busy = true;
 
