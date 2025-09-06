@@ -28,7 +28,7 @@
 
 #define AUDIO_LIST_LEN 10
 
-void FS_Audio_Init(void);
+HAL_StatusTypeDef FS_Audio_Init(void);
 void FS_Audio_DeInit(void);
 
 void FS_Audio_Beep(uint32_t startFrequency, uint32_t endFrequency, uint32_t duration, uint8_t volume);

@@ -100,7 +100,11 @@ void FS_ActiveMode_Init(void)
 	if (FS_Config_Get()->enable_audio)
 	{
 		/* Initialize audio */
-		FS_Audio_Init();
+		if (FS_Audio_Init() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("Audio init failed");
+		}
 
 		// Enable audio control
 		FS_AudioControl_Init();
