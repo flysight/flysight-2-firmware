@@ -83,7 +83,12 @@ void FS_ActiveMode_Init(void)
 		if (FS_Config_Get()->enable_raw)  enable_flags |= FS_LOG_ENABLE_RAW;
 
 		// Enable logging
-		FS_Log_Init(FS_State_Get()->temp_folder, enable_flags);
+		if (FS_Log_Init(FS_State_Get()->temp_folder, enable_flags) != HAL_OK)
+		{
+			isSystemHealthy = false;
+			// We cannot log this failure, as logging init itself has failed.
+			// The red LED will be the indicator.
+		}
 
 		// Log timer usage adjusted for:
 		//   - FS_ActiveControl_Init (1)
