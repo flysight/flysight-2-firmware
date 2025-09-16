@@ -1137,11 +1137,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
     FS_VBAT_ConversionComplete();
 }
 
-void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
-{
-  Error_Handler();
-}
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   switch (GPIO_Pin)

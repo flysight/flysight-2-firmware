@@ -23,6 +23,8 @@
 
 #include "main.h"
 #include "app_common.h"
+#include "log.h"
+#include "stm32_seq.h"
 #include "vbat.h"
 
 #define VBAT_TIMER_MSEC     1000
@@ -59,6 +61,31 @@ extern ADC_HandleTypeDef hadc1;
 
 static FS_VBAT_Data_t vbatData;
 
+// Error logging
+static volatile uint32_t vbat_error_code;
+
+void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
+{
+	vbat_error_code = hadc->ErrorCode;
+
+	// Check for a recoverable overrun error.
+	if (vbat_error_code & HAL_ADC_ERROR_OVR)
+	{
+		// This is non-fatal. We will log it and the timer will attempt another conversion.
+		UTIL_SEQ_SetTask(1 << CFG_TASK_FS_VBAT_LOG_ERROR_ID, CFG_SCH_PRIO_1);
+	}
+	else
+	{
+		// Any other error (especially DMA or Internal) is critical and unrecoverable.
+		Error_Handler();
+	}
+}
+
+static void FS_VBAT_LogError(void)
+{
+	FS_Log_WriteEvent("ADC fatal error: 0x%lX", vbat_error_code);
+}
+
 static void FS_VBAT_Timer(void)
 {
 	// Enable battery measurement
@@ -70,6 +97,9 @@ static void FS_VBAT_Timer(void)
 
 void FS_VBAT_Init(void)
 {
+	// Initialize ADC error logging task
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_VBAT_LOG_ERROR_ID, UTIL_SEQ_RFU, FS_VBAT_LogError);
+
 	// Initialize measurement timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &vbat_timer_id, hw_ts_Repeated, FS_VBAT_Timer);
 	HW_TS_Start(vbat_timer_id, VBAT_TIMER_TICKS);
@@ -80,6 +110,7 @@ void FS_VBAT_DeInit(void)
 	// Delete timer
 	HW_TS_Delete(vbat_timer_id);
 }
+
 
 void FS_VBAT_ConversionComplete(void)
 {

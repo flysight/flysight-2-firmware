@@ -99,7 +99,6 @@ static FS_IMU_Data_t imuData;
 static volatile bool handleRead  = false;
 static volatile bool dataWaiting = false;
 static volatile bool busy = false;
-static volatile uint32_t overrun_count;
 
 typedef enum {
     IMU_STATE_UNINITIALIZED = 0,
@@ -109,6 +108,8 @@ typedef enum {
 } FS_IMU_State_t;
 
 static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
+
+static volatile uint32_t overrun_count;
 
 extern SPI_HandleTypeDef hspi1;
 
