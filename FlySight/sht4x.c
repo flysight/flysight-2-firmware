@@ -29,6 +29,9 @@
 #include "sensor.h"
 #include "sht4x.h"
 
+#define READ_TIMER_MSEC    10
+#define READ_TIMER_TICKS   (READ_TIMER_MSEC*1000/CFG_TS_TICK_VAL)
+
 #define CRC_POLYNOMIAL 0x31
 
 #define SHT4X_ADDR                   0x88
@@ -48,12 +51,20 @@ static uint8_t buf[6];
 
 static FS_Hum_Data_t *humData;
 
-static uint8_t timer_id;
+static uint8_t measure_timer_id;
+static uint8_t read_timer_id;
 
-static volatile uint8_t measure_ready;
-static volatile uint8_t measure_busy;
+typedef enum {
+    SHT4X_STATE_IDLE,
+    SHT4X_STATE_WAITING_FOR_MEASUREMENT
+} FS_SHT4X_State_t;
 
+static volatile FS_SHT4X_State_t sht4x_state = SHT4X_STATE_IDLE;
+
+static void FS_SHT4X_Measure(void);
+static void FS_SHT4X_Measure_Callback(HAL_StatusTypeDef result);
 static void FS_SHT4X_Read(void);
+static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result);
 
 static uint8_t CRC8(const uint8_t *data, int length)
 {
@@ -118,12 +129,12 @@ HAL_StatusTypeDef FS_SHT4X_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 
-	// Reset measurement flags
-	measure_ready = 0;
-	measure_busy = 0;
+	// Reset measurement state
+	sht4x_state = SHT4X_STATE_IDLE;
 
-	// Create measurement timer
-	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_SHT4X_Read);
+	// Create measurement timers
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &measure_timer_id, hw_ts_Repeated, FS_SHT4X_Measure);
+	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &read_timer_id, hw_ts_SingleShot, FS_SHT4X_Read);
 
 	// Start measurement timer
 	switch(config->hum_odr)
@@ -131,13 +142,13 @@ HAL_StatusTypeDef FS_SHT4X_Start(void)
 	case 0: // HTS221_ODR_OS
 		break;
 	case 1: // HTS221_ODR_1
-		HW_TS_Start(timer_id, 1000000UL / CFG_TS_TICK_VAL);
+		HW_TS_Start(measure_timer_id, 1000000UL / CFG_TS_TICK_VAL);
 		break;
 	case 2: // HTS221_ODR_7
-		HW_TS_Start(timer_id, 142857UL / CFG_TS_TICK_VAL);
+		HW_TS_Start(measure_timer_id, 142857UL / CFG_TS_TICK_VAL);
 		break;
 	case 3: // HTS221_ODR_12_5
-		HW_TS_Start(timer_id, 80000UL / CFG_TS_TICK_VAL);
+		HW_TS_Start(measure_timer_id, 80000UL / CFG_TS_TICK_VAL);
 		break;
 	default:
 		Error_Handler(); // Should never be called
@@ -148,55 +159,74 @@ HAL_StatusTypeDef FS_SHT4X_Start(void)
 
 HAL_StatusTypeDef FS_SHT4X_Stop(void)
 {
-	// Delete measurement timer
-	HW_TS_Delete(timer_id);
+	// Delete measurement timers
+	HW_TS_Delete(measure_timer_id);
+	HW_TS_Delete(read_timer_id);
 
 	return HAL_OK;
+}
+
+static void FS_SHT4X_Measure(void)
+{
+	if (sht4x_state == SHT4X_STATE_IDLE)
+	{
+		sht4x_state = SHT4X_STATE_WAITING_FOR_MEASUREMENT;
+
+		humData->time = HAL_GetTick();
+		buf[0] = SHT4X_MEASURE_HIGH_PRECISION;
+		FS_Sensor_TransmitAsync(SHT4X_ADDR, buf, 1, FS_SHT4X_Measure_Callback);
+	}
+}
+
+static void FS_SHT4X_Measure_Callback(HAL_StatusTypeDef result)
+{
+	if (result == HAL_OK)
+	{
+		// The command was successfully sent. Start a one-shot timer to wait
+		// for the sensor's internal measurement to complete.
+		HW_TS_Start(read_timer_id, READ_TIMER_TICKS);
+	}
+	else
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEvent("Error starting humidity measurement");
+		sht4x_state = SHT4X_STATE_IDLE;
+	}
+}
+
+static void FS_SHT4X_Read(void)
+{
+	// This is called by the one-shot measurement timer.
+	// It is now safe to queue the I2C read command.
+	FS_Sensor_ReceiveAsync(SHT4X_ADDR, buf, 6, FS_SHT4X_Read_Callback);
 }
 
 static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 {
 	uint16_t val;
 
-	// Reset measurement flag
-	measure_busy = 0;
-
 	// Read raw measurements
-	if (measure_ready)
+	if (result == HAL_OK)
 	{
-		if (result == HAL_OK)
+		if ((CRC8(&buf[0], 2) == buf[2])
+				&& (CRC8(&buf[3], 2) == buf[5]))
 		{
-			if ((CRC8(&buf[0], 2) == buf[2])
-					&& (CRC8(&buf[3], 2) == buf[5]))
-			{
-				// Compute temperature
-				val = (int16_t) ((buf[0] << 8) | buf[1]);
-				humData->temperature = -450 + (int32_t) 1750 * val / 0xffff;
+			// Compute temperature
+			val = (int16_t) ((buf[0] << 8) | buf[1]);
+			humData->temperature = -450 + (int32_t) 1750 * val / 0xffff;
 
-				// Compute humidity
-				val = (int16_t) ((buf[3] << 8) | buf[4]);
-				humData->humidity = -60 + (int32_t) 1250 * val / 0xffff;
+			// Compute humidity
+			val = (int16_t) ((buf[3] << 8) | buf[4]);
+			humData->humidity = -60 + (int32_t) 1250 * val / 0xffff;
 
-				FS_Hum_DataReady_Callback();
-			}
-		}
-		else
-		{
-			FS_Log_WriteEvent("Error reading from humidity sensor");
+			FS_Hum_DataReady_Callback();
 		}
 	}
-
-	humData->time = HAL_GetTick();
-	buf[0] = SHT4X_MEASURE_HIGH_PRECISION;
-	FS_Sensor_TransmitAsync(SHT4X_ADDR, buf, 1, 0);
-	measure_ready = 1;
-}
-
-static void FS_SHT4X_Read(void)
-{
-	if (!measure_busy)
+	else
 	{
-		measure_busy = 1;
-		FS_Sensor_ReceiveAsync(SHT4X_ADDR, buf, 6, FS_SHT4X_Read_Callback);
+		FS_Log_WriteEvent("Error reading from humidity sensor");
 	}
+
+	// This measurement cycle is now complete, reset the state.
+	sht4x_state = SHT4X_STATE_IDLE;
 }
