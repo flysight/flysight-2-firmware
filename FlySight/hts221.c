@@ -241,7 +241,7 @@ static void FS_HTS221_Read_Callback(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from humidity sensor");
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
 	}
 }
 

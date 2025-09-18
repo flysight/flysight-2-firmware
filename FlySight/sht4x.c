@@ -189,7 +189,7 @@ static void FS_SHT4X_Measure_Callback(HAL_StatusTypeDef result)
 	else
 	{
 		// Abort this measurement cycle and reset the state to allow the next one.
-		FS_Log_WriteEvent("Error starting humidity measurement");
+		FS_Log_WriteEventAsync("Error starting humidity measurement");
 		sht4x_state = SHT4X_STATE_IDLE;
 	}
 }
@@ -224,7 +224,7 @@ static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from humidity sensor");
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
 	}
 
 	// This measurement cycle is now complete, reset the state.

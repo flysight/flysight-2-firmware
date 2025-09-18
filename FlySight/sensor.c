@@ -62,8 +62,6 @@ static          Handler_t handlerBuf[HANDLER_COUNT];	// handler buffer
 static volatile uint32_t  handlerRdI = 0;				// read index
 static volatile uint32_t  handlerWrI = 0;				// write index
 
-static volatile uint32_t overrun_count;
-
 extern I2C_HandleTypeDef hi2c3;
 
 static void BeginRead(void);
@@ -81,7 +79,6 @@ void FS_Sensor_TransferError(void)
 
 void FS_Sensor_Start(void)
 {
-	overrun_count = 0;
 	mode = MODE_ACTIVE;
 
 	if (handlerRdI != handlerWrI)
@@ -92,11 +89,6 @@ void FS_Sensor_Start(void)
 
 void FS_Sensor_Stop(void)
 {
-	if (overrun_count > 0)
-	{
-		FS_Log_WriteEvent("Sensor data overruns: %lu", overrun_count);
-	}
-
 	mode = MODE_INACTIVE;
 	while (busy);
 }
@@ -168,7 +160,7 @@ void FS_Sensor_TransmitAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (
 	// Check if the handler queue is full
 	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
 	{
-		++overrun_count;
+		FS_Log_WriteEventAsync("Sensor data overrun");
 		return;
 	}
 
@@ -202,7 +194,7 @@ void FS_Sensor_ReceiveAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (*
 	// Check if the handler queue is full
 	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
 	{
-		++overrun_count;
+		FS_Log_WriteEventAsync("Sensor data overrun");
 		return;
 	}
 
@@ -236,7 +228,7 @@ void FS_Sensor_WriteAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t s
 	// Check if the handler queue is full
 	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
 	{
-		++overrun_count;
+		FS_Log_WriteEventAsync("Sensor data overrun");
 		return;
 	}
 
@@ -271,7 +263,7 @@ void FS_Sensor_ReadAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t si
 	// Check if the handler queue is full
 	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
 	{
-		++overrun_count;
+		FS_Log_WriteEventAsync("Sensor data overrun");
 		return;
 	}
 

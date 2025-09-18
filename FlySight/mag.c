@@ -189,7 +189,7 @@ static void FS_Mag_Read_Callback_1(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from magnetometer");
+		FS_Log_WriteEventAsync("Error reading from magnetometer");
 	}
 }
 
@@ -203,7 +203,7 @@ static void FS_Mag_Read_Callback_2(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from magnetometer");
+		FS_Log_WriteEventAsync("Error reading from magnetometer");
 	}
 }
 

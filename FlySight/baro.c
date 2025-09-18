@@ -198,7 +198,7 @@ static void FS_Baro_Read_Callback(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from barometer");
+		FS_Log_WriteEventAsync("Error reading from barometer");
 	}
 }
 
