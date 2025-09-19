@@ -58,6 +58,7 @@ typedef enum {
 } FS_Mag_State_t;
 
 static FS_Mag_State_t magState = MAG_STATE_UNINITIALIZED;
+static volatile bool sensor_is_busy;
 
 void FS_Mag_Init(void)
 {
@@ -136,6 +137,9 @@ HAL_StatusTypeDef FS_Mag_Start(void)
 		return HAL_ERROR;
 	}
 
+	// Reset busy flag
+	sensor_is_busy = false;
+
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_6);
 
@@ -205,6 +209,9 @@ static void FS_Mag_Read_Callback_2(HAL_StatusTypeDef result)
 	{
 		FS_Log_WriteEventAsync("Error reading from magnetometer");
 	}
+
+	// This measurement cycle is now complete, reset the busy flag.
+	sensor_is_busy = false;
 }
 
 void FS_Mag_Read(void)
@@ -214,6 +221,12 @@ void FS_Mag_Read(void)
 		return;
 	}
 
+	if (sensor_is_busy)
+	{
+		return;
+	}
+
+	sensor_is_busy = true;
 	magData.time = HAL_GetTick();
 	magDataGood = false;
 

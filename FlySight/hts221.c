@@ -65,6 +65,8 @@ static uint8_t dataBuf[4];
 
 static FS_Hum_Data_t *humData;
 
+static volatile bool sensor_is_busy;
+
 HAL_StatusTypeDef FS_HTS221_Init(FS_Hum_Data_t *data)
 {
 	uint8_t buf[4];
@@ -168,6 +170,9 @@ HAL_StatusTypeDef FS_HTS221_Start(void)
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
 
+	// Reset busy flag
+	sensor_is_busy = false;
+
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_4);
 
@@ -243,10 +248,19 @@ static void FS_HTS221_Read_Callback(HAL_StatusTypeDef result)
 	{
 		FS_Log_WriteEventAsync("Error reading from humidity sensor");
 	}
+
+	// This measurement cycle is now complete, reset the busy flag.
+	sensor_is_busy = false;
 }
 
 void FS_HTS221_Read(void)
 {
+	if (sensor_is_busy)
+	{
+		return;
+	}
+
+	sensor_is_busy = true;
 	humData->time = HAL_GetTick();
 	FS_Sensor_ReadAsync(HTS221_ADDR, HTS221_REG_HUMIDITY_OUT_L, dataBuf, 4, FS_HTS221_Read_Callback);
 }

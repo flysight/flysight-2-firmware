@@ -61,6 +61,7 @@ typedef enum {
 } FS_Baro_State_t;
 
 static FS_Baro_State_t baroState = BARO_STATE_UNINITIALIZED;
+static volatile bool sensor_is_busy;
 
 void FS_Baro_Init(void)
 {
@@ -139,6 +140,9 @@ HAL_StatusTypeDef FS_Baro_Start(void)
 		return HAL_ERROR;
 	}
 
+	// Reset busy flag
+	sensor_is_busy = false;
+
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_13);
 
@@ -200,6 +204,9 @@ static void FS_Baro_Read_Callback(HAL_StatusTypeDef result)
 	{
 		FS_Log_WriteEventAsync("Error reading from barometer");
 	}
+
+	// This measurement cycle is now complete, reset the busy flag.
+	sensor_is_busy = false;
 }
 
 void FS_Baro_Read(void)
@@ -209,6 +216,12 @@ void FS_Baro_Read(void)
 		return;
 	}
 
+	if (sensor_is_busy)
+	{
+		return;
+	}
+
+	sensor_is_busy = true;
 	baroData.time = HAL_GetTick();
 	FS_Sensor_ReadAsync(BARO_ADDR, BARO_REG_PRESS_OUT_XL, dataBuf, 5, FS_Baro_Read_Callback);
 }
