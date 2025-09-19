@@ -857,6 +857,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		FS_Log_WriteEvent("%lu/%lu slots used in $RAW message buffer",  rawUsed, RAW_COUNT);
 		FS_Log_WriteEvent("%lu/%lu slots used in $IMU message buffer",  imuUsed, IMU_COUNT);
 		FS_Log_WriteEvent("%lu/%lu slots used in $VBAT message buffer", vbatUsed, VBAT_COUNT);
+		FS_Log_WriteEvent("%lu/%lu slots used in $EVNT message buffer", eventUsed, EVENT_COUNT);
 
 		// Add event log entries for timing info
 		FS_Log_WriteEvent("----------");
