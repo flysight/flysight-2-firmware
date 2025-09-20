@@ -54,12 +54,7 @@ static FS_Hum_Data_t *humData;
 static uint8_t measure_timer_id;
 static uint8_t read_timer_id;
 
-typedef enum {
-    SHT4X_STATE_IDLE,
-    SHT4X_STATE_WAITING_FOR_MEASUREMENT
-} FS_SHT4X_State_t;
-
-static volatile FS_SHT4X_State_t sht4x_state = SHT4X_STATE_IDLE;
+static volatile bool sensor_is_busy;
 
 static void FS_SHT4X_Measure(void);
 static void FS_SHT4X_Measure_Callback(HAL_StatusTypeDef result);
@@ -129,8 +124,8 @@ HAL_StatusTypeDef FS_SHT4X_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 
-	// Reset measurement state
-	sht4x_state = SHT4X_STATE_IDLE;
+	// Reset busy flag
+	sensor_is_busy = false;
 
 	// Create measurement timers
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &measure_timer_id, hw_ts_Repeated, FS_SHT4X_Measure);
@@ -168,13 +163,19 @@ HAL_StatusTypeDef FS_SHT4X_Stop(void)
 
 static void FS_SHT4X_Measure(void)
 {
-	if (sht4x_state == SHT4X_STATE_IDLE)
+	if (sensor_is_busy)
 	{
-		sht4x_state = SHT4X_STATE_WAITING_FOR_MEASUREMENT;
+		return;
+	}
 
-		humData->time = HAL_GetTick();
-		buf[0] = SHT4X_MEASURE_HIGH_PRECISION;
-		FS_Sensor_TransmitAsync(SHT4X_ADDR, buf, 1, FS_SHT4X_Measure_Callback);
+	sensor_is_busy = true;
+	humData->time = HAL_GetTick();
+	buf[0] = SHT4X_MEASURE_HIGH_PRECISION;
+	if (FS_Sensor_TransmitAsync(SHT4X_ADDR, buf, 1, FS_SHT4X_Measure_Callback) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error starting humidity measurement");
+		sensor_is_busy = false;
 	}
 }
 
@@ -189,8 +190,8 @@ static void FS_SHT4X_Measure_Callback(HAL_StatusTypeDef result)
 	else
 	{
 		// Abort this measurement cycle and reset the state to allow the next one.
-		FS_Log_WriteEvent("Error starting humidity measurement");
-		sht4x_state = SHT4X_STATE_IDLE;
+		FS_Log_WriteEventAsync("Error starting humidity measurement");
+		sensor_is_busy = false;
 	}
 }
 
@@ -198,7 +199,12 @@ static void FS_SHT4X_Read(void)
 {
 	// This is called by the one-shot measurement timer.
 	// It is now safe to queue the I2C read command.
-	FS_Sensor_ReceiveAsync(SHT4X_ADDR, buf, 6, FS_SHT4X_Read_Callback);
+	if (FS_Sensor_ReceiveAsync(SHT4X_ADDR, buf, 6, FS_SHT4X_Read_Callback) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
+		sensor_is_busy = false;
+	}
 }
 
 static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
@@ -224,9 +230,9 @@ static void FS_SHT4X_Read_Callback(HAL_StatusTypeDef result)
 	}
 	else
 	{
-		FS_Log_WriteEvent("Error reading from humidity sensor");
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
 	}
 
-	// This measurement cycle is now complete, reset the state.
-	sht4x_state = SHT4X_STATE_IDLE;
+	// This measurement cycle is now complete, reset the busy flag.
+	sensor_is_busy = false;
 }

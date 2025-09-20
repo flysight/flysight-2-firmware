@@ -49,6 +49,15 @@
 #define IMU_COUNT   667
 #define VBAT_COUNT  2
 
+#define EVENT_MESSAGE_MAX_LEN 80
+#define EVENT_COUNT 2
+
+typedef struct
+{
+	uint32_t time;
+	char     message[EVENT_MESSAGE_MAX_LEN];
+} FS_Log_Event_t;
+
 static          FS_Baro_Data_t baroBuf[BARO_COUNT]; // data buffer
 static          uint32_t       baroRdI;             // read index
 static volatile uint32_t       baroWrI;             // write index
@@ -88,6 +97,11 @@ static          FS_VBAT_Data_t vbatBuf[VBAT_COUNT]; // data buffer
 static          uint32_t       vbatRdI;             // read index
 static volatile uint32_t       vbatWrI;             // write index
 static          uint32_t       vbatUsed;            // buffer used
+
+static          FS_Log_Event_t eventBuf[EVENT_COUNT]; // data buffer
+static          uint32_t       eventRdI;              // read index
+static volatile uint32_t       eventWrI;              // write index
+static          uint32_t       eventUsed;             // buffer used
 
 static FIL gnssFile;
 static FIL sensorFile;
@@ -474,9 +488,32 @@ void FS_Log_UpdateVBAT(void)
 	++vbatRdI;
 }
 
+void FS_Log_WriteEventEntry(const FS_Log_Event_t *entry)
+{
+	char row[100];
+	char *ptr;
+	UINT bw;
+
+	// Write to disk
+	ptr = row + sizeof(row);
+	ptr = writeInt32ToBuf(ptr, entry->time, 3, 1, ',');
+	*(--ptr) = ',';
+	*(--ptr) = 'T';
+	*(--ptr) = 'N';
+	*(--ptr) = 'V';
+	*(--ptr) = 'E';
+	*(--ptr) = '$';
+
+	f_write(&eventFile, ptr, row + sizeof(row) - ptr, &bw);
+	f_puts("\"", &eventFile);
+	f_puts(entry->message, &eventFile);
+	f_puts("\"\n", &eventFile);
+}
+
 static void FS_Log_Update(void)
 {
 	uint32_t msStart, msEnd;
+	const uint32_t eventIndex = eventWrI;
 	const uint32_t gnssIndex = gnssWrI;
 	const uint32_t rawIndex = rawWrI;
 	FS_Log_SensorType_t next;
@@ -488,6 +525,14 @@ static void FS_Log_Update(void)
 		updateMaxInterval = MAX(updateMaxInterval, msStart - updateLastCall);
 	}
 	updateLastCall = msStart;
+
+	// Write event log entries
+	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
+			(eventRdI != eventIndex))
+	{
+		FS_Log_WriteEventEntry(&eventBuf[eventRdI % EVENT_COUNT]);
+		eventRdI++;
+	}
 
 	// Write raw GNSS output
 	while ((HAL_GetTick() < msStart + LOG_TIMEOUT) &&
@@ -534,7 +579,7 @@ static void FS_Log_Update(void)
 
 	++updateCount;
 
-	if (updateCount % 6 == 0)
+	if (updateCount % 5 == 0)
 	{
 		// Call sync task
 		UTIL_SEQ_SetTask(1<<CFG_TASK_FS_LOG_SYNC_ID, CFG_SCH_PRIO_1);
@@ -557,7 +602,7 @@ static void FS_Log_Sync(void)
 	}
 	syncLastCall = msStart;
 
-	switch (syncCount % 3)
+	switch (syncCount % 4)
 	{
 	case 0:
 		if (enable_flags & FS_LOG_ENABLE_GNSS)
@@ -575,6 +620,12 @@ static void FS_Log_Sync(void)
 		if (enable_flags & FS_LOG_ENABLE_SENSOR)
 		{
 			f_sync(&sensorFile);
+		}
+		break;
+	case 3:
+		if (enable_flags & FS_LOG_ENABLE_EVENT)
+		{
+			f_sync(&eventFile);
 		}
 		break;
 	}
@@ -847,6 +898,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 		FS_Log_WriteEvent("%lu/%lu slots used in $RAW message buffer",  rawUsed, RAW_COUNT);
 		FS_Log_WriteEvent("%lu/%lu slots used in $IMU message buffer",  imuUsed, IMU_COUNT);
 		FS_Log_WriteEvent("%lu/%lu slots used in $VBAT message buffer", vbatUsed, VBAT_COUNT);
+		FS_Log_WriteEvent("%lu/%lu slots used in $EVNT message buffer", eventUsed, EVENT_COUNT);
 
 		// Add event log entries for timing info
 		FS_Log_WriteEvent("----------");
@@ -1129,36 +1181,50 @@ void FS_Log_WriteVBATData(const FS_VBAT_Data_t *current)
 
 void FS_Log_WriteEvent(const char *format, ...)
 {
-	const uint32_t time = HAL_GetTick();
-	char row[100];
-	char *ptr;
-	UINT bw;
-
+	FS_Log_Event_t entry;
 	va_list args;
 
 	if (logState != LOG_STATE_ACTIVE) return;
 	if (!(enable_flags & FS_LOG_ENABLE_EVENT)) return;
 
-	// Write to disk
-	ptr = row + sizeof(row);
-	ptr = writeInt32ToBuf(ptr, time, 3, 1, ',');
-	*(--ptr) = ',';
-	*(--ptr) = 'T';
-	*(--ptr) = 'N';
-	*(--ptr) = 'V';
-	*(--ptr) = 'E';
-	*(--ptr) = '$';
-
-	f_write(&eventFile, ptr, row + sizeof(row) - ptr, &bw);
-
-	f_puts("\"", &eventFile);
+	entry.time = HAL_GetTick();
 
 	va_start(args, format);
-	vsprintf(row, format, args);
-	f_puts(row, &eventFile);
+	vsnprintf(entry.message, EVENT_MESSAGE_MAX_LEN, format, args);
+	entry.message[EVENT_MESSAGE_MAX_LEN - 1] = '\0';
 	va_end(args);
 
-	f_puts("\"\n", &eventFile);
+	FS_Log_WriteEventEntry(&entry);
+}
 
-	f_sync(&eventFile);
+void FS_Log_WriteEventAsync(const char *format, ...)
+{
+	va_list args;
+
+	if (logState != LOG_STATE_ACTIVE) return;
+	if (!(enable_flags & FS_LOG_ENABLE_EVENT)) return;
+
+	if (eventWrI < eventRdI + EVENT_COUNT)
+	{
+		// Copy to circular buffer
+		FS_Log_Event_t *entry = &eventBuf[eventWrI % EVENT_COUNT];
+
+		entry->time = HAL_GetTick();
+
+		va_start(args, format);
+		vsnprintf(entry->message, EVENT_MESSAGE_MAX_LEN, format, args);
+		entry->message[EVENT_MESSAGE_MAX_LEN - 1] = '\0';
+		va_end(args);
+
+		// Increment write index
+		++eventWrI;
+
+		// Update buffer statistics
+		eventUsed = MAX(eventUsed, eventWrI - eventRdI);
+	}
+	else
+	{
+		// Update buffer statistics
+		eventUsed = EVENT_COUNT;
+	}
 }

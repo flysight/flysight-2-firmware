@@ -109,8 +109,6 @@ typedef enum {
 
 static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
 
-static volatile uint32_t overrun_count;
-
 extern SPI_HandleTypeDef hspi1;
 
 static void FS_IMU_BeginRead(void);
@@ -288,7 +286,6 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 	case GYRO_FS_2000: gyroFactor = 2000 * 1000; break;
 	}
 
-	overrun_count = 0;
 	imuState = IMU_STATE_ACTIVE;
 
 	// Enable asynchronous reads
@@ -328,11 +325,6 @@ void FS_IMU_Stop(void)
 	buf[0] = 0x01;
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
 
-	if (overrun_count > 0)
-	{
-		FS_Log_WriteEvent("IMU data overruns: %lu", overrun_count);
-	}
-
 	imuState = IMU_STATE_READY;
 }
 
@@ -365,7 +357,7 @@ static void FS_IMU_BeginRead(void)
 	if (busy)
 	{
 		/* Handle data overrun */
-		++overrun_count;
+		FS_Log_WriteEventAsync("IMU data overrun");
 		return;
 	}
 

@@ -450,8 +450,8 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		// Immediately restart the DMA transfer to continue receiving data.
 		if (HAL_UART_Receive_DMA(&huart1, gnssRxData.whole, GNSS_RX_BUF_LEN) == HAL_OK)
 		{
-			// If restart was successful, schedule a task to log the error message later.
-			UTIL_SEQ_SetTask(1 << CFG_TASK_FS_GNSS_LOG_ERROR_ID, CFG_SCH_PRIO_1);
+			// If restart was successful, log the error message.
+			FS_Log_WriteEventAsync("GNSS UART non-fatal error: 0x%lX", uart_error_code);
 		}
 		else
 		{
@@ -466,11 +466,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		// Halt the system. The error code can be inspected in a debug session.
 		Error_Handler();
 	}
-}
-
-static void FS_GNSS_LogError(void)
-{
-	FS_Log_WriteEvent("GNSS UART fatal error: 0x%lX", uart_error_code);
 }
 
 static uint8_t FS_GNSS_GetChar(void)
@@ -931,7 +926,6 @@ void FS_GNSS_Init(void)
 
 	// Initialize GNSS tasks
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_UPDATE_ID, UTIL_SEQ_RFU, FS_GNSS_Update);
-	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_GNSS_LOG_ERROR_ID, UTIL_SEQ_RFU, FS_GNSS_LogError);
 
 	// Initialize GNSS update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_GNSS_Timer);
