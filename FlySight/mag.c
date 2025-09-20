@@ -230,8 +230,19 @@ void FS_Mag_Read(void)
 	magData.time = HAL_GetTick();
 	magDataGood = false;
 
-	FS_Sensor_ReadAsync(MAG_ADDR, MAG_REG_OUTX_L_REG, dataBuf, 6, FS_Mag_Read_Callback_1);
-	FS_Sensor_ReadAsync(MAG_ADDR, MAG_TEMP_OUT_L_REG, dataBuf, 2, FS_Mag_Read_Callback_2);
+	if (FS_Sensor_ReadAsync(MAG_ADDR, MAG_REG_OUTX_L_REG, dataBuf, 6, FS_Mag_Read_Callback_1) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
+		sensor_is_busy = false;
+	}
+
+	if (FS_Sensor_ReadAsync(MAG_ADDR, MAG_TEMP_OUT_L_REG, dataBuf, 2, FS_Mag_Read_Callback_2) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
+		sensor_is_busy = false;
+	}
 }
 
 const FS_Mag_Data_t *FS_Mag_GetData(void)

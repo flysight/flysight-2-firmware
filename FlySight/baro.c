@@ -223,7 +223,12 @@ void FS_Baro_Read(void)
 
 	sensor_is_busy = true;
 	baroData.time = HAL_GetTick();
-	FS_Sensor_ReadAsync(BARO_ADDR, BARO_REG_PRESS_OUT_XL, dataBuf, 5, FS_Baro_Read_Callback);
+	if (FS_Sensor_ReadAsync(BARO_ADDR, BARO_REG_PRESS_OUT_XL, dataBuf, 5, FS_Baro_Read_Callback) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error reading from barometer");
+		sensor_is_busy = false;
+	}
 }
 
 const FS_Baro_Data_t *FS_Baro_GetData(void)

@@ -262,5 +262,10 @@ void FS_HTS221_Read(void)
 
 	sensor_is_busy = true;
 	humData->time = HAL_GetTick();
-	FS_Sensor_ReadAsync(HTS221_ADDR, HTS221_REG_HUMIDITY_OUT_L, dataBuf, 4, FS_HTS221_Read_Callback);
+	if (FS_Sensor_ReadAsync(HTS221_ADDR, HTS221_REG_HUMIDITY_OUT_L, dataBuf, 4, FS_HTS221_Read_Callback) != HAL_OK)
+	{
+		// Abort this measurement cycle and reset the state to allow the next one.
+		FS_Log_WriteEventAsync("Error reading from humidity sensor");
+		sensor_is_busy = false;
+	}
 }

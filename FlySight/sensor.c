@@ -151,142 +151,86 @@ static void NextHandler(HAL_StatusTypeDef result)
 	}
 }
 
-void FS_Sensor_TransmitAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+static HAL_StatusTypeDef FS_Sensor_Enqueue(
+		Operation_t op,
+		uint8_t addr,
+		uint16_t reg,
+		uint8_t *pData,
+		uint16_t size,
+		void (*Callback)(HAL_StatusTypeDef))
 {
-	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
-	uint32_t primask_bit;
-	bool begin;
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
 
-	// Check if the handler queue is full
-	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
-	{
-		FS_Log_WriteEventAsync("Sensor data overrun");
-		return;
-	}
+    // Check full *inside* the critical section
+    if ((handlerWrI - handlerRdI) >= HANDLER_COUNT) {
+        __set_PRIMASK(primask);
+        FS_Log_WriteEventAsync("Sensor data overrun");
+        return HAL_ERROR;
+    }
 
-	// Initialize handler
-	h->op = Operation_Transmit;
-	h->addr = addr;
-	h->pData = pData;
-	h->size = size;
-	h->Callback = Callback;
+    // Reserve slot and fill it atomically
+    uint32_t idx = handlerWrI % HANDLER_COUNT;
+    handlerBuf[idx].op       = op;
+    handlerBuf[idx].addr     = addr;
+    handlerBuf[idx].reg      = reg;
+    handlerBuf[idx].pData    = pData;
+    handlerBuf[idx].size     = size;
+    handlerBuf[idx].Callback = Callback;
 
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
+    handlerWrI++;
 
-	++handlerWrI;
-	begin = (mode == MODE_ACTIVE) && !busy;
+    // Decide whether to kick the engine now and reserve the bus
+    bool start_now = (mode == MODE_ACTIVE) && !busy;
+    if (start_now) {
+        busy = true;  // reserve bus so no second producer calls BeginRead()
+    }
 
-	__set_PRIMASK(primask_bit);
+    __set_PRIMASK(primask);
 
-	if (begin)
-	{
-		BeginRead();
-	}
+    if (start_now) {
+        BeginRead();  // OK if BeginRead() sets busy again; harmless
+    }
+
+    return HAL_OK;
 }
 
-void FS_Sensor_ReceiveAsync(uint8_t addr, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+HAL_StatusTypeDef FS_Sensor_TransmitAsync(
+		uint8_t addr,
+		uint8_t *pData,
+		uint16_t size,
+		void (*Callback)(HAL_StatusTypeDef))
 {
-	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
-	uint32_t primask_bit;
-	bool begin;
-
-	// Check if the handler queue is full
-	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
-	{
-		FS_Log_WriteEventAsync("Sensor data overrun");
-		return;
-	}
-
-	// Initialize handler
-	h->op = Operation_Recieve;
-	h->addr = addr;
-	h->pData = pData;
-	h->size = size;
-	h->Callback = Callback;
-
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
-	++handlerWrI;
-	begin = (mode == MODE_ACTIVE) && !busy;
-
-	__set_PRIMASK(primask_bit);
-
-	if (begin)
-	{
-		BeginRead();
-	}
+    return FS_Sensor_Enqueue(Operation_Transmit, addr, 0, pData, size, Callback);
 }
 
-void FS_Sensor_WriteAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+HAL_StatusTypeDef FS_Sensor_ReceiveAsync(
+		uint8_t addr,
+		uint8_t *pData,
+		uint16_t size,
+		void (*Callback)(HAL_StatusTypeDef))
 {
-	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
-	uint32_t primask_bit;
-	bool begin;
-
-	// Check if the handler queue is full
-	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
-	{
-		FS_Log_WriteEventAsync("Sensor data overrun");
-		return;
-	}
-
-	// Initialize handler
-	h->op = Operation_Write;
-	h->addr = addr;
-	h->reg = reg;
-	h->pData = pData;
-	h->size = size;
-	h->Callback = Callback;
-
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
-	++handlerWrI;
-	begin = (mode == MODE_ACTIVE) && !busy;
-
-	__set_PRIMASK(primask_bit);
-
-	if (begin)
-	{
-		BeginRead();
-	}
+    return FS_Sensor_Enqueue(Operation_Recieve, addr, 0, pData, size, Callback);
 }
 
-void FS_Sensor_ReadAsync(uint8_t addr, uint16_t reg, uint8_t *pData, uint16_t size, void (*Callback)(HAL_StatusTypeDef))
+HAL_StatusTypeDef FS_Sensor_WriteAsync(
+		uint8_t addr,
+		uint16_t reg,
+		uint8_t *pData,
+		uint16_t size,
+		void (*Callback)(HAL_StatusTypeDef))
 {
-	Handler_t *h = &handlerBuf[handlerWrI % HANDLER_COUNT];
-	uint32_t primask_bit;
-	bool begin;
+    return FS_Sensor_Enqueue(Operation_Write, addr, reg, pData, size, Callback);
+}
 
-	// Check if the handler queue is full
-	if (handlerWrI - handlerRdI >= HANDLER_COUNT)
-	{
-		FS_Log_WriteEventAsync("Sensor data overrun");
-		return;
-	}
-
-	// Initialize handler
-	h->op = Operation_Read;
-	h->addr = addr;
-	h->reg = reg;
-	h->pData = pData;
-	h->size = size;
-	h->Callback = Callback;
-
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
-	++handlerWrI;
-	begin = (mode == MODE_ACTIVE) && !busy;
-
-	__set_PRIMASK(primask_bit);
-
-	if (begin)
-	{
-		BeginRead();
-	}
+HAL_StatusTypeDef FS_Sensor_ReadAsync(
+		uint8_t addr,
+		uint16_t reg,
+		uint8_t *pData,
+		uint16_t size,
+		void (*Callback)(HAL_StatusTypeDef))
+{
+    return FS_Sensor_Enqueue(Operation_Read, addr, reg, pData, size, Callback);
 }
 
 HAL_StatusTypeDef FS_Sensor_Transmit(uint8_t addr, uint8_t *pData, uint16_t size)
