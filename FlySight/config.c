@@ -311,7 +311,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Mode",      config.mode,         val, (val >= 0 && val <= 7) || (val == 11));
 		HANDLE_VALUE("Min",       config.min,          val, TRUE);
 		HANDLE_VALUE("Max",       config.max,          val, TRUE);
-		HANDLE_VALUE("Limits",    config.limits,       val, val >= 0 && val <= 2);
+		HANDLE_VALUE("Limits",    config.limits,       val, val >= 0 && val <= 3);
 		HANDLE_VALUE("Volume",    config.volume,       8 - val, val >= 0 && val <= 8);
 		HANDLE_VALUE("Mode_2",    config.mode_2,       val, (val >= 0 && val <= 9) || (val == 11));
 		HANDLE_VALUE("Min_Val_2", config.min_2,        val, TRUE);
@@ -343,7 +343,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 		HANDLE_VALUE("Enable_Baro",    config.enable_baro,    val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Hum",     config.enable_hum,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Enable_Mag",     config.enable_mag,     val, val == 0 || val == 1);
-		HANDLE_VALUE("Ble_Tx_Power",   config.ble_tx_power,   val, val >= 0 || val <= 31);
+		HANDLE_VALUE("Ble_Tx_Power",   config.ble_tx_power,   val, val >= 0 && val <= 31);
 		HANDLE_VALUE("Enable_Raw",     config.enable_raw,     val, val == 0 || val == 1);
 		HANDLE_VALUE("Cold_Start",     config.cold_start,     val, val == 0 || val == 1);
 
