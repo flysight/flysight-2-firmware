@@ -29,6 +29,7 @@
 #include "app_common.h"
 #include "button.h"
 #include "config_mode.h"
+#include "log.h"
 #include "mode.h"
 #include "pairing_mode.h"
 #include "start_mode.h"
@@ -79,10 +80,25 @@ Button_State_t button_state;
 
 void FS_Mode_PushQueue(FS_Mode_Event_t event)
 {
-	// TODO: Log if this queue overflows
+	bool overflowed = false;
+	uint32_t primask_bit = __get_PRIMASK();
+	__disable_irq();
 
-	event_queue[queue_write] = event;
-	queue_write = (queue_write + 1) % QUEUE_LENGTH;
+	if ((uint8_t)(queue_write - queue_read) >= QUEUE_LENGTH)
+	{
+		queue_read++;
+		overflowed = true;
+	}
+
+	event_queue[queue_write % QUEUE_LENGTH] = event;
+	queue_write++;
+
+	__set_PRIMASK(primask_bit);
+
+	if (overflowed)
+	{
+		FS_Log_WriteEventAsync("Mode event queue overflow");
+	}
 
 	// Call update task
 	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_MODE_UPDATE_ID, CFG_SCH_PRIO_1);
@@ -90,16 +106,39 @@ void FS_Mode_PushQueue(FS_Mode_Event_t event)
 
 FS_Mode_Event_t FS_Mode_PopQueue(void)
 {
-	// TODO: Log if this queue underflows
+	FS_Mode_Event_t event = FS_MODE_EVENT_FORCE_UPDATE;
+	bool underflowed = false;
+	uint32_t primask_bit = __get_PRIMASK();
+	__disable_irq();
 
-	const FS_Mode_Event_t event = event_queue[queue_read];
-	queue_read = (queue_read + 1) % QUEUE_LENGTH;
+	if (queue_write == queue_read)
+	{
+		underflowed = true;
+	}
+	else
+	{
+		event = event_queue[queue_read % QUEUE_LENGTH];
+		queue_read++;
+	}
+
+	__set_PRIMASK(primask_bit);
+
+	if (underflowed)
+	{
+		FS_Log_WriteEventAsync("Mode event queue underflow");
+	}
+
 	return event;
 }
 
 bool FS_Mode_QueueEmpty(void)
 {
-	return queue_read == queue_write;
+	bool empty;
+	uint32_t primask_bit = __get_PRIMASK();
+	__disable_irq();
+	empty = (queue_write == queue_read);
+	__set_PRIMASK(primask_bit);
+	return empty;
 }
 
 static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
@@ -290,6 +329,12 @@ static void FS_Mode_Timer(void)
 
 void FS_Mode_Init(void)
 {
+	uint32_t primask_bit = __get_PRIMASK();
+	__disable_irq();
+	queue_read = 0;
+	queue_write = 0;
+	__set_PRIMASK(primask_bit);
+
 	if (HAL_GPIO_ReadPin(VBUS_DIV_GPIO_Port, VBUS_DIV_Pin))
 	{
 		// Update mode
