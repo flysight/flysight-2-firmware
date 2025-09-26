@@ -72,7 +72,7 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
 	if (vbat_error_code & HAL_ADC_ERROR_OVR)
 	{
 		// This is non-fatal. We will log it and the timer will attempt another conversion.
-		FS_Log_WriteEvent("ADC non-fatal error: 0x%lX", vbat_error_code);
+		FS_Log_WriteEventAsync("ADC non-fatal error: 0x%lX", vbat_error_code);
 	}
 	else
 	{
