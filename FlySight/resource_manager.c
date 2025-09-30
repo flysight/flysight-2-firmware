@@ -88,110 +88,115 @@ static void VCC_DeInit(void)
 
 static FS_ResourceManager_Result_t MicroSD_Init(void)
 {
-	FS_ResourceManager_Result_t ret = FS_RESOURCE_MANAGER_FAILURE;
-
 	if (resource_counts[FS_RESOURCE_MICROSD] == 0)
 	{
 		/* Initialize VCC */
 		if (FS_ResourceManager_RequestResource(FS_RESOURCE_VCC)
-				== FS_RESOURCE_MANAGER_SUCCESS)
+				!= FS_RESOURCE_MANAGER_SUCCESS)
 		{
-			GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-			/* Configure MMC_NCS pin */
-			HAL_GPIO_WritePin(MMC_NCS_GPIO_Port, MMC_NCS_Pin, GPIO_PIN_SET);
-
-			GPIO_InitStruct.Pin = MMC_NCS_Pin;
-			GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-			GPIO_InitStruct.Pull = GPIO_NOPULL;
-			GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-			HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
-
-			++resource_counts[FS_RESOURCE_MICROSD];
-
-			ret =  FS_RESOURCE_MANAGER_SUCCESS;
+			return FS_RESOURCE_MANAGER_FAILURE;
 		}
+
+		GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+		/* Configure MMC_NCS pin */
+		HAL_GPIO_WritePin(MMC_NCS_GPIO_Port, MMC_NCS_Pin, GPIO_PIN_SET);
+
+		GPIO_InitStruct.Pin = MMC_NCS_Pin;
+		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+		HAL_GPIO_Init(MMC_NCS_GPIO_Port, &GPIO_InitStruct);
 	}
 
-	return ret;
+	++resource_counts[FS_RESOURCE_MICROSD];
+
+	return FS_RESOURCE_MANAGER_SUCCESS;
 }
 
 static void MicroSD_DeInit(void)
 {
-	if (resource_counts[FS_RESOURCE_MICROSD] == 1)
+	if (resource_counts[FS_RESOURCE_MICROSD] == 0)
 	{
-		--resource_counts[FS_RESOURCE_MICROSD];
-
-		/* Disable SPI */
-		HAL_SPI_DeInit(&hspi2);
-
-		/* Disable MMC_NCS pin */
-		HAL_GPIO_DeInit(MMC_NCS_GPIO_Port, MMC_NCS_Pin);
-
-		/* De-initialize VCC */
-		FS_ResourceManager_ReleaseResource(FS_RESOURCE_VCC);
+		Error_Handler();
 	}
 	else
 	{
-		Error_Handler();
+		--resource_counts[FS_RESOURCE_MICROSD];
+
+		if (resource_counts[FS_RESOURCE_MICROSD] == 0)
+		{
+			/* Disable SPI */
+			HAL_SPI_DeInit(&hspi2);
+
+			/* Disable MMC_NCS pin */
+			HAL_GPIO_DeInit(MMC_NCS_GPIO_Port, MMC_NCS_Pin);
+
+			/* De-initialize VCC */
+			FS_ResourceManager_ReleaseResource(FS_RESOURCE_VCC);
+		}
 	}
 }
 
 static FS_ResourceManager_Result_t FatFS_Init(void)
 {
-	FS_ResourceManager_Result_t ret = FS_RESOURCE_MANAGER_FAILURE;
-
 	if (resource_counts[FS_RESOURCE_FATFS] == 0)
 	{
 		/* Initialize microSD */
 		if (FS_ResourceManager_RequestResource(FS_RESOURCE_MICROSD)
-				== FS_RESOURCE_MANAGER_SUCCESS)
+				!= FS_RESOURCE_MANAGER_SUCCESS)
 		{
-			/* Initialize FatFS */
-			if (MX_FATFS_Init() != APP_OK)
-			{
-				Error_Handler();
-			}
+			return FS_RESOURCE_MANAGER_FAILURE;
+		}
 
-			/* Enable microSD card */
-			if (f_mount(&fs, "0:/", 1) != FR_OK)
-			{
-				Error_Handler();
-			}
+		/* Initialize FatFS */
+		if (MX_FATFS_Init() != APP_OK)
+		{
+			FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+			return FS_RESOURCE_MANAGER_FAILURE;
+		}
 
-			++resource_counts[FS_RESOURCE_FATFS];
-
-			ret =  FS_RESOURCE_MANAGER_SUCCESS;
+		/* Enable microSD card */
+		if (f_mount(&fs, "0:/", 1) != FR_OK)
+		{
+			MX_FATFS_DeInit();
+			FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+			return FS_RESOURCE_MANAGER_FAILURE;
 		}
 	}
 
-	return ret;
+	++resource_counts[FS_RESOURCE_FATFS];
+
+	return FS_RESOURCE_MANAGER_SUCCESS;
 }
 
 static void FatFS_DeInit(void)
 {
-	if (resource_counts[FS_RESOURCE_FATFS] == 1)
+	if (resource_counts[FS_RESOURCE_FATFS] == 0)
 	{
-		--resource_counts[FS_RESOURCE_FATFS];
-
-		/* Disable microSD card */
-		if (f_mount(0, "0:/", 0) != FR_OK)
-		{
-			Error_Handler();
-		}
-
-		/* Disable FatFS */
-		if (MX_FATFS_DeInit() != APP_OK)
-		{
-			Error_Handler();
-		}
-
-		/* De-initialize microSD */
-		FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+		Error_Handler();
 	}
 	else
 	{
-		Error_Handler();
+		--resource_counts[FS_RESOURCE_FATFS];
+
+		if (resource_counts[FS_RESOURCE_FATFS] == 0)
+		{
+			/* Disable microSD card */
+			if (f_mount(0, "0:/", 0) != FR_OK)
+			{
+				Error_Handler();
+			}
+
+			/* Disable FatFS */
+			if (MX_FATFS_DeInit() != APP_OK)
+			{
+				Error_Handler();
+			}
+
+			/* De-initialize microSD */
+			FS_ResourceManager_ReleaseResource(FS_RESOURCE_MICROSD);
+		}
 	}
 }
 
