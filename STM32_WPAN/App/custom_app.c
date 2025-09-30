@@ -826,7 +826,7 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   if (Custom_App_Context.Sd_gnss_measurement_Notification_Status)
   {
     BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GNSS_MEASUREMENT,
-            gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
+        gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
   }
 }
 
@@ -845,7 +845,7 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
   if (Custom_App_Context.Sp_result_Indication_Status)
   {
     BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SP_RESULT,
-            start_result_packet, SizeSp_Result, 0, 0);
+        start_result_packet, SizeSp_Result, 0, 0);
   }
 }
 
@@ -857,43 +857,45 @@ static void Custom_App_Timeout(void)
 
 void Custom_Mode_Update(uint8_t newMode)
 {
-    /*
-     * Even if Mode_Notification_Status == 0 (notifications off),
-     * we still call Custom_STM_App_Update_Char so that the
-     * characteristic value is always up-to-date when read.
-     */
-    Custom_STM_App_Update_Char(CUSTOM_STM_DS_MODE, &newMode);
+  /*
+   * Even if Mode_Notification_Status == 0 (notifications off),
+   * we still call BLE_TX_Queue_SendTxPacket so that the
+   * characteristic value is always up-to-date when read.
+   */
+  BLE_TX_Queue_SendTxPacket(CUSTOM_STM_DS_MODE,
+      &newMode, sizeof(newMode), &SizeDs_Mode, 0);
 }
 
 static uint8_t calculate_battery_percentage(uint16_t voltage_mv) {
-    const uint16_t MIN_VOLTAGE_MV = 3300; // Example for LiPo empty
-    const uint16_t MAX_VOLTAGE_MV = 4200; // Example for LiPo full
-    int32_t percentage;
+  const uint16_t MIN_VOLTAGE_MV = 3300; // Example for LiPo empty
+  const uint16_t MAX_VOLTAGE_MV = 4200; // Example for LiPo full
+  int32_t percentage;
 
-    if (voltage_mv <= MIN_VOLTAGE_MV) {
-        percentage = 0;
-    } else if (voltage_mv >= MAX_VOLTAGE_MV) {
-        percentage = 100;
-    } else {
-        percentage = ((int32_t)voltage_mv - MIN_VOLTAGE_MV) * 100 / (MAX_VOLTAGE_MV - MIN_VOLTAGE_MV);
-    }
-    return (uint8_t)percentage;
+  if (voltage_mv <= MIN_VOLTAGE_MV) {
+    percentage = 0;
+  } else if (voltage_mv >= MAX_VOLTAGE_MV) {
+    percentage = 100;
+  } else {
+    percentage = ((int32_t)voltage_mv - MIN_VOLTAGE_MV) * 100 / (MAX_VOLTAGE_MV - MIN_VOLTAGE_MV);
+  }
+  return (uint8_t)percentage;
 }
 
 void Custom_VBAT_Update(const FS_VBAT_Data_t *current)
 {
-	uint8_t new_battery_level = calculate_battery_percentage(current->voltage);
+  uint8_t new_battery_level = calculate_battery_percentage(current->voltage);
 
-	// Update the global/context variable
-	// This ensures that read requests get the most recent value
-	current_battery_level_percent = new_battery_level;
+  // Update the global/context variable
+  // This ensures that read requests get the most recent value
+  current_battery_level_percent = new_battery_level;
 
-	// If notifications are enabled for the Battery Level characteristic, send an update
-	if (Custom_App_Context.Battery_level_Notification_Status == 1)
-	{
-		// APP_DBG_MSG("Sending battery level notification: %d%%\n", new_battery_level);
-		Custom_STM_App_Update_Char(CUSTOM_STM_BATTERY_LEVEL, &new_battery_level);
-	}
+  // If notifications are enabled for the Battery Level characteristic, send an update
+  if (Custom_App_Context.Battery_level_Notification_Status)
+  {
+    // APP_DBG_MSG("Sending battery level notification: %d%%\n", new_battery_level);
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_BATTERY_LEVEL,
+        &new_battery_level, sizeof(new_battery_level), &SizeBattery_Level, 0);
+  }
 }
 
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
