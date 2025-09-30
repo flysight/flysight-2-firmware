@@ -770,16 +770,32 @@ static void Custom_CRS_OnConnect(Custom_App_ConnHandle_Not_evt_t *pNotification)
   Custom_App_Context.ConnectionHandle = pNotification->ConnectionHandle;
 
   // Start timeout timer
+  APP_DBG_MSG("Start connection timeout\n");
   HW_TS_Start(timeout_timer_id, TIMEOUT_TICKS);
 }
 
 static void Custom_CRS_OnDisconnect(void)
 {
   // Stop timeout timer
+  APP_DBG_MSG("Stop connection timeout\n");
   HW_TS_Stop(timeout_timer_id);
 
   // Update state
   connected_flag = 0;
+
+  // Reset per-connection CCCD mirrors so producers stop sending
+  Custom_App_Context.Ft_packet_out_Notification_Status = 0;
+
+  Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
+  Custom_App_Context.Sd_control_point_Indication_Status = 0;
+
+  Custom_App_Context.Sp_control_point_Indication_Status = 0;
+  Custom_App_Context.Sp_result_Indication_Status = 0;
+
+  Custom_App_Context.Ds_mode_Indication_Status = 0;
+  Custom_App_Context.Ds_control_point_Indication_Status = 0;
+
+  Custom_App_Context.Battery_level_Notification_Status = 0;
 
   // Call update task
   UTIL_SEQ_SetTask(1<<CFG_TASK_FS_CRS_UPDATE_ID, CFG_SCH_PRIO_1);
@@ -791,7 +807,9 @@ static void Custom_CRS_OnRxWrite(Custom_STM_App_Notification_evt_t *pNotificatio
 
   if (rx_write_index < rx_read_index + FS_CRS_WINDOW_LENGTH)
   {
-	packet = &rx_buffer[(rx_write_index++) % FS_CRS_WINDOW_LENGTH];
+    APP_DBG_MSG("Received data on CRS_RX\n");
+
+    packet = &rx_buffer[(rx_write_index++) % FS_CRS_WINDOW_LENGTH];
 	packet->length = pNotification->DataTransfered.Length;
     memcpy(packet->data, pNotification->DataTransfered.pPayload, packet->length);
 
@@ -851,6 +869,7 @@ void Custom_Start_Update(uint16_t year, uint8_t month, uint8_t day,
 
 static void Custom_App_Timeout(void)
 {
+  APP_DBG_MSG("Connection timeout triggered\n");
   aci_gap_terminate(Custom_App_Context.ConnectionHandle,
 		  HCI_REMOTE_USER_TERMINATED_CONNECTION_ERR_CODE);
 }
