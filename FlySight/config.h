@@ -180,6 +180,11 @@ typedef struct
 
 	// Flag to control whether navigation modes are allowed
 	uint8_t  enable_nav;
+
+	// Metadata fields
+	char     name[64];
+	char     description[128];
+	char     labels[256];
 } FS_Config_Data_t;
 
 typedef enum {
