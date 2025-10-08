@@ -1407,54 +1407,50 @@ static void APP_BLE_UpdateAdvertisingData(APP_BLE_ConnStatus_t NewStatus)
 static int8_t ble_count_bonded_devices(void)
 {
   uint8_t total = 0;
+  tBleStatus ret;
   Bonded_Device_Entry_t devices[16];
-  Identity_Entry_t Private_devices[16];
+  Identity_Entry_t rl_entries[16];
 
-  tBleStatus ret = aci_gap_configure_whitelist();
+  // 1) Rebuild the whitelist from the bonding database (PM0271 5.3.1 step 3)
+  ret = aci_gap_configure_whitelist();
   APP_DBG_MSG("\taci_gap_configure_whitelist = 0x%02X\r\n", ret);
 
+  // 2) Fetch bonded identities (PM0271 5.3.1 step 4)
   ret = aci_gap_get_bonded_devices(&total, devices);
-  if(BLE_STATUS_SUCCESS == ret)
-  {
-    if(total == 0)
-    {
-      APP_DBG_MSG("No previous bonded devices\r\n");
-    }
-    else
-    {
-      for(uint8_t k = 0; k < total; k++)
-      {
-        APP_DBG_MSG("Bonded device %d / %d - %s BLE address %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                    k, total,
-                    devices[k].Address_Type == 0 ? "Public" : "Random",
-                    devices[k].Address[5], devices[k].Address[4], devices[k].Address[3],
-                    devices[k].Address[2], devices[k].Address[1], devices[k].Address[0]);
-        Private_devices[k].Peer_Identity_Address_Type = devices[k].Address_Type;
-        Private_devices[k].Peer_Identity_Address[5] = devices[k].Address[5];
-        Private_devices[k].Peer_Identity_Address[4] = devices[k].Address[4];
-        Private_devices[k].Peer_Identity_Address[3] = devices[k].Address[3];
-        Private_devices[k].Peer_Identity_Address[2] = devices[k].Address[2];
-        Private_devices[k].Peer_Identity_Address[1] = devices[k].Address[1];
-        Private_devices[k].Peer_Identity_Address[0] = devices[k].Address[0];
-      }
-
-      ret = aci_gap_add_devices_to_resolving_list(total, Private_devices, 0);
-      if(BLE_STATUS_SUCCESS == ret)
-      {
-        APP_DBG_MSG("aci_gap_add_devices_to_resolving_list success \r\n");
-      }
-      else
-      {
-        APP_DBG_MSG("aci_gap_add_devices_to_resolving_list fail %x \r\n", ret);
-      }
-    }
-  }
-  else
+  if (ret != BLE_STATUS_SUCCESS)
   {
     APP_DBG_MSG("ACI_GAP_GET_BONDED_DEVICES error %x\r\n", ret);
-    total = -1;
+    return -1;
   }
-  return total;
+
+  if (total == 0)
+  {
+    APP_DBG_MSG("No previous bonded devices\r\n");
+  }
+
+  for (uint8_t k = 0; k < total; k++)
+  {
+    // Log for visibility
+    APP_DBG_MSG("Bonded %u/%u - %s %02X:%02X:%02X:%02X:%02X:%02X\r\n",
+                k + 1, total,
+                devices[k].Address_Type == 0 ? "Public" : "Random",
+                devices[k].Address[5], devices[k].Address[4], devices[k].Address[3],
+                devices[k].Address[2], devices[k].Address[1], devices[k].Address[0]);
+
+    rl_entries[k].Peer_Identity_Address_Type = devices[k].Address_Type;
+    memcpy(rl_entries[k].Peer_Identity_Address, devices[k].Address, 6);
+  }
+
+  // 3) Add bonded identities to resolving list (PM0271 5.3.1 step 5)
+  ret = aci_gap_add_devices_to_resolving_list(total, rl_entries, 1);
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("aci_gap_add_devices_to_resolving_list fail %x\r\n", ret);
+    return -1;
+  }
+
+  APP_DBG_MSG("Resolving List populated with %u bonded device(s)\r\n", total);
+  return (int8_t)total;
 }
 /* USER CODE END FD_SPECIFIC_FUNCTIONS */
 /*************************************************************
