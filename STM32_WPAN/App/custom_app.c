@@ -32,6 +32,7 @@
 #include "crs.h"
 #include "start_control.h"
 #include "gnss_ble.h"
+#include "baro_ble.h"
 #include "mode.h"
 #include "ble_tx_queue.h"
 #include "sensor_data.h"
@@ -47,6 +48,7 @@ typedef struct
   /* Sensor_Data */
   uint8_t               Sd_gnss_measurement_Notification_Status;
   uint8_t               Sd_control_point_Indication_Status;
+  uint8_t               Sd_baro_measurement_Notification_Status;
   /* Starter_Pistol */
   uint8_t               Sp_control_point_Indication_Status;
   uint8_t               Sp_result_Indication_Status;
@@ -96,6 +98,8 @@ static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t gnss_pv_packet[GNSS_BLE_MAX_LEN];
+static uint8_t baro_pv_packet[BARO_BLE_MAX_LEN];
+static uint8_t baro_sample_counter = 0;
 
 static uint8_t start_result_packet[9];
 
@@ -218,6 +222,28 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
       Custom_App_Context.Sd_control_point_Indication_Status = 0;
       /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT */
+      if (!Custom_App_Context.Sd_baro_measurement_Notification_Status)
+      {
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_BARO_MEASUREMENT, baro_pv_packet);
+      }
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_baro_measurement_Notification_Status = 1;
+      baro_sample_counter = 0;  /* Reset decimation counter */
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT */
       break;
 
     /* Starter_Pistol */
@@ -403,6 +429,7 @@ void Custom_APP_Init(void)
   /* Sensor_Data */
   Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
   Custom_App_Context.Sd_control_point_Indication_Status = 0;
+  Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
 
   /* Starter_Pistol */
   Custom_App_Context.Sp_control_point_Indication_Status = 0;
@@ -788,6 +815,7 @@ static void Custom_CRS_OnDisconnect(void)
 
   Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
   Custom_App_Context.Sd_control_point_Indication_Status = 0;
+  Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
 
   Custom_App_Context.Sp_control_point_Indication_Status = 0;
   Custom_App_Context.Sp_result_Indication_Status = 0;
@@ -845,6 +873,25 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   {
     BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GNSS_MEASUREMENT,
         gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
+  }
+}
+
+void Custom_BARO_Update(const FS_Baro_Data_t *current)
+{
+  /* Decimation: only send every Nth sample */
+  uint8_t divider = BARO_BLE_GetDivider();
+  if (++baro_sample_counter < divider)
+  {
+    return;
+  }
+  baro_sample_counter = 0;
+
+  uint8_t length = BARO_BLE_Build(current, baro_pv_packet);
+
+  if (Custom_App_Context.Sd_baro_measurement_Notification_Status)
+  {
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_BARO_MEASUREMENT,
+        baro_pv_packet, length, &SizeSd_Baro_Measurement, 0);
   }
 }
 

@@ -172,13 +172,18 @@ void FS_ActiveControl_DeInit(void)
 
 void FS_Baro_DataReady_Callback(void)
 {
+	const FS_Baro_Data_t *data = FS_Baro_GetData();
+
 	if (state != FS_CONTROL_ACTIVE) return;
 
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
-		FS_Log_WriteBaroData(FS_Baro_GetData());
+		FS_Log_WriteBaroData(data);
 	}
+
+	// Update BLE characteristic
+	Custom_BARO_Update(data);
 }
 
 void FS_Hum_DataReady_Callback(void)
