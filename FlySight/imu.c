@@ -380,13 +380,13 @@ static void FS_IMU_Read_Callback(HAL_StatusTypeDef result)
 	{
 		imuData.temperature = (((int16_t) ((dataBuf[2] << 8) | dataBuf[1])) * 100) / 256 + 2500;
 
-		imuData.wy = (((int16_t) ((dataBuf[4] << 8) | dataBuf[3])) * (gyroFactor / 8)) / (32768 / 8);
-		imuData.wx = -(((int16_t) ((dataBuf[6] << 8) | dataBuf[5])) * (gyroFactor / 8)) / (32768 / 8);
-		imuData.wz = (((int16_t) ((dataBuf[8] << 8) | dataBuf[7])) * (gyroFactor / 8)) / (32768 / 8);
+		imuData.wy = (((int64_t) (int16_t) ((dataBuf[4] << 8) | dataBuf[3])) * gyroFactor) / 32768;
+		imuData.wx = -(((int64_t) (int16_t) ((dataBuf[6] << 8) | dataBuf[5])) * gyroFactor) / 32768;
+		imuData.wz = (((int64_t) (int16_t) ((dataBuf[8] << 8) | dataBuf[7])) * gyroFactor) / 32768;
 
-		imuData.ay = (((int16_t) ((dataBuf[10] << 8) | dataBuf[9])) * (accelFactor / 8)) / (32768 / 8);
-		imuData.ax = -(((int16_t) ((dataBuf[12] << 8) | dataBuf[11])) * (accelFactor / 8)) / (32768 / 8);
-		imuData.az = (((int16_t) ((dataBuf[14] << 8) | dataBuf[13])) * (accelFactor / 8)) / (32768 / 8);
+		imuData.ay = (((int64_t) (int16_t) ((dataBuf[10] << 8) | dataBuf[9])) * accelFactor) / 32768;
+		imuData.ax = -(((int64_t) (int16_t) ((dataBuf[12] << 8) | dataBuf[11])) * accelFactor) / 32768;
+		imuData.az = (((int64_t) (int16_t) ((dataBuf[14] << 8) | dataBuf[13])) * accelFactor) / 32768;
 
 		FS_IMU_DataReady_Callback();
 	}
