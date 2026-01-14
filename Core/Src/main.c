@@ -40,6 +40,7 @@
 #include "sensor.h"
 #include "start_control.h"
 #include "state.h"
+#include "stm32_seq.h"
 #include "vbat.h"
 #include "vbus.h"
 /* USER CODE END Includes */
@@ -116,14 +117,15 @@ static void MX_RF_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void Watchdog_Timer(void)
-{
-  /* Timer only exists to force wake-up */
-}
-
-void UTIL_SEQ_PostIdle(void)
+static void Watchdog_Update(void)
 {
   WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
+}
+
+static void Watchdog_Timer(void)
+{
+  /* Call watchdog update task */
+  UTIL_SEQ_SetTask(1<<CFG_TASK_FS_WATCHDOG_UPDATE_ID, CFG_SCH_PRIO_1);
 }
 /* USER CODE END 0 */
 
@@ -187,7 +189,8 @@ int main(void)
   /* Reset watchdog timer */
   WRITE_REG(IWDG->KR, IWDG_KEY_RELOAD);
 
-  /* Initialize watchdog reset timer */
+  /* Initialize watchdog reset timer and task */
+  UTIL_SEQ_RegTask(1<<CFG_TASK_FS_WATCHDOG_UPDATE_ID, UTIL_SEQ_RFU, Watchdog_Update);
   HW_TS_Create(CFG_TIM_PROC_ID_ISR, &watchdog_timer_id, hw_ts_Repeated, Watchdog_Timer);
   HW_TS_Start(watchdog_timer_id, WATCHDOG_RESET_RATE);
 
