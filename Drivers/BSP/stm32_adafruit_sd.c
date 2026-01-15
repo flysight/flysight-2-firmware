@@ -251,6 +251,9 @@ __IO uint8_t SdStatus = SD_NOT_PRESENT;
 */
 uint16_t flag_SDHC = 0;
 
+/* Static buffer for SPI dummy receive data during writes */
+static uint8_t sd_dummy_rx_buf[512];
+
 /**
   * @}
   */
@@ -438,7 +441,6 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
   uint32_t offset = 0;
   uint32_t addr;
   uint8_t retr = BSP_SD_ERROR;
-  uint8_t *ptr = NULL;
   SD_CmdAnswer_typedef response;
   uint16_t BlockSize = 512;
 
@@ -448,12 +450,6 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
   SD_IO_CSState(1);
   SD_IO_WriteByte(SD_DUMMY_BYTE);
   if ( response.r1 != SD_R1_NO_ERROR)
-  {
-    goto error;
-  }
-
-  ptr = malloc(sizeof(uint8_t)*BlockSize);
-  if (ptr == NULL)
   {
     goto error;
   }
@@ -479,8 +475,8 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
     /* Send the data token to signify the start of the data */
     SD_IO_WriteByte(SD_TOKEN_START_DATA_SINGLE_BLOCK_WRITE);
 
-    /* Write the block data to SD */
-    SD_IO_WriteReadData((uint8_t*)pData + offset, ptr, BlockSize);
+    /* Write the block data to SD (use static buffer for dummy rx data) */
+    SD_IO_WriteReadData((uint8_t*)pData + offset, sd_dummy_rx_buf, BlockSize);
 
     /* Set next write address */
     offset += BlockSize;
@@ -503,7 +499,6 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
   retr = BSP_SD_OK;
 
 error :
-  if(ptr != NULL) free(ptr);
   /* Send dummy byte: 8 Clock pulses of delay */
   SD_IO_CSState(1);
   SD_IO_WriteByte(SD_DUMMY_BYTE);
