@@ -252,7 +252,7 @@ __IO uint8_t SdStatus = SD_NOT_PRESENT;
 uint16_t flag_SDHC = 0;
 
 /* Static buffer for SPI dummy receive data during writes */
-static uint8_t sd_dummy_rx_buf[512];
+static uint8_t sd_dummy_buf[512];
 
 /**
   * @}
@@ -356,26 +356,22 @@ uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint32_t ReadAddr, uint32_t NumOfBloc
   uint32_t offset = 0;
   uint32_t addr;
   uint8_t retr = BSP_SD_ERROR;
-  uint8_t *ptr = NULL;
   SD_CmdAnswer_typedef response;
   uint16_t BlockSize = 512;
 
-  /* Send CMD16 (SD_CMD_SET_BLOCKLEN) to set the size of the block and
-     Check if the SD acknowledged the set block length command: R1 response (0x00: no errors) */
-  response = SD_SendCmd(SD_CMD_SET_BLOCKLEN, BlockSize, 0xFF, SD_ANSWER_R1_EXPECTED);
-  SD_IO_CSState(1);
-  SD_IO_WriteByte(SD_DUMMY_BYTE);
-  if ( response.r1 != SD_R1_NO_ERROR)
+  /* Send CMD16 only for SDSC cards - SDHC has fixed 512-byte blocks */
+  if (flag_SDHC == 0)
   {
-     goto error;
+    response = SD_SendCmd(SD_CMD_SET_BLOCKLEN, BlockSize, 0xFF, SD_ANSWER_R1_EXPECTED);
+    SD_IO_CSState(1);
+    SD_IO_WriteByte(SD_DUMMY_BYTE);
+    if ( response.r1 != SD_R1_NO_ERROR)
+    {
+       goto error;
+    }
   }
 
-  ptr = malloc(sizeof(uint8_t)*BlockSize);
-  if( ptr == NULL )
-  {
-     goto error;
-  }
-  memset(ptr, SD_DUMMY_BYTE, sizeof(uint8_t)*BlockSize);
+  memset(sd_dummy_buf, SD_DUMMY_BYTE, BlockSize);
 
   /* Initialize the address */
   addr = (ReadAddr * ((flag_SDHC == 1) ? 1 : BlockSize));
@@ -395,7 +391,7 @@ uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint32_t ReadAddr, uint32_t NumOfBloc
     if (SD_WaitData(SD_TOKEN_START_DATA_SINGLE_BLOCK_READ) == BSP_SD_OK)
     {
       /* Read the SD block data : read NumByteToRead data */
-      SD_IO_WriteReadData(ptr, (uint8_t*)pData + offset, BlockSize);
+      SD_IO_WriteReadData(sd_dummy_buf, (uint8_t*)pData + offset, BlockSize);
 
       /* Set next read address*/
       offset += BlockSize;
@@ -421,7 +417,6 @@ error :
   /* Send dummy byte: 8 Clock pulses of delay */
   SD_IO_CSState(1);
   SD_IO_WriteByte(SD_DUMMY_BYTE);
-  if(ptr != NULL) free(ptr);
 
   /* Return the reponse */
   return retr;
@@ -444,14 +439,16 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
   SD_CmdAnswer_typedef response;
   uint16_t BlockSize = 512;
 
-  /* Send CMD16 (SD_CMD_SET_BLOCKLEN) to set the size of the block and
-     Check if the SD acknowledged the set block length command: R1 response (0x00: no errors) */
-  response = SD_SendCmd(SD_CMD_SET_BLOCKLEN, BlockSize, 0xFF, SD_ANSWER_R1_EXPECTED);
-  SD_IO_CSState(1);
-  SD_IO_WriteByte(SD_DUMMY_BYTE);
-  if ( response.r1 != SD_R1_NO_ERROR)
+  /* Send CMD16 only for SDSC cards - SDHC has fixed 512-byte blocks */
+  if (flag_SDHC == 0)
   {
-    goto error;
+    response = SD_SendCmd(SD_CMD_SET_BLOCKLEN, BlockSize, 0xFF, SD_ANSWER_R1_EXPECTED);
+    SD_IO_CSState(1);
+    SD_IO_WriteByte(SD_DUMMY_BYTE);
+    if ( response.r1 != SD_R1_NO_ERROR)
+    {
+      goto error;
+    }
   }
 
   /* Initialize the address */
@@ -476,7 +473,7 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
     SD_IO_WriteByte(SD_TOKEN_START_DATA_SINGLE_BLOCK_WRITE);
 
     /* Write the block data to SD (use static buffer for dummy rx data) */
-    SD_IO_WriteReadData((uint8_t*)pData + offset, sd_dummy_rx_buf, BlockSize);
+    SD_IO_WriteReadData((uint8_t*)pData + offset, sd_dummy_buf, BlockSize);
 
     /* Set next write address */
     offset += BlockSize;
