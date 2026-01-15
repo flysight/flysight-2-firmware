@@ -285,6 +285,8 @@ static uint8_t SD_ReadData(void);
   */
 uint8_t BSP_SD_Init(void)
 {
+  uint8_t result;
+
   /* Configure IO functionalities for SD pin */
   SD_IO_Init();
 
@@ -292,7 +294,15 @@ uint8_t BSP_SD_Init(void)
   SdStatus = SD_PRESENT;
 
   /* SD initialized and set to SPI mode properly */
-  return SD_GoIdleState();
+  result = SD_GoIdleState();
+
+  if (result == BSP_SD_OK)
+  {
+    /* Switch to high speed (32 MHz) for data transfer */
+    SD_IO_SetFastSpeed();
+  }
+
+  return result;
 }
 
 /**

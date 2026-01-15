@@ -214,6 +214,7 @@ uint8_t BSP_SD_GetCardInfo(SD_CardInfo *pCardInfo);
    
 /* Link functions for SD Card peripheral*/
 void    SD_IO_Init(void);
+void    SD_IO_SetFastSpeed(void);
 void    SD_IO_CSState(uint8_t state);
 void    SD_IO_WriteReadData(const uint8_t *DataIn, uint8_t *DataOut, uint16_t DataLength);
 uint8_t SD_IO_WriteByte(uint8_t Data);
