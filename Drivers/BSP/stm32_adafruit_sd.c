@@ -155,8 +155,8 @@ typedef enum {
 #define SD_TOKEN_START_DATA_SINGLE_BLOCK_READ    0xFE  /* Data token start byte, Start Single Block Read */
 #define SD_TOKEN_START_DATA_MULTIPLE_BLOCK_READ  0xFE  /* Data token start byte, Start Multiple Block Read */
 #define SD_TOKEN_START_DATA_SINGLE_BLOCK_WRITE   0xFE  /* Data token start byte, Start Single Block Write */
-#define SD_TOKEN_START_DATA_MULTIPLE_BLOCK_WRITE 0xFD  /* Data token start byte, Start Multiple Block Write */
-#define SD_TOKEN_STOP_DATA_MULTIPLE_BLOCK_WRITE  0xFD  /* Data toke stop byte, Stop Multiple Block Write */
+#define SD_TOKEN_START_DATA_MULTIPLE_BLOCK_WRITE 0xFC  /* Data token start byte, Start Multiple Block Write */
+#define SD_TOKEN_STOP_DATA_MULTIPLE_BLOCK_WRITE  0xFD  /* Data token stop byte, Stop Multiple Block Write */
 
 /**
   * @brief  Commands: CMDxx = CMD-number | 0x40
@@ -445,7 +445,7 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
     response = SD_SendCmd(SD_CMD_SET_BLOCKLEN, BlockSize, 0xFF, SD_ANSWER_R1_EXPECTED);
     SD_IO_CSState(1);
     SD_IO_WriteByte(SD_DUMMY_BYTE);
-    if ( response.r1 != SD_R1_NO_ERROR)
+    if (response.r1 != SD_R1_NO_ERROR)
     {
       goto error;
     }
@@ -454,53 +454,85 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr, uint32_t NumOfBl
   /* Initialize the address */
   addr = (WriteAddr * ((flag_SDHC == 1) ? 1 : BlockSize));
 
-  /* Data transfer */
-  while (NumOfBlocks--)
+  if (NumOfBlocks == 1)
   {
-    /* Send CMD24 (SD_CMD_WRITE_SINGLE_BLOCK) to write blocks  and
-       Check if the SD acknowledged the write block command: R1 response (0x00: no errors) */
+    /* === Single block write with CMD24 === */
     response = SD_SendCmd(SD_CMD_WRITE_SINGLE_BLOCK, addr, 0xFF, SD_ANSWER_R1_EXPECTED);
     if (response.r1 != SD_R1_NO_ERROR)
     {
       goto error;
     }
 
-    /* Send dummy byte for NWR timing : one byte between CMDWRITE and TOKEN */
+    /* NWR timing */
     SD_IO_WriteByte(SD_DUMMY_BYTE);
     SD_IO_WriteByte(SD_DUMMY_BYTE);
 
-    /* Send the data token to signify the start of the data */
+    /* Data token for single block */
     SD_IO_WriteByte(SD_TOKEN_START_DATA_SINGLE_BLOCK_WRITE);
 
-    /* Write the block data to SD (use static buffer for dummy rx data) */
-    SD_IO_WriteReadData((uint8_t*)pData + offset, sd_dummy_buf, BlockSize);
+    /* Write block data */
+    SD_IO_WriteReadData((uint8_t*)pData, sd_dummy_buf, BlockSize);
 
-    /* Set next write address */
-    offset += BlockSize;
-    addr = ((flag_SDHC == 1) ? (addr + 1) : (addr + BlockSize));
-
-    /* Put CRC bytes (not really needed by us, but required by SD) */
+    /* CRC bytes */
     SD_IO_WriteByte(SD_DUMMY_BYTE);
     SD_IO_WriteByte(SD_DUMMY_BYTE);
 
-    /* Read data response */
+    /* Check data response */
     if (SD_GetDataResponse() != SD_DATA_OK)
     {
-      /* Set response value to failure */
+      goto error;
+    }
+  }
+  else
+  {
+    /* === Multi-block write with CMD25 === */
+    response = SD_SendCmd(SD_CMD_WRITE_MULT_BLOCK, addr, 0xFF, SD_ANSWER_R1_EXPECTED);
+    if (response.r1 != SD_R1_NO_ERROR)
+    {
       goto error;
     }
 
-    SD_IO_CSState(1);
+    /* Write all blocks */
+    while (NumOfBlocks--)
+    {
+      /* NWR timing */
+      SD_IO_WriteByte(SD_DUMMY_BYTE);
+
+      /* Data token for multi-block (0xFC) */
+      SD_IO_WriteByte(SD_TOKEN_START_DATA_MULTIPLE_BLOCK_WRITE);
+
+      /* Write block data */
+      SD_IO_WriteReadData((uint8_t*)pData + offset, sd_dummy_buf, BlockSize);
+      offset += BlockSize;
+
+      /* CRC bytes */
+      SD_IO_WriteByte(SD_DUMMY_BYTE);
+      SD_IO_WriteByte(SD_DUMMY_BYTE);
+
+      /* Check data response */
+      if (SD_GetDataResponse() != SD_DATA_OK)
+      {
+        goto error;
+      }
+    }
+
+    /* Send Stop Token (0xFD) */
     SD_IO_WriteByte(SD_DUMMY_BYTE);
+    SD_IO_WriteByte(SD_TOKEN_STOP_DATA_MULTIPLE_BLOCK_WRITE);
+
+    /* Wait for card to finish programming (busy = 0x00) */
+    SD_IO_WriteByte(SD_DUMMY_BYTE);
+    while (SD_IO_WriteByte(SD_DUMMY_BYTE) != 0xFF);
   }
+
   retr = BSP_SD_OK;
 
-error :
+error:
   /* Send dummy byte: 8 Clock pulses of delay */
   SD_IO_CSState(1);
   SD_IO_WriteByte(SD_DUMMY_BYTE);
 
-  /* Return the reponse */
+  /* Return the response */
   return retr;
 }
 
