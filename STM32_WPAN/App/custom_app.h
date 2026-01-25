@@ -33,6 +33,8 @@ extern "C" {
 #include "gnss.h"
 #include "vbat.h"
 #include "baro.h"
+#include "imu.h"
+#include "mag.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -96,6 +98,12 @@ void Custom_Mode_Update(uint8_t newMode);
 void Custom_VBAT_Update(const FS_VBAT_Data_t *current);
 
 void Custom_BARO_Update(const FS_Baro_Data_t *current);
+
+void Custom_ACCEL_Update(const FS_IMU_Data_t *current);
+
+void Custom_GYRO_Update(const FS_IMU_Data_t *current);
+
+void Custom_MAG_Update(const FS_Mag_Data_t *current);
 /* USER CODE END EF */
 
 #ifdef __cplusplus

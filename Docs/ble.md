@@ -197,7 +197,7 @@ Packets sent over `FT_Packet_In` (WriteWithoutResponse) and received via notific
 
 ### 2. Sensor_Data Service
 
-Provides live GNSS data when FlySight is in Active Mode or Start Mode. Requires bonding.
+Provides live GNSS and IMU data when FlySight is in Active Mode or Start Mode. Requires bonding.
 
 *   **Service UUID:** `00000001-cc7a-482a-984a-7f2ed5b3e58f`
 *   **Characteristics:**
@@ -257,6 +257,78 @@ Provides live GNSS data when FlySight is in Active Mode or Start Mode. Requires 
                 *   Invalid Param: `[0xF0] [0x02] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
             *   For unknown command:
                 *   `[0xF0] [Received Opcode] [0x02 (CP_STATUS_CMD_NOT_SUPPORTED)]`
+
+    *   **`SD_BARO_Measurement` (Barometric Pressure/Altitude)**
+        *   UUID: `00000008-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Streams barometric sensor data. Updates only when FlySight is in Active Mode. Central must enable notifications.
+        *   Max Length: 10 bytes (`SizeSd_Baro_Measurement`). Variable length.
+        *   **Data Format (Little Endian):**
+            *   Byte 0: `mask` (uint8). Bitmask indicating which fields are present.
+                *   `0x80` (`BARO_BLE_BIT_TIME`): Timestamp included.
+                *   `0x40` (`BARO_BLE_BIT_PRESSURE`): Pressure included.
+                *   `0x20` (`BARO_BLE_BIT_TEMPERATURE`): Temperature included.
+            *   If `BARO_BLE_BIT_TIME` set: `time` (uint32_t). Timestamp in ms. (4 bytes)
+            *   If `BARO_BLE_BIT_PRESSURE` set: `pressure` (int32_t). Pressure in Pa. (4 bytes)
+            *   If `BARO_BLE_BIT_TEMPERATURE` set: `temperature` (int16_t). Temperature in 0.01°C. (2 bytes)
+
+    *   **`SD_ACCEL_Measurement` (Accelerometer)**
+        *   UUID: `00000009-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Streams accelerometer data from IMU. Updates only when FlySight is in Active Mode. Central must enable notifications.
+        *   Max Length: 20 bytes (`SizeSd_Accel_Measurement`). Variable length.
+        *   **Data Format (Little Endian):**
+            *   Byte 0: `mask` (uint8). Bitmask indicating which fields are present.
+                *   `0x80` (`ACCEL_BLE_BIT_TIME`): Timestamp included.
+                *   `0x40` (`ACCEL_BLE_BIT_ACCEL`): Acceleration data included.
+                *   `0x20` (`ACCEL_BLE_BIT_TEMPERATURE`): Temperature included.
+            *   If `ACCEL_BLE_BIT_TIME` set: `time` (uint32_t). Timestamp in ms. (4 bytes)
+            *   If `ACCEL_BLE_BIT_ACCEL` set:
+                *   `ax` (int16_t). X-axis acceleration in mg. (2 bytes)
+                *   `ay` (int16_t). Y-axis acceleration in mg. (2 bytes)
+                *   `az` (int16_t). Z-axis acceleration in mg. (2 bytes)
+            *   If `ACCEL_BLE_BIT_TEMPERATURE` set: `temperature` (int16_t). Temperature in 0.01°C. (2 bytes)
+        *   Default Mask: `0xE0` (all fields enabled).
+
+    *   **`SD_GYRO_Measurement` (Gyroscope)**
+        *   UUID: `0000000A-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Streams gyroscope data from IMU. Updates only when FlySight is in Active Mode. Central must enable notifications.
+        *   Max Length: 20 bytes (`SizeSd_Gyro_Measurement`). Variable length.
+        *   **Data Format (Little Endian):**
+            *   Byte 0: `mask` (uint8). Bitmask indicating which fields are present.
+                *   `0x80` (`GYRO_BLE_BIT_TIME`): Timestamp included.
+                *   `0x40` (`GYRO_BLE_BIT_GYRO`): Gyroscope data included.
+                *   `0x20` (`GYRO_BLE_BIT_TEMPERATURE`): Temperature included.
+            *   If `GYRO_BLE_BIT_TIME` set: `time` (uint32_t). Timestamp in ms. (4 bytes)
+            *   If `GYRO_BLE_BIT_GYRO` set:
+                *   `gx` (int16_t). X-axis angular rate in mdps. (2 bytes)
+                *   `gy` (int16_t). Y-axis angular rate in mdps. (2 bytes)
+                *   `gz` (int16_t). Z-axis angular rate in mdps. (2 bytes)
+            *   If `GYRO_BLE_BIT_TEMPERATURE` set: `temperature` (int16_t). Temperature in 0.01°C. (2 bytes)
+        *   Default Mask: `0xE0` (all fields enabled).
+
+    *   **`SD_MAG_Measurement` (Magnetometer)**
+        *   UUID: `0000000B-8e22-4541-9d4c-21edae82ed19`
+        *   Properties: **Read, Notify**
+        *   Permissions: Encrypted Read/Write required.
+        *   Usage: Streams magnetometer data. Updates only when FlySight is in Active Mode. Central must enable notifications.
+        *   Max Length: 14 bytes (`SizeSd_Mag_Measurement`). Variable length.
+        *   **Data Format (Little Endian):**
+            *   Byte 0: `mask` (uint8). Bitmask indicating which fields are present.
+                *   `0x80` (`MAG_BLE_BIT_TIME`): Timestamp included.
+                *   `0x40` (`MAG_BLE_BIT_MAG`): Magnetometer data included.
+                *   `0x20` (`MAG_BLE_BIT_TEMPERATURE`): Temperature included.
+            *   If `MAG_BLE_BIT_TIME` set: `time` (uint32_t). Timestamp in ms. (4 bytes)
+            *   If `MAG_BLE_BIT_MAG` set:
+                *   `mx` (int16_t). X-axis magnetic field in mGauss. (2 bytes)
+                *   `my` (int16_t). Y-axis magnetic field in mGauss. (2 bytes)
+                *   `mz` (int16_t). Z-axis magnetic field in mGauss. (2 bytes)
+            *   If `MAG_BLE_BIT_TEMPERATURE` set: `temperature` (int16_t). Temperature in 0.01°C. (2 bytes)
+        *   Default Mask: `0xE0` (all fields enabled).
 
 ### 3. Starter_Pistol Service
 
@@ -368,6 +440,10 @@ FlySight 2 also implements standard BLE services:
 | Sensor Data Service     |                           | `00000001-cc7a-482a-984a-7f2ed5b3e58f`       | Sensor_Data        |                        | N/A                |
 | GNSS Measurement        | `SD_GNSS_Measurement`     | `00000000-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 44 (Var)           |
 | Sensor Data Control     | `SD_Control_Point`        | `00000006-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Write, Indicate        | 20 (Var)           |
+| Baro Measurement        | `SD_BARO_Measurement`     | `00000008-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 10 (Var)           |
+| Accel Measurement       | `SD_ACCEL_Measurement`    | `00000009-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 20 (Var)           |
+| Gyro Measurement        | `SD_GYRO_Measurement`     | `0000000A-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 20 (Var)           |
+| Mag Measurement         | `SD_MAG_Measurement`      | `0000000B-8e22-4541-9d4c-21edae82ed19`       | Sensor_Data        | Read, Notify           | 14 (Var)           |
 | Starter Pistol Service  |                           | `00000002-cc7a-482a-984a-7f2ed5b3e58f`       | Starter_Pistol     |                        | N/A                |
 | Starter Pistol Control  | `SP_Control_Point`        | `00000003-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Write, Indicate        | 20 (Var)           |
 | Starter Pistol Result   | `SP_Result`               | `00000004-8e22-4541-9d4c-21edae82ed19`       | Starter_Pistol     | Read, Indicate         | 9 (Const)          |
