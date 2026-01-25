@@ -41,6 +41,9 @@
 HAL_StatusTypeDef FS_Log_Init(uint32_t sessionId, uint8_t flags);
 void FS_Log_DeInit(uint32_t sessionId);
 
+void FS_Log_SetExtSync(uint32_t timestamp);
+void FS_Log_ClearExtSync(void);
+
 void FS_Log_WriteBaroData(const FS_Baro_Data_t *current);
 void FS_Log_WriteHumData(const FS_Hum_Data_t *current);
 void FS_Log_WriteMagData(const FS_Mag_Data_t *current);

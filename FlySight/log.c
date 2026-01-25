@@ -127,6 +127,9 @@ static uint32_t syncMaxInterval;
 
 static TCHAR path[256];
 
+static uint32_t extSyncTimestamp;
+static bool     extSyncValid;
+
 typedef enum
 {
 	FS_LOG_SENSOR_NONE,
@@ -647,6 +650,17 @@ static void FS_Log_WriteHex(FIL *file, const uint32_t *data, uint32_t count)
 	}
 }
 
+void FS_Log_SetExtSync(uint32_t timestamp)
+{
+	extSyncTimestamp = timestamp;
+	extSyncValid = true;
+}
+
+void FS_Log_ClearExtSync(void)
+{
+	extSyncValid = false;
+}
+
 static void FS_Log_WriteCommonHeader(FIL *file)
 {
 	// Write file format
@@ -664,6 +678,12 @@ static void FS_Log_WriteCommonHeader(FIL *file)
 	f_printf(file, "$VAR,SESSION_ID,");
 	FS_Log_WriteHex(file, FS_State_Get()->session_id, 3);
 	f_printf(file, "\n");
+
+	// Write external sync timestamp if set
+	if (extSyncValid)
+	{
+		f_printf(file, "$VAR,EXT_SYNC,%lu\n", extSyncTimestamp);
+	}
 }
 
 static FRESULT delete_node (
@@ -851,6 +871,9 @@ HAL_StatusTypeDef FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 	// Initialize update timer
 	HW_TS_Create(CFG_TIM_PROC_ID_ISR, &timer_id, hw_ts_Repeated, FS_Log_Timer);
 	HW_TS_Start(timer_id, LOG_UPDATE_RATE);
+
+	// Clear external sync after headers are written
+	FS_Log_ClearExtSync();
 
 	logState = LOG_STATE_ACTIVE;
 	return HAL_OK;

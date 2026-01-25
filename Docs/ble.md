@@ -397,13 +397,38 @@ Provides information about the device's current operational state and allows for
         *   UUID: `00000007-8e22-4541-9d4c-21edae82ed19`
         *   Properties: **Write, Indicate**
         *   Permissions: Encrypted Read/Write required.
-        *   Usage: This characteristic is intended for future device state control commands. Currently, no specific commands are implemented. Writing any command will likely result in a `CP_STATUS_CMD_NOT_SUPPORTED` response.
+        *   Usage: Used for device state control commands such as querying firmware version, rebooting the device, getting device ID, and controlling operational mode.
         *   Max Length: 20 bytes (`SizeDs_Control_Point`). Variable length.
         *   **Write Operations (Central to FlySight):**
-            *   Currently, no commands are defined.
+            *   Byte 0: Opcode
+                *   `0x01` (`DS_CMD_GET_FW_VERSION`): Get the firmware version string.
+                    *   Payload: (None). (Total length: 1 byte)
+                *   `0x02` (`DS_CMD_REBOOT_DEVICE`): Reboot the FlySight 2.
+                    *   Payload: (None). (Total length: 1 byte)
+                *   `0x03` (`DS_CMD_GET_DEVICE_ID`): Get the unique device ID (24 hex characters).
+                    *   Payload: (None). (Total length: 1 byte)
+                *   `0x04` (`DS_CMD_SET_MODE`): Set the operational mode.
+                    *   Payload: `[target_mode (uint8)] [ext_sync (uint32, optional)]`. (Total length: 2 or 6 bytes)
+                    *   `target_mode` values:
+                        *   `0x00`: Request transition to SLEEP mode (from ACTIVE or START).
+                        *   `0x01`: Request transition to ACTIVE mode (from SLEEP).
+                    *   `ext_sync` (optional, little endian): External synchronization timestamp. If provided when switching to ACTIVE, this value is written to the CSV file headers as `$VAR,EXT_SYNC,<value>` for synchronization with external data sources.
         *   **Indication Responses (FlySight to Central, if indications enabled):**
-            *   Format: `[0xF0 (CP_RESPONSE_ID)] [Request Opcode] [Status]`
-            *   For any command written:
+            *   Format: `[0xF0 (CP_RESPONSE_ID)] [Request Opcode] [Status] [Optional Data...]`
+            *   For `DS_CMD_GET_FW_VERSION (0x01)`:
+                *   Success: `[0xF0] [0x01] [0x01 (CP_STATUS_SUCCESS)] [version_string (variable)]`
+                *   Invalid Param: `[0xF0] [0x01] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For `DS_CMD_REBOOT_DEVICE (0x02)`:
+                *   Success: `[0xF0] [0x02] [0x01 (CP_STATUS_SUCCESS)]` (device reboots immediately after)
+                *   Invalid Param: `[0xF0] [0x02] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For `DS_CMD_GET_DEVICE_ID (0x03)`:
+                *   Success: `[0xF0] [0x03] [0x01 (CP_STATUS_SUCCESS)] [device_id_hex (24 bytes)]`
+                *   Invalid Param: `[0xF0] [0x03] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+            *   For `DS_CMD_SET_MODE (0x04)`:
+                *   Success: `[0xF0] [0x04] [0x01 (CP_STATUS_SUCCESS)]`
+                *   Invalid Param: `[0xF0] [0x04] [0x03 (CP_STATUS_INVALID_PARAMETER)]`
+                *   Not Permitted: `[0xF0] [0x04] [0x05 (CP_STATUS_OPERATION_NOT_PERMITTED)]` (invalid mode transition)
+            *   For unknown command:
                 *   `[0xF0] [Received Opcode] [0x02 (CP_STATUS_CMD_NOT_SUPPORTED)]`
 
 ### 5. Standard BLE Services

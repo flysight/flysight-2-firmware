@@ -31,6 +31,8 @@
 #include "ble_tx_queue.h"
 #include "version.h"    // For GIT_TAG
 #include "state.h"      // For FS_State_Get()->device_id
+#include "mode.h"       // For FS_Mode_PushQueue, FS_Mode_State
+#include "log.h"        // For FS_Log_SetExtSync
 #include "dbg_trace.h"
 
 // Device State (DS) Control Point command opcodes
@@ -39,6 +41,9 @@
 #define DS_CMD_REBOOT_DEVICE   0x02 // Payload: (none)
 #define DS_CMD_GET_DEVICE_ID   0x03 // Payload: (none)
                                     // Response Data: [device_id_hex_string (24 bytes)]
+#define DS_CMD_SET_MODE        0x04 // Payload: [target_mode (uint8)] [ext_sync (uint32, optional)]
+                                    // target_mode: 0x00 = SLEEP, 0x01 = ACTIVE
+                                    // ext_sync: optional external sync timestamp (little endian)
 
 extern uint8_t SizeDs_Control_Point; // From custom_stm.c
 
@@ -114,6 +119,35 @@ void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t len
                     } else {
                         status = CP_STATUS_ERROR_UNKNOWN; // Buffer too small for ID string
                         response_data_len = 0;
+                    }
+                }
+                break;
+
+            case DS_CMD_SET_MODE:
+                // Accept 1 byte (mode only) or 5 bytes (mode + 4-byte ext_sync timestamp)
+                if (params_len != 1 && params_len != 5) {
+                    status = CP_STATUS_INVALID_PARAMETER;
+                } else {
+                    uint8_t target_mode = payload[1];
+                    FS_Mode_State_t current = FS_Mode_State();
+
+                    if (target_mode == FS_MODE_STATE_ACTIVE && current == FS_MODE_STATE_SLEEP) {
+                        // If ext_sync timestamp provided, store it for CSV header
+                        if (params_len == 5) {
+                            uint32_t extSync = (uint32_t)payload[2] |
+                                              ((uint32_t)payload[3] << 8) |
+                                              ((uint32_t)payload[4] << 16) |
+                                              ((uint32_t)payload[5] << 24);
+                            FS_Log_SetExtSync(extSync);
+                        }
+                        FS_Mode_PushQueue(FS_MODE_EVENT_BLE_SET_ACTIVE);
+                        status = CP_STATUS_SUCCESS;
+                    } else if (target_mode == FS_MODE_STATE_SLEEP &&
+                               (current == FS_MODE_STATE_ACTIVE || current == FS_MODE_STATE_START)) {
+                        FS_Mode_PushQueue(FS_MODE_EVENT_BLE_SET_SLEEP);
+                        status = CP_STATUS_SUCCESS;
+                    } else {
+                        status = CP_STATUS_OPERATION_NOT_PERMITTED;
                     }
                 }
                 break;
