@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2025 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,36 +21,57 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef MODE_H_
-#define MODE_H_
+#include <string.h>
 
-typedef enum
+#include "baro_ble.h"
+
+static uint8_t s_mask = BARO_BLE_DEFAULT_MASK;
+static uint8_t s_divider = 1u;  /* 1 = every sample, 2 = every 2nd sample, etc. */
+
+void BARO_BLE_Init(void)
 {
-	FS_MODE_EVENT_BUTTON_PRESSED,
-	FS_MODE_EVENT_BUTTON_RELEASED,
-	FS_MODE_EVENT_TIMER,
-	FS_MODE_EVENT_VBUS_HIGH,
-	FS_MODE_EVENT_VBUS_LOW,
-	FS_MODE_EVENT_FORCE_UPDATE,
-	FS_MODE_EVENT_BLE_SET_ACTIVE,
-	FS_MODE_EVENT_BLE_SET_SLEEP
-} FS_Mode_Event_t;
+    s_mask = BARO_BLE_DEFAULT_MASK;
+    s_divider = 1u;
+}
 
-typedef enum
+uint8_t BARO_BLE_GetMask(void)
 {
-	FS_MODE_STATE_SLEEP,
-	FS_MODE_STATE_ACTIVE,
-	FS_MODE_STATE_CONFIG,
-	FS_MODE_STATE_USB,
-	FS_MODE_STATE_PAIRING,
-	FS_MODE_STATE_START,
+    return s_mask;
+}
 
-	// Number of modes
-	FS_MODE_STATE_COUNT
-} FS_Mode_State_t;
+void BARO_BLE_SetMask(uint8_t mask)
+{
+    s_mask = mask;
+}
 
-void FS_Mode_Init(void);
-void FS_Mode_PushQueue(FS_Mode_Event_t event);
-FS_Mode_State_t FS_Mode_State(void);
+uint8_t BARO_BLE_GetDivider(void)
+{
+    return s_divider;
+}
 
-#endif /* MODE_H_ */
+void BARO_BLE_SetDivider(uint8_t divider)
+{
+    if (divider == 0) divider = 1;  /* Minimum divider is 1 */
+    s_divider = divider;
+}
+
+uint8_t BARO_BLE_Build(const FS_Baro_Data_t *src, uint8_t *dst)
+{
+    uint8_t *p = dst;
+
+    *p++ = s_mask;                                          /* byte 0 : mask        */
+
+    if (s_mask & BARO_BLE_BIT_TIME) {                       /* time (ms)            */
+        memcpy(p, &src->time, sizeof(src->time));         p += 4;
+    }
+
+    if (s_mask & BARO_BLE_BIT_PRESSURE) {                   /* pressure (Pa * 100)  */
+        memcpy(p, &src->pressure, sizeof(src->pressure)); p += 4;
+    }
+
+    if (s_mask & BARO_BLE_BIT_TEMPERATURE) {                /* temperature (C * 100)*/
+        memcpy(p, &src->temperature, sizeof(src->temperature)); p += 2;
+    }
+
+    return (uint8_t)(p - dst);                              /* total payload length */
+}

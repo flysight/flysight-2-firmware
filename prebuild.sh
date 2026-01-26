@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GIT_TAG=$(git describe --tags --always)
+GIT_TAG=$(git describe --tags --always)-BARO-TEST
 
 cat << EOF > ../FlySight/version.h
 #ifndef VERSION_H

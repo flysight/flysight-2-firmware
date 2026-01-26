@@ -1,7 +1,7 @@
 /***************************************************************************
 **                                                                        **
 **  FlySight 2 firmware                                                   **
-**  Copyright 2023 Bionic Avionics Inc.                                   **
+**  Copyright 2025 Bionic Avionics Inc.                                   **
 **                                                                        **
 **  This program is free software: you can redistribute it and/or modify  **
 **  it under the terms of the GNU General Public License as published by  **
@@ -21,36 +21,34 @@
 **  Website: http://flysight.ca/                                          **
 ****************************************************************************/
 
-#ifndef MODE_H_
-#define MODE_H_
+#ifndef GYRO_BLE_H_
+#define GYRO_BLE_H_
 
-typedef enum
-{
-	FS_MODE_EVENT_BUTTON_PRESSED,
-	FS_MODE_EVENT_BUTTON_RELEASED,
-	FS_MODE_EVENT_TIMER,
-	FS_MODE_EVENT_VBUS_HIGH,
-	FS_MODE_EVENT_VBUS_LOW,
-	FS_MODE_EVENT_FORCE_UPDATE,
-	FS_MODE_EVENT_BLE_SET_ACTIVE,
-	FS_MODE_EVENT_BLE_SET_SLEEP
-} FS_Mode_Event_t;
+#include <stdint.h>
+#include "stm32wbxx_hal.h"
+#include "imu.h"
 
-typedef enum
-{
-	FS_MODE_STATE_SLEEP,
-	FS_MODE_STATE_ACTIVE,
-	FS_MODE_STATE_CONFIG,
-	FS_MODE_STATE_USB,
-	FS_MODE_STATE_PAIRING,
-	FS_MODE_STATE_START,
+/* ------------------------------------------------------------------ */
+/* Packet layout control                                              */
+/* ------------------------------------------------------------------ */
+#define GYRO_BLE_MAX_LEN            20u
 
-	// Number of modes
-	FS_MODE_STATE_COUNT
-} FS_Mode_State_t;
+/* Bit-layout of mask byte (MSB first) */
+#define GYRO_BLE_BIT_TIME           0x80u
+#define GYRO_BLE_BIT_GYRO           0x40u
+#define GYRO_BLE_BIT_TEMPERATURE    0x20u
 
-void FS_Mode_Init(void);
-void FS_Mode_PushQueue(FS_Mode_Event_t event);
-FS_Mode_State_t FS_Mode_State(void);
+/* Default mask: all fields enabled */
+#define GYRO_BLE_DEFAULT_MASK       0xE0u
 
-#endif /* MODE_H_ */
+/* ------------------------------------------------------------------ */
+/* Public API                                                         */
+/* ------------------------------------------------------------------ */
+void    GYRO_BLE_Init(void);
+uint8_t GYRO_BLE_GetMask(void);
+void    GYRO_BLE_SetMask(uint8_t mask);
+uint8_t GYRO_BLE_GetDivider(void);
+void    GYRO_BLE_SetDivider(uint8_t divider);
+uint8_t GYRO_BLE_Build(const FS_IMU_Data_t *src, uint8_t *dst);
+
+#endif /* GYRO_BLE_H_ */

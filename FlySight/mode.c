@@ -220,6 +220,19 @@ static FS_Mode_State_t FS_Mode_State_Sleep(FS_Mode_Event_t event)
 		FS_USBMode_Init();
 		next_mode = FS_MODE_STATE_USB;
 	}
+	else if (event == FS_MODE_EVENT_BLE_SET_ACTIVE)
+	{
+		if (FS_State_Get()->active_mode == FS_ACTIVE_MODE_DEFAULT)
+		{
+			FS_ActiveMode_Init();
+			next_mode = FS_MODE_STATE_ACTIVE;
+		}
+		else if (FS_State_Get()->active_mode == FS_ACTIVE_MODE_START)
+		{
+			FS_StartMode_Init();
+			next_mode = FS_MODE_STATE_START;
+		}
+	}
 
 	return next_mode;
 }
@@ -237,6 +250,11 @@ static FS_Mode_State_t FS_Mode_State_Active(FS_Mode_Event_t event)
 		HW_TS_Stop(timer_id);
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
+	{
+		FS_ActiveMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+	else if (event == FS_MODE_EVENT_BLE_SET_SLEEP)
 	{
 		FS_ActiveMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;
@@ -307,6 +325,11 @@ static FS_Mode_State_t FS_Mode_State_Start(FS_Mode_Event_t event)
 		HW_TS_Stop(timer_id);
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
+	{
+		FS_StartMode_DeInit();
+		next_mode = FS_MODE_STATE_SLEEP;
+	}
+	else if (event == FS_MODE_EVENT_BLE_SET_SLEEP)
 	{
 		FS_StartMode_DeInit();
 		next_mode = FS_MODE_STATE_SLEEP;

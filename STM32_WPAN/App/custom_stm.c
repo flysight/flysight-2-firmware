@@ -34,6 +34,10 @@ typedef struct{
   uint16_t  CustomSensor_DataHdle;                    /**< Sensor_Data handle */
   uint16_t  CustomSd_Gnss_MeasurementHdle;                  /**< SD_GNSS_Measurement handle */
   uint16_t  CustomSd_Control_PointHdle;                  /**< SD_Control_Point handle */
+  uint16_t  CustomSd_Baro_MeasurementHdle;                  /**< SD_BARO_Measurement handle */
+  uint16_t  CustomSd_Accel_MeasurementHdle;                  /**< SD_ACCEL_Measurement handle */
+  uint16_t  CustomSd_Gyro_MeasurementHdle;                   /**< SD_GYRO_Measurement handle */
+  uint16_t  CustomSd_Mag_MeasurementHdle;                   /**< SD_MAG_Measurement handle */
   uint16_t  CustomStarter_PistolHdle;                    /**< Starter_Pistol handle */
   uint16_t  CustomSp_Control_PointHdle;                  /**< SP_Control_Point handle */
   uint16_t  CustomSp_ResultHdle;                  /**< SP_Result handle */
@@ -79,6 +83,10 @@ uint8_t SizeFt_Packet_Out = 244;
 uint8_t SizeFt_Packet_In = 244;
 uint8_t SizeSd_Gnss_Measurement = 44;
 uint8_t SizeSd_Control_Point = 20;
+uint8_t SizeSd_Baro_Measurement = 12;
+uint8_t SizeSd_Accel_Measurement = 20;
+uint8_t SizeSd_Gyro_Measurement = 20;
+uint8_t SizeSd_Mag_Measurement = 14;
 uint8_t SizeSp_Control_Point = 20;
 uint8_t SizeSp_Result = 9;
 uint8_t SizeDs_Mode = 1;
@@ -153,6 +161,10 @@ do {\
 #define COPY_DEVICE_STATE_UUID(uuid_struct)          COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x03,0xcc,0x7a,0x48,0x2a,0x98,0x4a,0x7f,0x2e,0xd5,0xb3,0xe5,0x8f)
 #define COPY_DS_MODE_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x05,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 #define COPY_DS_CONTROL_POINT_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x07,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_SD_BARO_MEASUREMENT_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x08,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_SD_ACCEL_MEASUREMENT_UUID(uuid_struct)   COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x09,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_SD_GYRO_MEASUREMENT_UUID(uuid_struct)    COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x0A,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
+#define COPY_SD_MAG_MEASUREMENT_UUID(uuid_struct)     COPY_UUID_128(uuid_struct,0x00,0x00,0x00,0x0B,0x8e,0x22,0x45,0x41,0x9d,0x4c,0x21,0xed,0xae,0x82,0xed,0x19)
 
 /* USER CODE BEGIN PF */
 
@@ -322,6 +334,182 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
               break;
             }
           }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSD_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Baro_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3 */
+
+            /* USER CODE END CUSTOM_STM_Service_2_Char_3 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_3_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_3_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_3_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_3_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_3_COMSVC_Notification_END */
+                break;
+
+              default:
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_default */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_3_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Baro_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Accel_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4 */
+
+            /* USER CODE END CUSTOM_STM_Service_2_Char_4 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_4_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_4_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_4_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_4_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_4_COMSVC_Notification_END */
+                break;
+
+              default:
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_default */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_4_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Accel_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Gyro_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5 */
+
+            /* USER CODE END CUSTOM_STM_Service_2_Char_5 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_5_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_5_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_5_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_5_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_5_COMSVC_Notification_END */
+                break;
+
+              default:
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_default */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_5_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Gyro_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
+
+          else if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Mag_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6 */
+
+            /* USER CODE END CUSTOM_STM_Service_2_Char_6 */
+            switch (attribute_modified->Attr_Data[0])
+            {
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_attribute_modified */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_6_attribute_modified */
+
+              /* Disabled Notification management */
+              case (!(COMSVC_Notification)):
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_Disabled_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_6_Disabled_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_DISABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_Disabled_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_6_Disabled_END */
+                break;
+
+              /* Enabled Notification management */
+              case COMSVC_Notification:
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_COMSVC_Notification_BEGIN */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_6_COMSVC_Notification_BEGIN */
+                Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_ENABLED_EVT;
+                Custom_STM_App_Notification(&Notification);
+                /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_COMSVC_Notification_END */
+
+                /* USER CODE END CUSTOM_STM_Service_2_Char_6_COMSVC_Notification_END */
+                break;
+
+              default:
+              /* USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_default */
+
+              /* USER CODE END CUSTOM_STM_Service_2_Char_6_default */
+              break;
+            }
+          }  /* if (attribute_modified->Attr_Handle == (CustomContext.CustomSd_Mag_MeasurementHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))*/
 
           else if (attribute_modified->Attr_Handle == (CustomContext.CustomSp_Control_PointHdle + CHARACTERISTIC_DESCRIPTOR_ATTRIBUTE_OFFSET))
           {
@@ -609,6 +797,54 @@ static SVCCTL_EvtAckStatus_t Custom_STM_Event_Handler(void *Event)
 
             /*USER CODE END CUSTOM_STM_Service_2_Char_1_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
           } /* if (read_req->Attribute_Handle == (CustomContext.CustomSd_Gnss_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomSd_Baro_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_2_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_2_Char_3_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomSd_Baro_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomSd_Accel_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_ACCEL_MEASUREMENT_READ_EVT;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_2_Char_4_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_4_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_2_Char_4_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomSd_Accel_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomSd_Gyro_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_GYRO_MEASUREMENT_READ_EVT;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_2_Char_5_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_5_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_2_Char_5_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomSd_Gyro_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
+          else if (read_req->Attribute_Handle == (CustomContext.CustomSd_Mag_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
+          {
+            return_value = SVCCTL_EvtAckFlowEnable;
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1 */
+            Notification.Custom_Evt_Opcode = CUSTOM_STM_SD_MAG_MEASUREMENT_READ_EVT;
+            Custom_STM_App_Notification(&Notification);
+            /*USER CODE END CUSTOM_STM_Service_2_Char_6_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_1*/
+            aci_gatt_allow_read(read_req->Connection_Handle);
+            /*USER CODE BEGIN CUSTOM_STM_Service_2_Char_6_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2 */
+
+            /*USER CODE END CUSTOM_STM_Service_2_Char_6_ACI_GATT_READ_PERMIT_REQ_VSEVT_CODE_2*/
+          } /* if (read_req->Attribute_Handle == (CustomContext.CustomSd_Mag_MeasurementHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))*/
           else if (read_req->Attribute_Handle == (CustomContext.CustomSp_ResultHdle + CHARACTERISTIC_VALUE_ATTRIBUTE_OFFSET))
           {
             return_value = SVCCTL_EvtAckFlowEnable;
@@ -825,14 +1061,22 @@ void SVCCTL_InitCustomSvc(void)
    * service_max_attribute_record = 1 for Sensor_Data +
    *                                2 for SD_GNSS_Measurement +
    *                                2 for SD_Control_Point +
+   *                                2 for SD_BARO_Measurement +
+   *                                2 for SD_ACCEL_Measurement +
+   *                                2 for SD_GYRO_Measurement +
+   *                                2 for SD_MAG_Measurement +
    *                                1 for SD_GNSS_Measurement configuration descriptor +
    *                                1 for SD_Control_Point configuration descriptor +
-   *                              = 7
+   *                                1 for SD_BARO_Measurement configuration descriptor +
+   *                                1 for SD_ACCEL_Measurement configuration descriptor +
+   *                                1 for SD_GYRO_Measurement configuration descriptor +
+   *                                1 for SD_MAG_Measurement configuration descriptor +
+   *                              = 19
    *
    * This value doesn't take into account number of descriptors manually added
    * In case of descriptors added, please update the max_attr_record value accordingly in the next SVCCTL_InitService User Section
    */
-  max_attr_record = 7;
+  max_attr_record = 19;
 
   /* USER CODE BEGIN SVCCTL_InitService */
   /* max_attr_record to be updated if descriptors have been added */
@@ -906,6 +1150,114 @@ void SVCCTL_InitCustomSvc(void)
   /* Place holder for Characteristic Descriptors */
 
   /* USER CODE END SVCCTL_Init_Service2_Char2 */
+
+  /**
+   *  SD_BARO_Measurement
+   */
+  COPY_SD_BARO_MEASUREMENT_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(CustomContext.CustomSensor_DataHdle,
+                          UUID_TYPE_128, &uuid,
+                          SizeSd_Baro_Measurement,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_VARIABLE,
+                          &(CustomContext.CustomSd_Baro_MeasurementHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : SD_BARO_MEASUREMENT, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : SD_BARO_MEASUREMENT \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service2_Char3/ */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service2_Char3 */
+
+  /**
+   *  SD_ACCEL_Measurement
+   */
+  COPY_SD_ACCEL_MEASUREMENT_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(CustomContext.CustomSensor_DataHdle,
+                          UUID_TYPE_128, &uuid,
+                          SizeSd_Accel_Measurement,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_VARIABLE,
+                          &(CustomContext.CustomSd_Accel_MeasurementHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : SD_ACCEL_MEASUREMENT, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : SD_ACCEL_MEASUREMENT \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service2_Char4 */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service2_Char4 */
+
+  /**
+   *  SD_GYRO_Measurement
+   */
+  COPY_SD_GYRO_MEASUREMENT_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(CustomContext.CustomSensor_DataHdle,
+                          UUID_TYPE_128, &uuid,
+                          SizeSd_Gyro_Measurement,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_VARIABLE,
+                          &(CustomContext.CustomSd_Gyro_MeasurementHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : SD_GYRO_MEASUREMENT, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : SD_GYRO_MEASUREMENT \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service2_Char5 */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service2_Char5 */
+
+  /**
+   *  SD_MAG_Measurement
+   */
+  COPY_SD_MAG_MEASUREMENT_UUID(uuid.Char_UUID_128);
+  ret = aci_gatt_add_char(CustomContext.CustomSensor_DataHdle,
+                          UUID_TYPE_128, &uuid,
+                          SizeSd_Mag_Measurement,
+                          CHAR_PROP_READ | CHAR_PROP_NOTIFY,
+                          ATTR_PERMISSION_ENCRY_READ | ATTR_PERMISSION_ENCRY_WRITE,
+                          GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                          0x10,
+                          CHAR_VALUE_LEN_VARIABLE,
+                          &(CustomContext.CustomSd_Mag_MeasurementHdle));
+  if (ret != BLE_STATUS_SUCCESS)
+  {
+    APP_DBG_MSG("  Fail   : aci_gatt_add_char command   : SD_MAG_MEASUREMENT, error code: 0x%x \n\r", ret);
+  }
+  else
+  {
+    APP_DBG_MSG("  Success: aci_gatt_add_char command   : SD_MAG_MEASUREMENT \n\r");
+  }
+
+  /* USER CODE BEGIN SVCCTL_Init_Service2_Char6 */
+  /* Place holder for Characteristic Descriptors */
+
+  /* USER CODE END SVCCTL_Init_Service2_Char6 */
 
   /**
    *          Starter_Pistol
@@ -1243,6 +1595,82 @@ tBleStatus Custom_STM_App_Update_Char(Custom_STM_Char_Opcode_t CharOpcode, uint8
       /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_2_Char_2*/
 
       /* USER CODE END CUSTOM_STM_App_Update_Service_2_Char_2*/
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT:
+      ret = aci_gatt_update_char_value(CustomContext.CustomSensor_DataHdle,
+                                       CustomContext.CustomSd_Baro_MeasurementHdle,
+                                       0, /* charValOffset */
+                                       SizeSd_Baro_Measurement, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value SD_BARO_MEASUREMENT command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value SD_BARO_MEASUREMENT command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_2_Char_3*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_2_Char_3*/
+      break;
+
+    case CUSTOM_STM_SD_ACCEL_MEASUREMENT:
+      ret = aci_gatt_update_char_value(CustomContext.CustomSensor_DataHdle,
+                                       CustomContext.CustomSd_Accel_MeasurementHdle,
+                                       0, /* charValOffset */
+                                       SizeSd_Accel_Measurement, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value SD_ACCEL_MEASUREMENT command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value SD_ACCEL_MEASUREMENT command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_2_Char_4*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_2_Char_4*/
+      break;
+
+    case CUSTOM_STM_SD_GYRO_MEASUREMENT:
+      ret = aci_gatt_update_char_value(CustomContext.CustomSensor_DataHdle,
+                                       CustomContext.CustomSd_Gyro_MeasurementHdle,
+                                       0, /* charValOffset */
+                                       SizeSd_Gyro_Measurement, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value SD_GYRO_MEASUREMENT command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value SD_GYRO_MEASUREMENT command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_2_Char_5*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_2_Char_5*/
+      break;
+
+    case CUSTOM_STM_SD_MAG_MEASUREMENT:
+      ret = aci_gatt_update_char_value(CustomContext.CustomSensor_DataHdle,
+                                       CustomContext.CustomSd_Mag_MeasurementHdle,
+                                       0, /* charValOffset */
+                                       SizeSd_Mag_Measurement, /* charValueLen */
+                                       (uint8_t *)  pPayload);
+      if (ret != BLE_STATUS_SUCCESS)
+      {
+        APP_DBG_MSG("  Fail   : aci_gatt_update_char_value SD_MAG_MEASUREMENT command, result : 0x%x \n\r", ret);
+      }
+      else
+      {
+        APP_DBG_MSG("  Success: aci_gatt_update_char_value SD_MAG_MEASUREMENT command\n\r");
+      }
+      /* USER CODE BEGIN CUSTOM_STM_App_Update_Service_2_Char_5*/
+
+      /* USER CODE END CUSTOM_STM_App_Update_Service_2_Char_5*/
       break;
 
     case CUSTOM_STM_SP_CONTROL_POINT:

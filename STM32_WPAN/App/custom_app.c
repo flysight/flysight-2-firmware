@@ -32,6 +32,10 @@
 #include "crs.h"
 #include "start_control.h"
 #include "gnss_ble.h"
+#include "baro_ble.h"
+#include "accel_ble.h"
+#include "gyro_ble.h"
+#include "mag_ble.h"
 #include "mode.h"
 #include "ble_tx_queue.h"
 #include "sensor_data.h"
@@ -47,6 +51,10 @@ typedef struct
   /* Sensor_Data */
   uint8_t               Sd_gnss_measurement_Notification_Status;
   uint8_t               Sd_control_point_Indication_Status;
+  uint8_t               Sd_baro_measurement_Notification_Status;
+  uint8_t               Sd_accel_measurement_Notification_Status;
+  uint8_t               Sd_gyro_measurement_Notification_Status;
+  uint8_t               Sd_mag_measurement_Notification_Status;
   /* Starter_Pistol */
   uint8_t               Sp_control_point_Indication_Status;
   uint8_t               Sp_result_Indication_Status;
@@ -73,7 +81,7 @@ typedef struct
 
 /* Private macros -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define TIMEOUT_MSEC  30000
+#define TIMEOUT_MSEC  300000  /* 5 minutes for testing */
 #define TIMEOUT_TICKS (TIMEOUT_MSEC*1000/CFG_TS_TICK_VAL)
 /* USER CODE END PM */
 
@@ -96,6 +104,14 @@ static Custom_CRS_Packet_t rx_buffer[FS_CRS_WINDOW_LENGTH+1];
 static uint32_t rx_read_index, rx_write_index;
 
 static uint8_t gnss_pv_packet[GNSS_BLE_MAX_LEN];
+static uint8_t baro_pv_packet[BARO_BLE_MAX_LEN];
+static uint8_t baro_sample_counter = 0;
+static uint8_t accel_pv_packet[ACCEL_BLE_MAX_LEN];
+static uint8_t accel_sample_counter = 0;
+static uint8_t gyro_pv_packet[GYRO_BLE_MAX_LEN];
+static uint8_t gyro_sample_counter = 0;
+static uint8_t mag_pv_packet[MAG_BLE_MAX_LEN];
+static uint8_t mag_sample_counter = 0;
 
 static uint8_t start_result_packet[9];
 
@@ -218,6 +234,106 @@ void Custom_STM_App_Notification(Custom_STM_App_Notification_evt_t *pNotificatio
       /* USER CODE BEGIN CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
       Custom_App_Context.Sd_control_point_Indication_Status = 0;
       /* USER CODE END CUSTOM_STM_SD_CONTROL_POINT_INDICATE_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT */
+      {
+        /* Read current baro value directly from sensor */
+        const FS_Baro_Data_t *data = FS_Baro_GetData();
+        uint8_t packet[BARO_BLE_MAX_LEN];
+        uint8_t len = BARO_BLE_Build(data, packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_BARO_MEASUREMENT, packet);
+      }
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_baro_measurement_Notification_Status = 1;
+      baro_sample_counter = 0;  /* Reset decimation counter */
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_BARO_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_ACCEL_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_ACCEL_MEASUREMENT_READ_EVT */
+      {
+        /* Read current ACCEL value directly from sensor */
+        const FS_IMU_Data_t *data = FS_IMU_GetData();
+        uint8_t packet[ACCEL_BLE_MAX_LEN];
+        uint8_t len = ACCEL_BLE_Build(data, packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_ACCEL_MEASUREMENT, packet);
+      }
+      /* USER CODE END CUSTOM_STM_SD_ACCEL_MEASUREMENT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_accel_measurement_Notification_Status = 1;
+      accel_sample_counter = 0;  /* Reset decimation counter */
+      /* USER CODE END CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_accel_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_ACCEL_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_GYRO_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GYRO_MEASUREMENT_READ_EVT */
+      {
+        /* Read current GYRO value directly from sensor */
+        const FS_IMU_Data_t *data = FS_IMU_GetData();
+        uint8_t packet[GYRO_BLE_MAX_LEN];
+        uint8_t len = GYRO_BLE_Build(data, packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_GYRO_MEASUREMENT, packet);
+      }
+      /* USER CODE END CUSTOM_STM_SD_GYRO_MEASUREMENT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_gyro_measurement_Notification_Status = 1;
+      gyro_sample_counter = 0;  /* Reset decimation counter */
+      /* USER CODE END CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_gyro_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_GYRO_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_MAG_MEASUREMENT_READ_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_MAG_MEASUREMENT_READ_EVT */
+      {
+        /* Read current MAG value directly from sensor */
+        const FS_Mag_Data_t *data = FS_Mag_GetData();
+        uint8_t packet[MAG_BLE_MAX_LEN];
+        uint8_t len = MAG_BLE_Build(data, packet);
+        Custom_STM_App_Update_Char(CUSTOM_STM_SD_MAG_MEASUREMENT, packet);
+      }
+      /* USER CODE END CUSTOM_STM_SD_MAG_MEASUREMENT_READ_EVT */
+      break;
+
+    case CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_ENABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      Custom_App_Context.Sd_mag_measurement_Notification_Status = 1;
+      mag_sample_counter = 0;  /* Reset decimation counter */
+      /* USER CODE END CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_ENABLED_EVT */
+      break;
+
+    case CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_DISABLED_EVT:
+      /* USER CODE BEGIN CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_DISABLED_EVT */
+      Custom_App_Context.Sd_mag_measurement_Notification_Status = 0;
+      /* USER CODE END CUSTOM_STM_SD_MAG_MEASUREMENT_NOTIFY_DISABLED_EVT */
       break;
 
     /* Starter_Pistol */
@@ -403,6 +519,7 @@ void Custom_APP_Init(void)
   /* Sensor_Data */
   Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
   Custom_App_Context.Sd_control_point_Indication_Status = 0;
+  Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
 
   /* Starter_Pistol */
   Custom_App_Context.Sp_control_point_Indication_Status = 0;
@@ -788,6 +905,7 @@ static void Custom_CRS_OnDisconnect(void)
 
   Custom_App_Context.Sd_gnss_measurement_Notification_Status = 0;
   Custom_App_Context.Sd_control_point_Indication_Status = 0;
+  Custom_App_Context.Sd_baro_measurement_Notification_Status = 0;
 
   Custom_App_Context.Sp_control_point_Indication_Status = 0;
   Custom_App_Context.Sp_result_Indication_Status = 0;
@@ -845,6 +963,82 @@ void Custom_GNSS_Update(const FS_GNSS_Data_t *current)
   {
     BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GNSS_MEASUREMENT,
         gnss_pv_packet, length, &SizeSd_Gnss_Measurement, 0);
+  }
+}
+
+void Custom_BARO_Update(const FS_Baro_Data_t *current)
+{
+  /* Decimation: only send every Nth sample */
+  uint8_t divider = BARO_BLE_GetDivider();
+  if (++baro_sample_counter < divider)
+  {
+    return;
+  }
+  baro_sample_counter = 0;
+
+  uint8_t length = BARO_BLE_Build(current, baro_pv_packet);
+
+  if (Custom_App_Context.Sd_baro_measurement_Notification_Status)
+  {
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_BARO_MEASUREMENT,
+        baro_pv_packet, length, &SizeSd_Baro_Measurement, 0);
+  }
+}
+
+void Custom_ACCEL_Update(const FS_IMU_Data_t *current)
+{
+  /* Decimation: only send every Nth sample */
+  uint8_t divider = ACCEL_BLE_GetDivider();
+  if (++accel_sample_counter < divider)
+  {
+    return;
+  }
+  accel_sample_counter = 0;
+
+  uint8_t length = ACCEL_BLE_Build(current, accel_pv_packet);
+
+  if (Custom_App_Context.Sd_accel_measurement_Notification_Status)
+  {
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_ACCEL_MEASUREMENT,
+        accel_pv_packet, length, &SizeSd_Accel_Measurement, 0);
+  }
+}
+
+void Custom_GYRO_Update(const FS_IMU_Data_t *current)
+{
+  /* Decimation: only send every Nth sample */
+  uint8_t divider = GYRO_BLE_GetDivider();
+  if (++gyro_sample_counter < divider)
+  {
+    return;
+  }
+  gyro_sample_counter = 0;
+
+  uint8_t length = GYRO_BLE_Build(current, gyro_pv_packet);
+
+  if (Custom_App_Context.Sd_gyro_measurement_Notification_Status)
+  {
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_GYRO_MEASUREMENT,
+        gyro_pv_packet, length, &SizeSd_Gyro_Measurement, 0);
+  }
+}
+
+void Custom_MAG_Update(const FS_Mag_Data_t *current)
+{
+  /* Decimation: only send every Nth sample */
+  uint8_t divider = MAG_BLE_GetDivider();
+  if (++mag_sample_counter < divider)
+  {
+    return;
+  }
+  mag_sample_counter = 0;
+
+  uint8_t length = MAG_BLE_Build(current, mag_pv_packet);
+
+  if (Custom_App_Context.Sd_mag_measurement_Notification_Status)
+  {
+    BLE_TX_Queue_SendTxPacket(CUSTOM_STM_SD_MAG_MEASUREMENT,
+        mag_pv_packet, length, &SizeSd_Mag_Measurement, 0);
   }
 }
 
