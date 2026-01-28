@@ -113,6 +113,7 @@ extern SPI_HandleTypeDef hspi1;
 
 static void FS_IMU_BeginRead(void);
 static void FS_IMU_Read_Callback(HAL_StatusTypeDef result);
+static HAL_StatusTypeDef FS_IMU_ClearInt1(void);
 
 void FS_IMU_TransferComplete(void)
 {
@@ -155,6 +156,14 @@ static HAL_StatusTypeDef FS_IMU_WriteRegister(uint8_t addr, uint8_t *data, uint1
 	CS_HIGH();
 
 	return result;
+}
+
+static HAL_StatusTypeDef FS_IMU_ClearInt1(void)
+{
+	uint8_t dummy[14];
+
+	// Read all output registers (TEMP + GYRO + ACCEL) to clear INT1
+	return FS_IMU_ReadRegister(LSM6DSO_OUT_TEMP_L_REG, dummy, 14);
 }
 
 void FS_IMU_Init(void)
@@ -221,6 +230,14 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 	{
 		return HAL_ERROR;
 	}
+
+	// Clear any pending interrupt before enabling rising-edge EXTI
+	// This prevents lockup if INT1 is already HIGH from previous session
+	if (HAL_GPIO_ReadPin(IMU_INT1_GPIO_Port, IMU_INT1_Pin) == GPIO_PIN_SET)
+	{
+		FS_IMU_ClearInt1();
+	}
+	LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_9);
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_9);
@@ -310,7 +327,7 @@ void FS_IMU_Stop(void)
 	uint8_t buf[1];
 	uint32_t primask_bit;
 
-	// Disable EXTI pin
+	// Disable EXTI to prevent new interrupts
 	LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
 
 	// Disable asynchronous reads
@@ -322,11 +339,18 @@ void FS_IMU_Stop(void)
 
 	__set_PRIMASK(primask_bit);
 
+	// Wait for any in-flight DMA to complete
 	while (busy);
 
 	// Software reset
 	buf[0] = 0x01;
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+
+	// Clear pending data to ensure INT1 goes LOW for clean restart
+	if (HAL_GPIO_ReadPin(IMU_INT1_GPIO_Port, IMU_INT1_Pin) == GPIO_PIN_SET)
+	{
+		FS_IMU_ClearInt1();
+	}
 
 	imuState = IMU_STATE_READY;
 }
