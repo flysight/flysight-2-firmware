@@ -310,6 +310,9 @@ void FS_IMU_Stop(void)
 	uint8_t buf[1];
 	uint32_t primask_bit;
 
+	// Disable EXTI pin
+	LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+
 	// Disable asynchronous reads
 	primask_bit = __get_PRIMASK();
 	__disable_irq();
