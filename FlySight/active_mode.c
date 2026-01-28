@@ -135,16 +135,6 @@ void FS_ActiveMode_Init(void)
 		HAL_GPIO_WritePin(MIC_EN_GPIO_Port, MIC_EN_Pin, GPIO_PIN_SET);
 	}
 
-	if (FS_Config_Get()->enable_imu)
-	{
-		/* Start IMU */
-		if (FS_IMU_Start() != HAL_OK)
-		{
-			isSystemHealthy = false;
-			FS_Log_WriteEvent("IMU start failed");
-		}
-	}
-
 	/* Enable USART */
 	MX_USART1_UART_Init();
 
@@ -196,6 +186,16 @@ void FS_ActiveMode_Init(void)
 	{
 		/* Start reading sensors */
 		FS_Sensor_Start();
+	}
+
+	if (FS_Config_Get()->enable_imu)
+	{
+		/* Start IMU */
+		if (FS_IMU_Start() != HAL_OK)
+		{
+			isSystemHealthy = false;
+			FS_Log_WriteEvent("IMU start failed");
+		}
 	}
 
 	/* Set the final health status */
