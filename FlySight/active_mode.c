@@ -207,6 +207,12 @@ void FS_ActiveMode_DeInit(void)
 	/* Disable controller */
 	FS_ActiveControl_DeInit();
 
+	if (FS_Config_Get()->enable_imu)
+	{
+		/* Stop IMU */
+		FS_IMU_Stop();
+	}
+
 	if (FS_Config_Get()->enable_baro || FS_Config_Get()->enable_hum || FS_Config_Get()->enable_mag)
 	{
 		/* Stop reading sensors */
@@ -236,12 +242,6 @@ void FS_ActiveMode_DeInit(void)
 
 	/* Disable USART */
 	HAL_UART_DeInit(&huart1);
-
-	if (FS_Config_Get()->enable_imu)
-	{
-		/* Stop IMU */
-		FS_IMU_Stop();
-	}
 
 	if (FS_Config_Get()->enable_mic)
 	{
