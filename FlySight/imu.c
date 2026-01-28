@@ -97,8 +97,8 @@ static uint8_t dataBuf[15];
 static FS_IMU_Data_t imuData;
 
 static volatile bool handleRead  = false;
-static volatile bool dataWaiting = false;
 static volatile bool busy = false;
+static volatile bool enable_logging = false;
 
 typedef enum {
     IMU_STATE_UNINITIALIZED = 0,
@@ -111,7 +111,7 @@ static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
 
 extern SPI_HandleTypeDef hspi1;
 
-static void FS_IMU_BeginRead(void);
+static void FS_IMU_BeginRead(bool is_startup);
 static void FS_IMU_Read_Callback(HAL_StatusTypeDef result);
 static HAL_StatusTypeDef FS_IMU_ClearInt1(void);
 
@@ -224,7 +224,6 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
-	uint32_t primask_bit;
 
 	if (imuState != IMU_STATE_READY)
 	{
@@ -306,18 +305,9 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 	imuState = IMU_STATE_ACTIVE;
 
 	// Enable asynchronous reads
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
 	handleRead = true;
-	bool read = dataWaiting;
 
-	__set_PRIMASK(primask_bit);
-
-	if (read)
-	{
-		FS_IMU_BeginRead();
-	}
+	FS_IMU_BeginRead(true);
 
 	return HAL_OK;
 }
@@ -325,19 +315,12 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 void FS_IMU_Stop(void)
 {
 	uint8_t buf[1];
-	uint32_t primask_bit;
 
 	// Disable EXTI to prevent new interrupts
 	LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
 
 	// Disable asynchronous reads
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
 	handleRead = false;
-	dataWaiting = false;
-
-	__set_PRIMASK(primask_bit);
 
 	// Wait for any in-flight DMA to complete
 	while (busy);
@@ -366,29 +349,38 @@ void FS_IMU_Read(void)
 
 	if (handleRead)
 	{
-		FS_IMU_BeginRead();
-	}
-	else
-	{
-		dataWaiting = true;
+		FS_IMU_BeginRead(false);
 	}
 }
 
-static void FS_IMU_BeginRead(void)
+static void FS_IMU_BeginRead(bool is_startup)
 {
 	HAL_StatusTypeDef res;
+	uint32_t primask_bit;
 
 	/* Address with read flag */
 	dataBuf[0] = LSM6DSO_OUT_TEMP_L_REG | 0x80;
 
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
 	if (busy)
 	{
-		/* Handle data overrun */
-		FS_Log_WriteEventAsync("IMU data overrun");
+		__set_PRIMASK(primask_bit);
+
+		if (!is_startup)
+		{
+			/* Handle data overrun */
+			FS_Log_WriteEventAsync("IMU data overrun");
+		}
+
 		return;
 	}
 
 	busy = true;
+	enable_logging = !is_startup;
+
+	__set_PRIMASK(primask_bit);
 
 	CS_LOW();
 	res = HAL_SPI_TransmitReceive_DMA(&hspi1, dataBuf, dataBuf, 15);
@@ -401,9 +393,7 @@ static void FS_IMU_Read_Callback(HAL_StatusTypeDef result)
 {
 	CS_HIGH();
 
-	busy = false;
-
-	if (result == HAL_OK)
+	if (enable_logging && (result == HAL_OK))
 	{
 		imuData.temperature = (((int16_t) ((dataBuf[2] << 8) | dataBuf[1])) * 100) / 256 + 2500;
 
@@ -415,7 +405,13 @@ static void FS_IMU_Read_Callback(HAL_StatusTypeDef result)
 		imuData.ax = -(((int64_t) (int16_t) ((dataBuf[12] << 8) | dataBuf[11])) * accelFactor) / 32768;
 		imuData.az = (((int64_t) (int16_t) ((dataBuf[14] << 8) | dataBuf[13])) * accelFactor) / 32768;
 
+		busy = false;
+
 		FS_IMU_DataReady_Callback();
+	}
+	else
+	{
+		busy = false;		
 	}
 }
 
