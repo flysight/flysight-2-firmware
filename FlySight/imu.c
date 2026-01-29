@@ -98,7 +98,7 @@ static FS_IMU_Data_t imuData;
 
 static volatile bool handleRead  = false;
 static volatile bool busy = false;
-static volatile bool enable_logging = false;
+static volatile bool enableLoggingCb = false;
 
 typedef enum {
     IMU_STATE_UNINITIALIZED = 0,
@@ -111,7 +111,7 @@ static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
 
 extern SPI_HandleTypeDef hspi1;
 
-static void FS_IMU_BeginRead(bool is_startup);
+static void FS_IMU_BeginRead(bool enableLogging);
 static void FS_IMU_Read_Callback(HAL_StatusTypeDef result);
 static HAL_StatusTypeDef FS_IMU_ClearInt1(void);
 
@@ -353,7 +353,7 @@ void FS_IMU_Read(void)
 	}
 }
 
-static void FS_IMU_BeginRead(bool is_startup)
+static void FS_IMU_BeginRead(bool enableLogging)
 {
 	HAL_StatusTypeDef res;
 	uint32_t primask_bit;
@@ -368,7 +368,7 @@ static void FS_IMU_BeginRead(bool is_startup)
 	{
 		__set_PRIMASK(primask_bit);
 
-		if (!is_startup)
+		if (enableLogging)
 		{
 			/* Handle data overrun */
 			FS_Log_WriteEventAsync("IMU data overrun");
@@ -378,7 +378,7 @@ static void FS_IMU_BeginRead(bool is_startup)
 	}
 
 	busy = true;
-	enable_logging = !is_startup;
+	enableLoggingCb = enableLogging;
 
 	__set_PRIMASK(primask_bit);
 
@@ -393,7 +393,7 @@ static void FS_IMU_Read_Callback(HAL_StatusTypeDef result)
 {
 	CS_HIGH();
 
-	if (enable_logging && (result == HAL_OK))
+	if (enableLoggingCb && (result == HAL_OK))
 	{
 		imuData.temperature = (((int16_t) ((dataBuf[2] << 8) | dataBuf[1])) * 100) / 256 + 2500;
 
