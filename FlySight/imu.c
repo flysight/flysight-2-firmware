@@ -307,7 +307,7 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 	// Enable asynchronous reads
 	handleRead = true;
 
-	FS_IMU_BeginRead(true);
+	FS_IMU_BeginRead(false);
 
 	return HAL_OK;
 }
@@ -349,7 +349,7 @@ void FS_IMU_Read(void)
 
 	if (handleRead)
 	{
-		FS_IMU_BeginRead(false);
+		FS_IMU_BeginRead(true);
 	}
 }
 
