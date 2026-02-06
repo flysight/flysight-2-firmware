@@ -149,6 +149,31 @@ typedef enum
 
 static FS_Log_State_t logState = LOG_STATE_UNINITIALIZED;
 
+#define SENSOR_BATCH_SIZE 2048
+
+static char sensorBatchBuf[SENSOR_BATCH_SIZE];
+static uint32_t sensorBatchLen = 0;
+
+static void FS_Log_FlushSensorBatch(void)
+{
+	UINT bw;
+	if (sensorBatchLen > 0)
+	{
+		f_write(&sensorFile, sensorBatchBuf, sensorBatchLen, &bw);
+		sensorBatchLen = 0;
+	}
+}
+
+static void FS_Log_WriteSensorBatch(const char *data, uint32_t len)
+{
+	if (sensorBatchLen + len > SENSOR_BATCH_SIZE)
+	{
+		FS_Log_FlushSensorBatch();
+	}
+	memcpy(sensorBatchBuf + sensorBatchLen, data, len);
+	sensorBatchLen += len;
+}
+
 static void FS_Log_Timer(void)
 {
 	// Call update task
@@ -182,7 +207,6 @@ static FS_Log_SensorType_t FS_Log_GetNextSensor(void)
 void FS_Log_UpdateHum(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -205,7 +229,7 @@ void FS_Log_UpdateHum(void)
 	*(--ptr) = 'H';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++humRdI;
@@ -214,7 +238,6 @@ void FS_Log_UpdateHum(void)
 void FS_Log_UpdateBaro(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -238,7 +261,7 @@ void FS_Log_UpdateBaro(void)
 	*(--ptr) = 'B';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++baroRdI;
@@ -247,7 +270,6 @@ void FS_Log_UpdateBaro(void)
 void FS_Log_UpdateMag(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -272,7 +294,7 @@ void FS_Log_UpdateMag(void)
 	*(--ptr) = 'M';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++magRdI;
@@ -329,7 +351,6 @@ void FS_Log_UpdateGNSS(void)
 void FS_Log_UpdateTime(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -353,7 +374,7 @@ void FS_Log_UpdateTime(void)
 	*(--ptr) = 'T';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++timeRdI;
@@ -381,7 +402,6 @@ void FS_Log_UpdateRaw(void)
 void FS_Log_UpdateIMU(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -409,7 +429,7 @@ void FS_Log_UpdateIMU(void)
 	*(--ptr) = 'I';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++imuRdI;
@@ -418,7 +438,6 @@ void FS_Log_UpdateIMU(void)
 void FS_Log_UpdateVBAT(void)
 {
 	char row[150];
-	UINT bw;
 
 	if (!(enable_flags & FS_LOG_ENABLE_SENSOR))
 	{
@@ -441,7 +460,7 @@ void FS_Log_UpdateVBAT(void)
 	*(--ptr) = 'V';
 	*(--ptr) = '$';
 
-	f_write(&sensorFile, ptr, row + sizeof(row) - ptr, &bw);
+	FS_Log_WriteSensorBatch(ptr, row + sizeof(row) - ptr);
 
 	// Increment read index
 	++vbatRdI;
@@ -578,6 +597,7 @@ static void FS_Log_Sync(void)
 	case 2:
 		if (enable_flags & FS_LOG_ENABLE_SENSOR)
 		{
+			FS_Log_FlushSensorBatch();
 			f_sync(&sensorFile);
 		}
 		break;
@@ -784,6 +804,7 @@ HAL_StatusTypeDef FS_Log_Init(uint32_t temp_folder, uint8_t flags)
 		f_printf(&sensorFile, "$UNIT,VBAT,s,volt\n");
 		f_printf(&sensorFile, "$DATA\n");
 		f_sync(&sensorFile);
+		sensorBatchLen = 0;
 	}
 
 	if (enable_flags & FS_LOG_ENABLE_EVENT)
@@ -884,6 +905,7 @@ void FS_Log_DeInit(uint32_t temp_folder)
 	}
 	if (enable_flags & FS_LOG_ENABLE_SENSOR)
 	{
+		FS_Log_FlushSensorBatch();
 		f_close(&sensorFile);
 	}
 	if (enable_flags & FS_LOG_ENABLE_EVENT)
