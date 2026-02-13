@@ -1336,13 +1336,13 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
   if (!FS_State_Get()->enable_ble)
   {
     /* Ensure radio is off and state is consistent */
-    if ((BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
-        || (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_ADV))
+    if ((BleApplicationContext.SmartPhone_Connection_Status == APP_BLE_FAST_ADV)
+        || (BleApplicationContext.SmartPhone_Connection_Status == APP_BLE_LP_ADV))
     {
       aci_gap_set_non_discoverable();
     }
-    HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
-    BleApplicationContext.Device_Connection_Status = APP_BLE_IDLE;
+    HW_TS_Stop(Advertising_mgr_timer_Id);
+    BleApplicationContext.SmartPhone_Connection_Status = APP_BLE_IDLE;
     return;
   }
   /* ===== END GATEKEEPER ===== */
