@@ -448,13 +448,10 @@ void APP_BLE_Init(void)
   BleApplicationContext.BleApplicationContext_legacy.advtServUUID[0] = NULL;
   BleApplicationContext.BleApplicationContext_legacy.advtServUUIDlen = 0;
 
-  if (FS_State_Get()->enable_ble)
-  {
-    /**
-     * Start to Advertise to be connected by a Client
-     */
-    FS_Adv_Request(APP_BLE_FAST_ADV);
-  }
+  /**
+   * Start to Advertise to be connected by a Client
+   */
+  FS_Adv_Request(APP_BLE_FAST_ADV);
   /* USER CODE END APP_BLE_Init_2 */
 
   return;
@@ -1334,6 +1331,21 @@ static void FS_Adv_Request(APP_BLE_ConnStatus_t NewStatus)
 {
   tBleStatus ret = BLE_STATUS_INVALID_PARAMS;
   uint16_t Min_Inter, Max_Inter;
+
+  /* ===== GATEKEEPER: Single point of enforcement ===== */
+  if (!FS_State_Get()->enable_ble)
+  {
+    /* Ensure radio is off and state is consistent */
+    if ((BleApplicationContext.Device_Connection_Status == APP_BLE_FAST_ADV)
+        || (BleApplicationContext.Device_Connection_Status == APP_BLE_LP_ADV))
+    {
+      aci_gap_set_non_discoverable();
+    }
+    HW_TS_Stop(BleApplicationContext.Advertising_mgr_timer_Id);
+    BleApplicationContext.Device_Connection_Status = APP_BLE_IDLE;
+    return;
+  }
+  /* ===== END GATEKEEPER ===== */
 
   if (NewStatus == APP_BLE_FAST_ADV)
   {

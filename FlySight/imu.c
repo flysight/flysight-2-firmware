@@ -97,8 +97,9 @@ static uint8_t dataBuf[15];
 static FS_IMU_Data_t imuData;
 
 static volatile bool handleRead  = false;
-static volatile bool dataWaiting = false;
 static volatile bool busy = false;
+static volatile bool enableLoggingCb = false;
+static volatile bool overrunPending = false;
 
 typedef enum {
     IMU_STATE_UNINITIALIZED = 0,
@@ -111,8 +112,12 @@ static FS_IMU_State_t imuState = IMU_STATE_UNINITIALIZED;
 
 extern SPI_HandleTypeDef hspi1;
 
-static void FS_IMU_BeginRead(void);
+static void FS_IMU_BeginRead(bool enableLogging);
 static void FS_IMU_Read_Callback(HAL_StatusTypeDef result);
+static HAL_StatusTypeDef FS_IMU_ClearInt1(void);
+static void FS_IMU_Int1Exti_DisableAndClear(void);
+static void FS_IMU_Int1Exti_Enable(void);
+static void FS_IMU_RecoverFromOverrun(void);
 
 void FS_IMU_TransferComplete(void)
 {
@@ -155,6 +160,68 @@ static HAL_StatusTypeDef FS_IMU_WriteRegister(uint8_t addr, uint8_t *data, uint1
 	CS_HIGH();
 
 	return result;
+}
+
+static HAL_StatusTypeDef FS_IMU_ClearInt1(void)
+{
+	uint8_t dummy[14];
+
+	// Read all output registers (TEMP + GYRO + ACCEL) to clear INT1
+	return FS_IMU_ReadRegister(LSM6DSO_OUT_TEMP_L_REG, dummy, 14);
+}
+
+static void FS_IMU_Int1Exti_DisableAndClear(void)
+{
+	LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
+	LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_9);
+}
+
+static void FS_IMU_Int1Exti_Enable(void)
+{
+	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_9);
+}
+
+static void FS_IMU_RecoverFromOverrun(void)
+{
+	uint8_t buf;
+
+	/*
+	 * Overrun recovery (deterministic, no polling/loops):
+	 *
+	 * The overrun path can leave INT1 HIGH (latched DRDY), and because EXTI is
+	 * rising-edge triggered, the driver can miss all future interrupts.
+	 *
+	 * Preconditions:
+	 * - FS_IMU_Int1Exti_DisableAndClear() was called (EXTI masked + flag cleared)
+	 * - busy is FALSE
+	 *
+	 * Guarantees on return:
+	 * - INT1 is not left in a stuck-high state without an in-flight read:
+	 *   - If INT1 is low: next sample produces a rising edge as normal.
+	 *   - If INT1 is high: we start a read immediately (software kick), which
+	 *     will clear the latch and keep the driver progressing.
+	 */
+
+	/* Force INT1 low by disabling DRDY routing while we clear the latch. */
+	buf = 0x00;
+	(void)FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, &buf, 1);
+
+	/* Clear any latched DRDY/INT1 by reading all output registers once. */
+	(void)FS_IMU_ClearInt1();
+
+	/* Restore DRDY routing on INT1. */
+	buf = 0x01; /* INT1_DRDY_XL */
+	(void)FS_IMU_WriteRegister(LSM6DSO_REG_INT1_CTRL, &buf, 1);
+
+	/*
+	 * If a sample is already pending (INT1 is HIGH) we cannot wait for a rising
+	 * edge (there won't be one). Kick a read immediately while EXTI is still
+	 * disabled, so there is no ISR race with FS_IMU_BeginRead().
+	 */
+	if (HAL_GPIO_ReadPin(IMU_INT1_GPIO_Port, IMU_INT1_Pin) == GPIO_PIN_SET)
+	{
+		FS_IMU_BeginRead(false);
+	}
 }
 
 void FS_IMU_Init(void)
@@ -215,12 +282,19 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 {
 	const FS_Config_Data_t *config = FS_Config_Get();
 	uint8_t buf[1];
-	uint32_t primask_bit;
 
 	if (imuState != IMU_STATE_READY)
 	{
 		return HAL_ERROR;
 	}
+
+	// Clear any pending interrupt before enabling rising-edge EXTI
+	// This prevents lockup if INT1 is already HIGH from previous session
+	if (HAL_GPIO_ReadPin(IMU_INT1_GPIO_Port, IMU_INT1_Pin) == GPIO_PIN_SET)
+	{
+		FS_IMU_ClearInt1();
+	}
+	LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_9);
 
 	// Enable EXTI pin
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_9);
@@ -289,18 +363,9 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 	imuState = IMU_STATE_ACTIVE;
 
 	// Enable asynchronous reads
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
 	handleRead = true;
-	bool read = dataWaiting;
 
-	__set_PRIMASK(primask_bit);
-
-	if (read)
-	{
-		FS_IMU_BeginRead();
-	}
+	FS_IMU_BeginRead(false);
 
 	return HAL_OK;
 }
@@ -308,22 +373,25 @@ HAL_StatusTypeDef FS_IMU_Start(void)
 void FS_IMU_Stop(void)
 {
 	uint8_t buf[1];
-	uint32_t primask_bit;
+
+	// Disable EXTI to prevent new interrupts
+	LL_EXTI_DisableIT_0_31(LL_EXTI_LINE_9);
 
 	// Disable asynchronous reads
-	primask_bit = __get_PRIMASK();
-	__disable_irq();
-
 	handleRead = false;
-	dataWaiting = false;
 
-	__set_PRIMASK(primask_bit);
-
+	// Wait for any in-flight DMA to complete
 	while (busy);
 
 	// Software reset
 	buf[0] = 0x01;
 	FS_IMU_WriteRegister(LSM6DSO_REG_CTRL3_C, buf, 1);
+
+	// Clear pending data to ensure INT1 goes LOW for clean restart
+	if (HAL_GPIO_ReadPin(IMU_INT1_GPIO_Port, IMU_INT1_Pin) == GPIO_PIN_SET)
+	{
+		FS_IMU_ClearInt1();
+	}
 
 	imuState = IMU_STATE_READY;
 }
@@ -339,29 +407,40 @@ void FS_IMU_Read(void)
 
 	if (handleRead)
 	{
-		FS_IMU_BeginRead();
-	}
-	else
-	{
-		dataWaiting = true;
+		FS_IMU_BeginRead(true);
 	}
 }
 
-static void FS_IMU_BeginRead(void)
+static void FS_IMU_BeginRead(bool enableLogging)
 {
 	HAL_StatusTypeDef res;
+	uint32_t primask_bit;
 
 	/* Address with read flag */
 	dataBuf[0] = LSM6DSO_OUT_TEMP_L_REG | 0x80;
 
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
 	if (busy)
 	{
-		/* Handle data overrun */
-		FS_Log_WriteEventAsync("IMU data overrun");
+		overrunPending = true;
+
+		__set_PRIMASK(primask_bit);
+
+		if (enableLogging)
+		{
+			/* Handle data overrun */
+			FS_Log_WriteEventAsync("IMU data overrun");
+		}
+
 		return;
 	}
 
 	busy = true;
+	enableLoggingCb = enableLogging;
+
+	__set_PRIMASK(primask_bit);
 
 	CS_LOW();
 	res = HAL_SPI_TransmitReceive_DMA(&hspi1, dataBuf, dataBuf, 15);
@@ -372,22 +451,71 @@ static void FS_IMU_BeginRead(void)
 
 static void FS_IMU_Read_Callback(HAL_StatusTypeDef result)
 {
+	bool doRecover;
+	bool shouldLog;
+	uint32_t primask_bit;
+
 	CS_HIGH();
 
-	busy = false;
+	/*
+	 * Snapshot per-transfer logging decision up front.
+	 *
+	 * Overrun recovery may start a new read (FS_IMU_BeginRead(false)), which
+	 * updates enableLoggingCb for the *next* transfer. We must not let that
+	 * clobber the decision for the transfer that just completed.
+	 */
+	shouldLog = (enableLoggingCb && (result == HAL_OK));
 
-	if (result == HAL_OK)
+	/*
+	 * Parse the buffer first while 'busy' is still TRUE, so no new DMA read can
+	 * reuse dataBuf until we've copied out the data we need.
+	 */
+	if (shouldLog)
 	{
 		imuData.temperature = (((int16_t) ((dataBuf[2] << 8) | dataBuf[1])) * 100) / 256 + 2500;
 
-		imuData.wy = (((int16_t) ((dataBuf[4] << 8) | dataBuf[3])) * (gyroFactor / 8)) / (32768 / 8);
-		imuData.wx = -(((int16_t) ((dataBuf[6] << 8) | dataBuf[5])) * (gyroFactor / 8)) / (32768 / 8);
-		imuData.wz = (((int16_t) ((dataBuf[8] << 8) | dataBuf[7])) * (gyroFactor / 8)) / (32768 / 8);
+		imuData.wy = (((int64_t) (int16_t) ((dataBuf[4] << 8) | dataBuf[3])) * gyroFactor) / 32768;
+		imuData.wx = -(((int64_t) (int16_t) ((dataBuf[6] << 8) | dataBuf[5])) * gyroFactor) / 32768;
+		imuData.wz = (((int64_t) (int16_t) ((dataBuf[8] << 8) | dataBuf[7])) * gyroFactor) / 32768;
 
-		imuData.ay = (((int16_t) ((dataBuf[10] << 8) | dataBuf[9])) * (accelFactor / 8)) / (32768 / 8);
-		imuData.ax = -(((int16_t) ((dataBuf[12] << 8) | dataBuf[11])) * (accelFactor / 8)) / (32768 / 8);
-		imuData.az = (((int16_t) ((dataBuf[14] << 8) | dataBuf[13])) * (accelFactor / 8)) / (32768 / 8);
+		imuData.ay = (((int64_t) (int16_t) ((dataBuf[10] << 8) | dataBuf[9])) * accelFactor) / 32768;
+		imuData.ax = -(((int64_t) (int16_t) ((dataBuf[12] << 8) | dataBuf[11])) * accelFactor) / 32768;
+		imuData.az = (((int64_t) (int16_t) ((dataBuf[14] << 8) | dataBuf[13])) * accelFactor) / 32768;
+	}
 
+	/*
+	 * Atomically:
+	 * - Snapshot whether an overrun occurred during this read,
+	 * - Mask EXTI if we need recovery,
+	 * - Clear busy as soon as possible after buffer parsing.
+	 */
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
+	doRecover = overrunPending;
+	overrunPending = false;
+
+	if (doRecover)
+	{
+		FS_IMU_Int1Exti_DisableAndClear();
+	}
+
+	busy = false;
+
+	__set_PRIMASK(primask_bit);
+
+	/*
+	 * If we detected an overrun, clear the latched INT1 state deterministically
+	 * before calling any user callbacks.
+	 */
+	if (doRecover)
+	{
+		FS_IMU_RecoverFromOverrun();
+		FS_IMU_Int1Exti_Enable();
+	}
+
+	if (shouldLog)
+	{
 		FS_IMU_DataReady_Callback();
 	}
 }

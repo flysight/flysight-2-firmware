@@ -314,10 +314,23 @@ static void ExitLowPower(void)
   {
 /* Restore the clock configuration of the application in this user section */
 /* USER CODE BEGIN ExitLowPower_1 */
-    LL_RCC_HSE_Enable( );
-    while(!LL_RCC_HSE_IsReady( ));
-    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_HSE);
-    while (LL_RCC_GetSysClkSource( ) != LL_RCC_SYS_CLKSOURCE_STATUS_HSE);
+    /* 1) Restore Flash latency BEFORE increasing SYSCLK */
+    __HAL_FLASH_SET_LATENCY(FLASH_LATENCY_3);
+
+    /* 2) Enable HSE (PLL source) */
+    LL_RCC_HSE_Enable();
+    while (!LL_RCC_HSE_IsReady());
+
+    /* 3) Restore SMPS clock source back to HSE (matches PeriphCommonClock_Config) */
+    LL_RCC_SetSMPSClockSource(LL_RCC_SMPS_CLKSOURCE_HSE);
+
+    /* 4) Re-enable PLL (PLL config is retained in STOP2; only PLLON is cleared) */
+    SET_BIT(RCC->CR, RCC_CR_PLLON);
+    while ((RCC->CR & RCC_CR_PLLRDY) == 0U);
+
+    /* 5) Switch SYSCLK to PLL (64 MHz) */
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+    while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL);
 /* USER CODE END ExitLowPower_1 */
   }
   else
