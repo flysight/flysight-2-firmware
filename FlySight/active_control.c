@@ -172,13 +172,18 @@ void FS_ActiveControl_DeInit(void)
 
 void FS_Baro_DataReady_Callback(void)
 {
+	const FS_Baro_Data_t *data = FS_Baro_GetData();
+
 	if (state != FS_CONTROL_ACTIVE) return;
 
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
-		FS_Log_WriteBaroData(FS_Baro_GetData());
+		FS_Log_WriteBaroData(data);
 	}
+
+	// Update BLE characteristic
+	Custom_BARO_Update(data);
 }
 
 void FS_Hum_DataReady_Callback(void)
@@ -194,13 +199,18 @@ void FS_Hum_DataReady_Callback(void)
 
 void FS_Mag_DataReady_Callback(void)
 {
+	const FS_Mag_Data_t *data = FS_Mag_GetData();
+
 	if (state != FS_CONTROL_ACTIVE) return;
 
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
-		FS_Log_WriteMagData(FS_Mag_GetData());
+		FS_Log_WriteMagData(data);
 	}
+
+	// Update BLE characteristic
+	Custom_MAG_Update(data);
 }
 
 void FS_ActiveControl_DataReady_Callback(void)
@@ -271,13 +281,19 @@ void FS_ActiveControl_RawReady_Callback(void)
 
 void FS_IMU_DataReady_Callback(void)
 {
+	const FS_IMU_Data_t *data = FS_IMU_GetData();
+
 	if (state != FS_CONTROL_ACTIVE) return;
 
 	if (FS_Config_Get()->enable_logging)
 	{
 		// Save to log file
-		FS_Log_WriteIMUData(FS_IMU_GetData());
+		FS_Log_WriteIMUData(data);
 	}
+
+	// Update BLE characteristics
+	Custom_ACCEL_Update(data);
+	Custom_GYRO_Update(data);
 }
 
 void FS_VBAT_ValueReady_Callback(void)
