@@ -24,6 +24,8 @@
 #ifndef ACTIVELOOK_H_
 #define ACTIVELOOK_H_
 
+#include <stdint.h>
+
 typedef enum {
     FS_AL_SETUP_IN_PROGRESS = 0,
     FS_AL_SETUP_DONE
@@ -31,5 +33,6 @@ typedef enum {
 
 void FS_ActiveLook_Init(void);
 void FS_ActiveLook_DeInit(void);
+uint8_t FS_ActiveLook_IsActive(void);
 
 #endif /* ACTIVELOOK_H_ */

@@ -358,3 +358,8 @@ void FS_ActiveLook_DeInit(void)
 	HW_TS_Delete(timer_id);
     UTIL_SEQ_SetTask(1 << CFG_TASK_DISCONN_DEV_1_ID, CFG_SCH_PRIO_0);
 }
+
+uint8_t FS_ActiveLook_IsActive(void)
+{
+    return (s_state != AL_STATE_INIT) ? 1 : 0;
+}

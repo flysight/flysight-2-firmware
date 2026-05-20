@@ -44,6 +44,7 @@
 /* USER CODE BEGIN Includes */
 #include "common.h"
 #include "state.h"
+#include "activelook.h"
 #include "activelook_client.h"
 #include "config.h"
 /* USER CODE END Includes */
@@ -500,6 +501,10 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
         APP_DBG_MSG("\r\n\r** DISCONNECTION EVENT OF END DEVICE 1 \n\r");
         BleApplicationContext.EndDevice_Connection_Status[0] = APP_BLE_IDLE;
         BleApplicationContext.connectionHandleEndDevice1 = 0xFFFF;
+        if (FS_ActiveLook_IsActive())
+        {
+          UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+        }
       }
 
       if (p_disconnection_complete_event->Connection_Handle == BleApplicationContext.connectionHandleCentral)
@@ -674,6 +679,8 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                 APP_DBG_MSG("   Address: %02X:%02X:%02X:%02X:%02X:%02X\n\r",
                             P2P_SERVER1_BDADDR[5], P2P_SERVER1_BDADDR[4], P2P_SERVER1_BDADDR[3],
                             P2P_SERVER1_BDADDR[2], P2P_SERVER1_BDADDR[1], P2P_SERVER1_BDADDR[0]);
+
+                aci_gap_terminate_gap_proc(GAP_GENERAL_DISCOVERY_PROC);
             }
           } /* end if (event_type == ADV_IND) */
           break;

@@ -28,6 +28,7 @@
 #include "app_ble.h"
 #include "app_common.h"
 #include "button.h"
+#include "config.h"
 #include "config_mode.h"
 #include "custom_app.h"
 #include "log.h"
@@ -235,6 +236,10 @@ static FS_Mode_State_t FS_Mode_State_Active(FS_Mode_Event_t event)
 	else if (event == FS_MODE_EVENT_BUTTON_RELEASED)
 	{
 		HW_TS_Stop(timer_id);
+		if (FS_Config_Get()->al_mode != 0)
+		{
+			UTIL_SEQ_SetTask(1 << CFG_TASK_START_SCAN_ID, CFG_SCH_PRIO_0);
+		}
 	}
 	else if (event == FS_MODE_EVENT_TIMER)
 	{
