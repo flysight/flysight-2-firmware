@@ -135,45 +135,32 @@ static double LN_Heading(const FS_GNSS_Data_t *d) {
     return (double)d->heading / 100000.0; // 1e-5 deg to deg
 }
 
-/**
- * Updated table entry: includes unitType for conversion purposes.
- * 'units' field removed, as it's now dynamic based on user choice.
- */
 typedef struct {
-    uint8_t             typeId;   // ID from config (e.g., FS_CONFIG_MODE_HORIZONTAL_SPEED)
-    const char         *label;    // Base text label (e.g., "HSpd:")
-    FS_ParamUnitType_t  unitType; // Type of quantity (Speed, Distance, etc.)
-    LineValueFn_t       fn;       // Function returning the value in base units (m/s, m, deg)
+    uint8_t             typeId;
+    const char         *label;
+    FS_ParamUnitType_t  unitType;
+    LineValueFn_t       fn;
+    uint8_t             icon_id;
 } AL_Mode0_LineMap_t;
 
-/*
-   A dictionary of possible line types based on FS_CONFIG_MODE_* in config.h
-   and implementations in audio_control.c.
-*/
 static const AL_Mode0_LineMap_t s_lineMap[] =
 {
-    { FS_CONFIG_MODE_HORIZONTAL_SPEED,         "HSpd:", FS_UNIT_TYPE_SPEED,    LN_HSpeed       }, // 0
-    { FS_CONFIG_MODE_VERTICAL_SPEED,           "VSpd:", FS_UNIT_TYPE_SPEED,    LN_VSpeed       }, // 1
-    { FS_CONFIG_MODE_GLIDE_RATIO,              "GR:",   FS_UNIT_TYPE_NONE,     LN_GlideRatio   }, // 2
-    { FS_CONFIG_MODE_INVERSE_GLIDE_RATIO,      "1/GR:", FS_UNIT_TYPE_NONE,     LN_InvGlideRatio}, // 3
-    { FS_CONFIG_MODE_TOTAL_SPEED,              "Spd:",  FS_UNIT_TYPE_SPEED,    LN_TotalSpeed   }, // 4
-    { FS_CONFIG_MODE_DIRECTION_TO_DESTINATION, "Dir:",  FS_UNIT_TYPE_ANGLE,    LN_DirToDest    }, // 5
-    { FS_CONFIG_MODE_DISTANCE_TO_DESTINATION,  "Dist:", FS_UNIT_TYPE_DISTANCE, LN_DistToDest   }, // 6
-    { FS_CONFIG_MODE_DIRECTION_TO_BEARING,     "Brg:",  FS_UNIT_TYPE_ANGLE,    LN_DirToBearing }, // 7
-    // Mode 8, 9, 10?
-    { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive:", FS_UNIT_TYPE_ANGLE,    LN_DiveAngle    }, // 11
-    { FS_CONFIG_MODE_ALTITUDE,                 "Alt:",  FS_UNIT_TYPE_ALTITUDE, LN_Altitude     }, // 12
-    { 13,                                      "Hdg:",  FS_UNIT_TYPE_ANGLE,    LN_Heading      }, // Mode 13 (Heading)
+    { FS_CONFIG_MODE_HORIZONTAL_SPEED,         "HSpd", FS_UNIT_TYPE_SPEED,    LN_HSpeed,        100 },
+    { FS_CONFIG_MODE_VERTICAL_SPEED,           "VSpd", FS_UNIT_TYPE_SPEED,    LN_VSpeed,        101 },
+    { FS_CONFIG_MODE_GLIDE_RATIO,              "GR",   FS_UNIT_TYPE_NONE,     LN_GlideRatio,    102 },
+    { FS_CONFIG_MODE_INVERSE_GLIDE_RATIO,      "IGR",  FS_UNIT_TYPE_NONE,     LN_InvGlideRatio, 103 },
+    { FS_CONFIG_MODE_TOTAL_SPEED,              "Spd",  FS_UNIT_TYPE_SPEED,    LN_TotalSpeed,    104 },
+    { FS_CONFIG_MODE_DIRECTION_TO_DESTINATION, "Dir",  FS_UNIT_TYPE_ANGLE,    LN_DirToDest,     105 },
+    { FS_CONFIG_MODE_DISTANCE_TO_DESTINATION,  "Dist", FS_UNIT_TYPE_DISTANCE, LN_DistToDest,    106 },
+    { FS_CONFIG_MODE_DIRECTION_TO_BEARING,     "Brg",  FS_UNIT_TYPE_ANGLE,    LN_DirToBearing,  107 },
+    { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive", FS_UNIT_TYPE_ANGLE,    LN_DiveAngle,     108 },
+    { FS_CONFIG_MODE_ALTITUDE,                 "Alt",  FS_UNIT_TYPE_ALTITUDE, LN_Altitude,      109 },
+    { 13,                                      "Hdg",  FS_UNIT_TYPE_ANGLE,    LN_Heading,       110 },
 };
 static const unsigned s_lineMapCount = sizeof(s_lineMap) / sizeof(s_lineMap[0]);
 
-/**
- * Updated line spec: stores only typeId and label.
- * Units and value calculation/conversion happen dynamically.
- */
 typedef struct {
-    uint8_t      typeId; // ID from config (e.g., FS_CONFIG_MODE_HORIZONTAL_SPEED)
-    const char  *label;  // Base label (e.g., "HSpd:")
+    const AL_Mode0_LineMap_t *mapEntry;
 } AL_Mode0_LineSpec_t;
 
 static AL_Mode0_LineSpec_t s_lineSpecs[4];
@@ -239,10 +226,14 @@ static UnitConversionInfo_t AL_GetUnitConversion(
    4. Helpers for Sending Commands / Building Layout
    -------------------------------------------------------------------------- */
 
-/* A helper to do a single WriteWithoutResp to the BLE client. */
 static void AL_SendRaw(const uint8_t *data, uint16_t length)
 {
     FS_ActiveLook_Client_WriteWithoutResp(data, length);
+}
+
+static tBleStatus AL_SendRawReliable(const uint8_t *data, uint16_t length)
+{
+    return FS_ActiveLook_Client_WriteWithResp(data, length);
 }
 
 /**
@@ -257,141 +248,167 @@ static uint8_t AL_BuildStatus(uint8_t layoutId,
     outBuf[idx++] = 0x00;  // 1B length
     uint8_t lenPos = idx++;
 
-    // layout ID
     outBuf[idx++] = layoutId;
-
-    // Additional commands size placeholder
     uint8_t addCmdSizePos = idx++;
 
-    // X, Y, Width, Height, color, etc. Hard-coded example
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x01;
-    outBuf[idx++] = 0x30;
-    outBuf[idx++] = 0x28;
-    outBuf[idx++] = 15;
-    outBuf[idx++] = 0;
-    outBuf[idx++] = 1;
-    outBuf[idx++] = 1;
-    outBuf[idx++] = 1;
-    outBuf[idx++] = 5;
-    outBuf[idx++] = 35;
-    outBuf[idx++] = 4;
-    outBuf[idx++] = 1;
+    // Status bar — same geometry as when battery icon worked (height=40, y=220)
+    outBuf[idx++] = 0x00; outBuf[idx++] = 0x00;  // clip X = 0
+    outBuf[idx++] = 0x00;                         // clip Y = 0
+    outBuf[idx++] = 0x01; outBuf[idx++] = 0x30;  // width = 304
+    outBuf[idx++] = 0x28;                         // height = 40
+    outBuf[idx++] = 6;                            // FG = grey 6
+    outBuf[idx++] = 0;                            // BG = black
+    outBuf[idx++] = 12;                           // font 12 (B612 22px)
+    outBuf[idx++] = 1;                            // textValid
+    outBuf[idx++] = 1; outBuf[idx++] = 0x05;     // text X = 261
+    outBuf[idx++] = 35;                           // text Y = 35
+    outBuf[idx++] = 4;                            // rotation = 4
+    outBuf[idx++] = 0;                            // opacity = 0 (transparent bg, icons visible behind text)
 
-    // Build sub-commands for label & units
     uint8_t extra[64];
     uint8_t e = 0;
 
-    // copy extras
+    extra[e++] = 0x03; extra[e++] = 6;           // color grey 6
+    extra[e++] = 0x00;                            // image sub-cmd: glasses (112)
+    extra[e++] = 112;
+    extra[e++] = 0x00; extra[e++] = 0xFA;        // x = 250
+    extra[e++] = 0x00; extra[e++] = 0x0A;        // y = 10
+
+    extra[e++] = 0x00;                            // image sub-cmd: flysight (113)
+    extra[e++] = 113;
+    extra[e++] = 0x00; extra[e++] = 0x99;        // x = 153
+    extra[e++] = 0x00; extra[e++] = 0x0B;        // y = 11
+
+    extra[e++] = 0x00;                            // image sub-cmd: satellite (111)
+    extra[e++] = 111;
+    extra[e++] = 0x00; extra[e++] = 0x36;        // x = 54
+    extra[e++] = 0x00; extra[e++] = 0x08;        // y = 8
+
     outBuf[addCmdSizePos] = e;
     memcpy(&outBuf[idx], extra, e);
     idx += e;
 
-    outBuf[idx++] = 0xAA; // footer
-    outBuf[lenPos] = idx; // fill length
+    outBuf[idx++] = 0xAA;
+    outBuf[lenPos] = idx;
 
     return idx;
 }
 
-/**
- * Build flight parameter layout
- */
 static uint8_t AL_BuildLayout(uint8_t layoutId,
                               const char *headingText,
                               const char *unitsText,
+                              uint8_t icon_id,
+                              uint8_t cellIndex,
                               uint8_t *outBuf)
 {
     uint8_t idx = 0;
     outBuf[idx++] = 0xFF;
-    outBuf[idx++] = 0x60;  // "layoutSave"
-    outBuf[idx++] = 0x00;  // 1B length
+    outBuf[idx++] = 0x60;
+    outBuf[idx++] = 0x00;
     uint8_t lenPos = idx++;
 
-    // layout ID
     outBuf[idx++] = layoutId;
-
-    // Additional commands size placeholder
     uint8_t addCmdSizePos = idx++;
 
-    // X, Y, Width, Height, color, etc. Hard-coded example
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x00;
-    outBuf[idx++] = 0x01;
-    outBuf[idx++] = 0x30;
-    outBuf[idx++] = 0x28;
-    outBuf[idx++] = 15;
-    outBuf[idx++] = 0;
-    outBuf[idx++] = 2;
-    outBuf[idx++] = 1;
-    outBuf[idx++] = 0;
-    outBuf[idx++] = 200;
-    outBuf[idx++] = 40;
-    outBuf[idx++] = 4;
-    outBuf[idx++] = 1;
+    outBuf[idx++] = 0x00; outBuf[idx++] = 0x00;  // clip X = 0
+    outBuf[idx++] = 0x00;                         // clip Y = 0
+    outBuf[idx++] = 0x00; outBuf[idx++] = 152;   // width
+    outBuf[idx++] = 110;                          // height
+    outBuf[idx++] = 15;                           // FG = white
+    outBuf[idx++] = 0;                            // BG = black
+    outBuf[idx++] = 11;                           // font 11 (B612 Mono 34px)
+    outBuf[idx++] = 1;                            // textValid
+    outBuf[idx++] = 0; outBuf[idx++] = 140;      // text X = 140
+    outBuf[idx++] = 70;                           // text Y = 70
+    outBuf[idx++] = 4;                            // rotation = 4 (centered)
+    outBuf[idx++] = 0;                            // opacity = 0 (transparent)
 
-    // Build sub-commands for label & units
-    uint8_t extra[64];
+    uint8_t extra[120];
     uint8_t e = 0;
 
-    // color
-    extra[e++] = 0x03;
-    extra[e++] = 15;
+    // --- Icon: visually top-left (high x, high y), grey 6 ---
+    if (icon_id > 0) {
+        extra[e++] = 0x03; extra[e++] = 6;       // color grey 6
+        extra[e++] = 0x00;                        // image sub-cmd
+        extra[e++] = icon_id;
+        extra[e++] = 0; extra[e++] = 115;        // x = 115
+        extra[e++] = 0; extra[e++] = 75;         // y = 75
+    } else {
+        extra[e++] = 0x03; extra[e++] = 6;       // color grey 6
+        extra[e++] = 0x04; extra[e++] = 10;      // font 10 (B612 18px)
+        extra[e++] = 0x09;                        // text sub-cmd
+        extra[e++] = 0; extra[e++] = 140;
+        extra[e++] = 0; extra[e++] = 80;
+        size_t lblLen = strlen(headingText);
+        extra[e++] = (uint8_t)lblLen;
+        memcpy(&extra[e], headingText, lblLen);
+        e += lblLen;
+    }
 
-    // font
-    extra[e++] = 0x04;
-    extra[e++] = 1;
+    // --- Units: visually bottom-right, grey 6 ---
+    if (strlen(unitsText) > 0) {
+        char unitBuf[8];
+        snprintf(unitBuf, sizeof(unitBuf), "%4s", unitsText);
+        size_t untLen = strlen(unitBuf);
+        extra[e++] = 0x03; extra[e++] = 6;        // color grey 6
+        extra[e++] = 0x04; extra[e++] = 10;       // font 10 (B612 18px)
+        extra[e++] = 0x09;                         // text sub-cmd
+        extra[e++] = 0; extra[e++] = 60;          // x = 60
+        extra[e++] = 0; extra[e++] = 28;          // y = 28
+        extra[e++] = (uint8_t)untLen;
+        memcpy(&extra[e], unitBuf, untLen);
+        e += untLen;
+    }
 
-    // text => position
-    extra[e++] = 0x09;
-    extra[e++] = 1;   // x hi
-    extra[e++] = 5;   // x lo
-    extra[e++] = 0;   // y hi
-    extra[e++] = 35;  // y lo
+    // --- Divider lines (barely visible) ---
+    extra[e++] = 0x03; extra[e++] = 1;            // color grey 1
 
-    // label
-    size_t lblLen = strlen(headingText);
-    extra[e++] = (uint8_t)lblLen;
-    memcpy(&extra[e], headingText, lblLen);
-    e += lblLen;
+    // Cells 0,2 (vis left column): vertical divider at center of screen
+    // x=0 appeared at far right of screen, so center must be at high x
+    // Cell width = 152, so x=151 = the left visual edge of the left cell
+    if (cellIndex == 0 || cellIndex == 2) {
+        extra[e++] = 0x05;                         // line sub-cmd
+        extra[e++] = 0; extra[e++] = 151;         // x0 = 151
+        extra[e++] = 0; extra[e++] = 0;           // y0 = 0
+        extra[e++] = 0; extra[e++] = 151;         // x1 = 151
+        extra[e++] = 0; extra[e++] = 110;         // y1 = 110
+    }
 
-    // font again
-    extra[e++] = 0x04;
-    extra[e++] = 1;
+    // Cells 0,1 (vis top row): horizontal line at visual bottom edge = row divider
+    // Layout-internal: y=0 = vis bottom, y=115 = vis top
+    // We want the line at the cell's vis-bottom edge = y=0
+    if (cellIndex == 0 || cellIndex == 1) {
+        extra[e++] = 0x05;                         // line sub-cmd
+        extra[e++] = 0; extra[e++] = 0;           // x0 = 0
+        extra[e++] = 0; extra[e++] = 0;           // y0 = 0 (vis bottom edge)
+        extra[e++] = 0; extra[e++] = 152;         // x1 = 152
+        extra[e++] = 0; extra[e++] = 0;           // y1 = 0
+    }
 
-    // text => position
-    extra[e++] = 0x09;
-    extra[e++] = 0;   // x hi
-    extra[e++] = 80;  // x lo
-    extra[e++] = 0;   // y hi
-    extra[e++] = 35;  // y lo
-
-    // units
-    size_t untLen = strlen(unitsText);
-    extra[e++] = (uint8_t)untLen;
-    memcpy(&extra[e], unitsText, untLen);
-    e += untLen;
-
-    // copy extras
     outBuf[addCmdSizePos] = e;
     memcpy(&outBuf[idx], extra, e);
     idx += e;
 
-    outBuf[idx++] = 0xAA; // footer
-    outBuf[lenPos] = idx; // fill length
-
+    outBuf[idx++] = 0xAA;
+    outBuf[lenPos] = idx;
     return idx;
 }
 
 /**
- * Build a page referencing layout #10..#14
+ * Build page: 2x2 grid of cells + status bar on top
  */
 static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 {
-    // Read config
     const FS_Config_Data_t *cfg = FS_Config_Get();
+
+    // Page positions for each cell: [top-left, top-right, bottom-left, bottom-right]
+    // Each entry: x_hi, x_lo, y
+    static const uint8_t cellPos[][3] = {
+        { 0x00, 0x00, 110 },   // cell 0: x=0,   y=110 (upper-left)
+        { 0x00, 152,  110 },   // cell 1: x=152, y=110 (upper-right)
+        { 0x00, 0x00, 0   },   // cell 2: x=0,   y=0   (lower-left)
+        { 0x00, 152,  0   },   // cell 3: x=152, y=0   (lower-right)
+    };
 
     uint8_t idx = 0;
     outBuf[idx++] = 0xFF;
@@ -401,17 +418,19 @@ static uint8_t AL_BuildPage(uint8_t pageId, uint8_t *outBuf)
 
     outBuf[idx++] = pageId;
 
+    // Status bar (layout 14) above grid
     outBuf[idx++] = 14;
     outBuf[idx++] = 0x00;
     outBuf[idx++] = 0x00;
-    outBuf[idx++] = 138 + 40;
+    outBuf[idx++] = 220;
 
-    for (int i = 0; i < cfg->num_al_lines; i++)
+    // Cell layouts
+    for (int i = 0; i < cfg->num_al_lines && i < 4; i++)
     {
         outBuf[idx++] = 10 + i;
-        outBuf[idx++] = 0x00;
-        outBuf[idx++] = 0x00;
-        outBuf[idx++] = 133 - 40 * i;
+        outBuf[idx++] = cellPos[i][0];
+        outBuf[idx++] = cellPos[i][1];
+        outBuf[idx++] = cellPos[i][2];
     }
 
     outBuf[idx++] = 0xAA;
@@ -503,19 +522,9 @@ void FS_ActiveLook_Mode0_Init(void)
 
     s_step = 0;
 
-    // For each line i, find its base label and store typeId
-    for (int i = 0; i < cfg->num_al_lines; i++)
+    for (int i = 0; i < cfg->num_al_lines && i < 4; i++)
     {
-        const AL_Mode0_LineMap_t* entry = FindLineMapEntry(
-                cfg->al_lines[i].mode);
-        if (entry) {
-            s_lineSpecs[i].typeId = entry->typeId;
-            s_lineSpecs[i].label  = entry->label;
-        } else {
-            // Fallback if typeId is not found in the map
-            s_lineSpecs[i].typeId = 0;
-            s_lineSpecs[i].label  = "?";
-        }
+        s_lineSpecs[i].mapEntry = FindLineMapEntry(cfg->al_lines[i].mode);
     }
 }
 
@@ -536,52 +545,38 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
     uint8_t length;
     FS_ActiveLook_SetupStatus_t status = FS_AL_SETUP_IN_PROGRESS;
 
-    if (s_step == 0) { // Build status layout
-        length = AL_BuildStatus(14, buf);
-        if (length > 0) {
-            AL_SendRaw(buf, length);
-            s_step++;
-        } else {
-            // Handle layout build error? Maybe retry or abort?
-             status = FS_AL_SETUP_DONE; // Or some error status if defined
-        }
-    } else if (s_step >= 1 && s_step < cfg->num_al_lines + 1) { // Build layouts
-        int lineIndex = s_step - 1; // Corresponds to s_lineSpecs[lineIndex]
+    if (s_step < cfg->num_al_lines) {
+        // Steps 0..N-1: Build cell layouts
+        int lineIndex = s_step;
         uint8_t layoutId = 10 + lineIndex;
-        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(
-                s_lineSpecs[lineIndex].typeId);
-        const char* label = s_lineSpecs[lineIndex].label;
-        const char* unitSuffix = ""; // Default empty suffix
+        const AL_Mode0_LineMap_t* mapEntry = s_lineSpecs[lineIndex].mapEntry;
+        const char* label = mapEntry ? mapEntry->label : "?";
+        const char* unitSuffix = "";
 
         if (mapEntry) {
             UnitConversionInfo_t unitInfo = AL_GetUnitConversion(
                     mapEntry->unitType,
                     cfg->al_lines[lineIndex].units);
             unitSuffix = unitInfo.suffix;
-        } else {
-             // Use fallback label "?" if entry not found (already set in Init)
-             // unitSuffix remains ""
         }
 
-        length = AL_BuildLayout(layoutId, label, unitSuffix, buf);
-        if (length > 0) {
-            AL_SendRaw(buf, length);
+        uint8_t icon = mapEntry ? mapEntry->icon_id : 0;
+        length = AL_BuildLayout(layoutId, label, unitSuffix, icon, lineIndex, buf);
+        if (length > 0 && AL_SendRawReliable(buf, length) == BLE_STATUS_SUCCESS) {
             s_step++;
-        } else {
-            // Handle layout build error? Maybe retry or abort?
-             status = FS_AL_SETUP_DONE; // Or some error status if defined
         }
-    } else if (s_step == cfg->num_al_lines + 1) { // Build page
-        length = AL_BuildPage(10, buf); // Page ID 10 references layouts 10-13
-        if (length > 0) {
-            AL_SendRaw(buf, length);
+    } else if (s_step == cfg->num_al_lines) {
+        length = AL_BuildStatus(14, buf);
+        if (length > 0 && AL_SendRawReliable(buf, length) == BLE_STATUS_SUCCESS) {
             s_step++;
-            status = FS_AL_SETUP_DONE; // Final step completed successfully
-        } else {
-             // Handle page build error?
-            status = FS_AL_SETUP_DONE; // Consider setup failed/done
         }
-    } else { // Steps > 4: Already done
+    } else if (s_step == cfg->num_al_lines + 1) {
+        length = AL_BuildPage(10, buf);
+        if (length > 0 && AL_SendRawReliable(buf, length) == BLE_STATUS_SUCCESS) {
+            s_step++;
+            status = FS_AL_SETUP_DONE;
+        }
+    } else {
         status = FS_AL_SETUP_DONE;
     }
 
@@ -622,7 +617,7 @@ void FS_ActiveLook_Mode0_Update(void)
         double displayVal = 0.0;
         bool display_invalid = false; // Flag to indicate if "----" should be shown
 
-        const AL_Mode0_LineMap_t* mapEntry = FindLineMapEntry(s_lineSpecs[i].typeId);
+        const AL_Mode0_LineMap_t* mapEntry = s_lineSpecs[i].mapEntry;
 
         if (mapEntry && mapEntry->fn) {
             // 1. If nav is disabled but line is a navigation mode, mark it invalid
@@ -696,11 +691,17 @@ void FS_ActiveLook_Mode0_Update(void)
                 displayVal = baseVal * unitInfo.multiplier;
 
                 // 6. Format the display value
+                int dec = (int)(cfg->al_lines[i].decimals);
+                if (dec > 1) dec = 1;
+                // Drop decimal for large values to fit cell
+                if (dec > 0 && (displayVal >= 10000.0 || displayVal <= -1000.0))
+                    dec = 0;
+                int width = (dec > 0) ? 6 : 5;
                 snprintf(
                         lineValueStr[i],
                         sizeof(lineValueStr[i]),
-                        "%.*f",
-                        (int)(cfg->al_lines[i].decimals),
+                        "%*.*f",
+                        width, dec,
                         displayVal);
             }
         } else {
@@ -708,10 +709,14 @@ void FS_ActiveLook_Mode0_Update(void)
             display_invalid = true;
         }
 
-        // If any limit check failed, display "----"
+        // If any limit check failed, display placeholder
         if (display_invalid) {
-             snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "----");
+             int dec2 = (int)(cfg->al_lines[i].decimals);
+             if (dec2 > 1) dec2 = 1;
+             int width2 = (dec2 > 0) ? 6 : 5;
+             snprintf(lineValueStr[i], sizeof(lineValueStr[i]), "%*s", width2, "--.-");
         }
+
     }
 
     // Build header text
@@ -726,7 +731,7 @@ void FS_ActiveLook_Mode0_Update(void)
     int fs_pct = (100 * (vbat->voltage - 3300)) / (4200 - 3200);
     fs_pct = MAX(0, MIN(100, fs_pct));
 
-    sprintf(battLevels, "A:%s%%   F:%d%%   N:%d", alBattStr, fs_pct, gnss->numSV);
+    sprintf(battLevels, " %s%%    %d%%    %d", alBattStr, fs_pct, gnss->numSV);
 
     // Build the final packet with the 4 lines
     uint8_t buf[128];

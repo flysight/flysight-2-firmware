@@ -50,6 +50,11 @@ uint8_t FS_ActiveLook_Client_IsReady(void);
 /* Write data to Rx characteristic (WriteWithoutResp) */
 tBleStatus FS_ActiveLook_Client_WriteWithoutResp(const uint8_t *data, uint16_t length);
 
+/* Write data to Rx characteristic (Write With Response).
+ * Triggers ACI_GATT_PROC_COMPLETE when the glasses acknowledge.
+ * Returns BLE_STATUS_BUSY if a previous write is still pending. */
+tBleStatus FS_ActiveLook_Client_WriteWithResp(const uint8_t *data, uint16_t length);
+
 /**
  * @brief Enable battery notifications for the standard Battery Service.
  *        This writes 0x01 to the CCC descriptor of the Battery Level char.
@@ -64,5 +69,16 @@ tBleStatus FS_ActiveLook_Client_EnableBatteryNotifications(void);
  * @return uint8_t
  */
 uint8_t FS_ActiveLook_Client_GetBatteryLevel(void);
+void FS_ActiveLook_Client_ReadBatteryLevel(void);
+
+/**
+ * @brief Send cfgRead command and register callback for the response.
+ * @param callback  Called with (found=1, version) if config exists,
+ *                  or (found=0, 0) if config not found.
+ */
+void FS_ActiveLook_Client_CfgRead(void (*callback)(uint8_t found, uint32_t version));
+
+uint8_t FS_ActiveLook_Client_CanSend(void);
+void FS_ActiveLook_Client_SetUploadActive(uint8_t active);
 
 #endif /* ACTIVELOOK_CLIENT_H */

@@ -23,9 +23,12 @@
 
 #include "activelook_client.h"
 #include "app_common.h"
+#include "app_conf.h"
 #include "dbg_trace.h"
 #include "ble.h"
 #include "tl.h"
+#include "log.h"
+#include "stm32_seq.h"
 #include <string.h>
 
 #ifndef UNPACK_2_BYTE_PARAMETER
@@ -44,11 +47,31 @@ static const uint8_t ACTIVELK_SERVICE_UUID[16] =
   0x3E, 0xB0, 0x83, 0x07
 };
 
-/* Rx characteristic UUID
+/* Rx characteristic UUID (write to glasses)
  * 0783B03E-8535-B5A0-7140-A304D2495CBA */
 static const uint8_t ACTIVELK_RX_CHAR_UUID[16] =
 {
   0xBA, 0x5C, 0x49, 0xD2,
+  0x04, 0xA3, 0x40, 0x71,
+  0xA0, 0xB5, 0x35, 0x85,
+  0x3E, 0xB0, 0x83, 0x07
+};
+
+/* Tx characteristic UUID (notify from glasses)
+ * 0783B03E-8535-B5A0-7140-A304D2495CB8 */
+static const uint8_t ACTIVELK_TX_CHAR_UUID[16] =
+{
+  0xB8, 0x5C, 0x49, 0xD2,
+  0x04, 0xA3, 0x40, 0x71,
+  0xA0, 0xB5, 0x35, 0x85,
+  0x3E, 0xB0, 0x83, 0x07
+};
+
+/* CTRL characteristic UUID (flow control, notify from glasses)
+ * 0783B03E-8535-B5A0-7140-A304D2495CB9 */
+static const uint8_t ACTIVELK_CTRL_CHAR_UUID[16] =
+{
+  0xB9, 0x5C, 0x49, 0xD2,
   0x04, 0xA3, 0x40, 0x71,
   0xA0, 0xB5, 0x35, 0x85,
   0x3E, 0xB0, 0x83, 0x07
@@ -61,7 +84,11 @@ typedef enum {
     DISC_STATE_SVC_IN_PROGRESS,
     DISC_STATE_CHAR_IN_PROGRESS,
     DISC_STATE_DESC_IN_PROGRESS,
-    DISC_STATE_BATTERY_NOTIFY_WRITE
+    DISC_STATE_BATTERY_NOTIFY_WRITE,
+    DISC_STATE_TX_DESC_IN_PROGRESS,
+    DISC_STATE_TX_NOTIFY_WRITE,
+    DISC_STATE_CTRL_DESC_IN_PROGRESS,
+    DISC_STATE_CTRL_NOTIFY_WRITE
 } DiscoveryState_t;
 
 /* We define a separate enum to track which service we are scanning for chars. */
@@ -83,6 +110,22 @@ typedef struct
 
     uint8_t  rxCharFound;
     uint16_t rxCharHandle;
+
+    uint8_t  txCharFound;
+    uint16_t txCharHandle;
+
+    uint16_t txCCCDHandle;
+
+    uint8_t  ctrlCharFound;
+    uint16_t ctrlCharHandle;
+    uint16_t ctrlCCCDHandle;
+    uint8_t  flowCtrlPaused;
+    uint8_t  writePending;
+    uint8_t  uploadActive;
+
+    uint32_t cfgReadVersion;
+    uint8_t  cfgReadPending;
+    void (*cfgReadCallback)(uint8_t found, uint32_t version);
 
     /* Store battery service info */
     uint8_t  batteryServiceFound;
@@ -139,6 +182,17 @@ void FS_ActiveLook_Client_StartDiscovery(uint16_t connectionHandle)
     g_ctx.serviceEndHandle      = 0;
     g_ctx.rxCharFound           = 0;
     g_ctx.rxCharHandle          = 0;
+    g_ctx.txCharFound           = 0;
+    g_ctx.txCharHandle          = 0;
+    g_ctx.txCCCDHandle          = 0;
+    g_ctx.ctrlCharFound         = 0;
+    g_ctx.ctrlCharHandle        = 0;
+    g_ctx.ctrlCCCDHandle        = 0;
+    g_ctx.flowCtrlPaused        = 0;
+    g_ctx.writePending          = 0;
+    g_ctx.uploadActive          = 0;
+    g_ctx.cfgReadPending        = 0;
+    g_ctx.cfgReadCallback       = NULL;
 
     g_ctx.batteryServiceFound   = 0;
     g_ctx.batteryServiceStartHandle = 0;
@@ -196,6 +250,13 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
 
             if (pc->Connection_Handle != g_ctx.connHandle)
                 break; /* Not for us */
+
+            if (g_ctx.writePending)
+            {
+                g_ctx.writePending = 0;
+                if (!g_ctx.uploadActive)
+                    UTIL_SEQ_SetTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, CFG_SCH_PRIO_0);
+            }
 
             if (g_ctx.discState == DISC_STATE_EXCH_MTU)
             {
@@ -315,48 +376,160 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
             }
             else if (g_ctx.discState == DISC_STATE_DESC_IN_PROGRESS)
             {
-                /* Done discovering battery descriptors. Now we can enable notifications. */
-                g_ctx.discState = DISC_STATE_IDLE;
-                APP_DBG_MSG("ActiveLook_Client: Descriptor discovery complete.\n");
+                /* Done discovering battery descriptors. Enable battery notifications. */
+                APP_DBG_MSG("ActiveLook_Client: Battery descriptor discovery complete.\n");
 
-                /* Attempt enabling battery notifications if we found that CCC handle */
                 if (g_ctx.batteryCCCDHandle != 0)
                 {
                     tBleStatus s2 = FS_ActiveLook_Client_EnableBatteryNotifications();
                     APP_DBG_MSG("EnableBatteryNotifications => 0x%02X\n", s2);
                     if (s2 == BLE_STATUS_SUCCESS)
                     {
-                        /* Expect a GATT procedure complete event for the CCC write. */
                         g_ctx.discState = DISC_STATE_BATTERY_NOTIFY_WRITE;
                     }
+                    else
+                    {
+                        /* Battery notify failed, but continue to TX discovery */
+                        g_ctx.discState = DISC_STATE_IDLE;
+                        if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                            g_ctx.cb->OnDiscoveryComplete();
+                    }
                 }
-
-                /* If we also found Rx char, call the callback now if desired */
-                if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                else
                 {
-                    g_ctx.cb->OnDiscoveryComplete();
+                    /* No battery CCCD, skip to TX discovery or finalize */
+                    g_ctx.discState = DISC_STATE_IDLE;
+                    if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                        g_ctx.cb->OnDiscoveryComplete();
                 }
             }
             else if (g_ctx.discState == DISC_STATE_BATTERY_NOTIFY_WRITE)
             {
-                /* The CCCD write just completed successfully. We can now read. */
-                g_ctx.discState = DISC_STATE_IDLE;
-
-                if (g_ctx.batteryCharFound && (g_ctx.batteryCharHandle != 0))
+                if (g_ctx.txCharFound && (g_ctx.txCharHandle != 0))
                 {
-                    g_ctx.currentReadHandle = g_ctx.batteryCharHandle;
-                    tBleStatus readStatus = aci_gatt_read_char_value(g_ctx.connHandle, g_ctx.batteryCharHandle);
-
-                    if (readStatus == BLE_STATUS_SUCCESS)
+                    g_ctx.discState = DISC_STATE_TX_DESC_IN_PROGRESS;
+                    tBleStatus s3 = aci_gatt_disc_all_char_desc(
+                                       g_ctx.connHandle,
+                                       g_ctx.txCharHandle,
+                                       g_ctx.txCharHandle + 2);
+                    if (s3 == BLE_STATUS_SUCCESS)
                     {
-                        APP_DBG_MSG("ActiveLook_Client: Requesting immediate battery read...\n");
+                        APP_DBG_MSG("ActiveLook_Client: Discovering TX descriptors...\n");
                     }
                     else
                     {
-                        APP_DBG_MSG("ActiveLook_Client: Battery read failed => 0x%02X\n", readStatus);
-                        g_ctx.currentReadHandle = 0; /* just in case */
+                        APP_DBG_MSG("ActiveLook_Client: TX desc discovery fail=0x%02X\n", s3);
+                        g_ctx.discState = DISC_STATE_IDLE;
+                        if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                            g_ctx.cb->OnDiscoveryComplete();
                     }
                 }
+                else
+                {
+                    g_ctx.discState = DISC_STATE_IDLE;
+                    if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                        g_ctx.cb->OnDiscoveryComplete();
+                }
+            }
+            else if (g_ctx.discState == DISC_STATE_TX_DESC_IN_PROGRESS)
+            {
+                /* TX descriptor discovery done. Enable TX notifications. */
+                g_ctx.discState = DISC_STATE_IDLE;
+                if (g_ctx.txCCCDHandle != 0)
+                {
+                    uint16_t enable = 0x0001;
+                    tBleStatus s4 = aci_gatt_write_char_desc(
+                                       g_ctx.connHandle,
+                                       g_ctx.txCCCDHandle,
+                                       2,
+                                       (uint8_t*)&enable);
+                    if (s4 == BLE_STATUS_SUCCESS)
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: TX notifications enabled\n");
+                        g_ctx.discState = DISC_STATE_TX_NOTIFY_WRITE;
+                    }
+                    else
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: TX notify enable fail=0x%02X\n", s4);
+                        if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                            g_ctx.cb->OnDiscoveryComplete();
+                    }
+                }
+                else
+                {
+                    APP_DBG_MSG("ActiveLook_Client: No TX CCCD found\n");
+                    if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                        g_ctx.cb->OnDiscoveryComplete();
+                }
+            }
+            else if (g_ctx.discState == DISC_STATE_TX_NOTIFY_WRITE)
+            {
+                APP_DBG_MSG("ActiveLook_Client: TX notifications enabled OK\n");
+
+                if (g_ctx.ctrlCharFound && (g_ctx.ctrlCharHandle != 0))
+                {
+                    g_ctx.discState = DISC_STATE_CTRL_DESC_IN_PROGRESS;
+                    tBleStatus s5 = aci_gatt_disc_all_char_desc(
+                                       g_ctx.connHandle,
+                                       g_ctx.ctrlCharHandle,
+                                       g_ctx.ctrlCharHandle + 2);
+                    if (s5 == BLE_STATUS_SUCCESS)
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: Discovering CTRL descriptors...\n");
+                    }
+                    else
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: CTRL desc discovery fail=0x%02X\n", s5);
+                        g_ctx.discState = DISC_STATE_IDLE;
+                        if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                            g_ctx.cb->OnDiscoveryComplete();
+                    }
+                }
+                else
+                {
+                    g_ctx.discState = DISC_STATE_IDLE;
+                    APP_DBG_MSG("ActiveLook_Client: All discovery complete (no CTRL)\n");
+                    if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                        g_ctx.cb->OnDiscoveryComplete();
+                }
+            }
+            else if (g_ctx.discState == DISC_STATE_CTRL_DESC_IN_PROGRESS)
+            {
+                g_ctx.discState = DISC_STATE_IDLE;
+                if (g_ctx.ctrlCCCDHandle != 0)
+                {
+                    uint16_t enable = 0x0001;
+                    tBleStatus s6 = aci_gatt_write_char_desc(
+                                       g_ctx.connHandle,
+                                       g_ctx.ctrlCCCDHandle,
+                                       2,
+                                       (uint8_t*)&enable);
+                    if (s6 == BLE_STATUS_SUCCESS)
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: CTRL notifications enabling...\n");
+                        g_ctx.discState = DISC_STATE_CTRL_NOTIFY_WRITE;
+                    }
+                    else
+                    {
+                        APP_DBG_MSG("ActiveLook_Client: CTRL notify enable fail=0x%02X\n", s6);
+                        if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                            g_ctx.cb->OnDiscoveryComplete();
+                    }
+                }
+                else
+                {
+                    APP_DBG_MSG("ActiveLook_Client: No CTRL CCCD found\n");
+                    if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                        g_ctx.cb->OnDiscoveryComplete();
+                }
+            }
+            else if (g_ctx.discState == DISC_STATE_CTRL_NOTIFY_WRITE)
+            {
+                g_ctx.discState = DISC_STATE_IDLE;
+                FS_Log_WriteEvent("AL CTRL notifications enabled");
+                APP_DBG_MSG("ActiveLook_Client: All discovery complete, TX+CTRL notifications active\n");
+                if (g_ctx.rxCharFound && g_ctx.cb && g_ctx.cb->OnDiscoveryComplete)
+                    g_ctx.cb->OnDiscoveryComplete();
             }
         }
         break;
@@ -438,12 +611,23 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
 
                     if (g_ctx.whichService == SERVICE_ACTIVELOOK)
                     {
-                        /* Compare to the known 128-bit Rx char */
                         if ((uuidLen == 16) && (memcmp(uuid, ACTIVELK_RX_CHAR_UUID, 16) == 0))
                         {
                             APP_DBG_MSG("ActiveLook_Client: Found RxChar=0x%04X\n", valHandle);
                             g_ctx.rxCharFound  = 1;
                             g_ctx.rxCharHandle = valHandle;
+                        }
+                        else if ((uuidLen == 16) && (memcmp(uuid, ACTIVELK_TX_CHAR_UUID, 16) == 0))
+                        {
+                            APP_DBG_MSG("ActiveLook_Client: Found TxChar=0x%04X\n", valHandle);
+                            g_ctx.txCharFound  = 1;
+                            g_ctx.txCharHandle = valHandle;
+                        }
+                        else if ((uuidLen == 16) && (memcmp(uuid, ACTIVELK_CTRL_CHAR_UUID, 16) == 0))
+                        {
+                            APP_DBG_MSG("ActiveLook_Client: Found CtrlChar=0x%04X\n", valHandle);
+                            g_ctx.ctrlCharFound  = 1;
+                            g_ctx.ctrlCharHandle = valHandle;
                         }
                     }
                     else if (g_ctx.whichService == SERVICE_BATTERY)
@@ -482,24 +666,92 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                         APP_DBG_MSG("ActiveLook_Client: Battery notification => %d%%\n", g_ctx.lastBatteryPercent);
                     }
                 }
-                /* If it’s from the AL Rx handle, you might parse it here, but
-                   currently we do not have a notify from the Rx char. */
+                /* Parse ActiveLook TX notifications (command responses) */
+                if (g_ctx.txCharFound &&
+                    pNotif->Attribute_Handle == g_ctx.txCharHandle &&
+                    pNotif->Attribute_Value_Length >= 2)
+                {
+                    uint8_t *d = pNotif->Attribute_Value;
+                    uint16_t len = pNotif->Attribute_Value_Length;
+
+                    /* cfgRead response: FF D1 [fmt] [len] [version:4] [counts:5] AA */
+                    if (d[0] == 0xFF && d[1] == 0xD1 && g_ctx.cfgReadPending)
+                    {
+                        g_ctx.cfgReadPending = 0;
+                        /* Parse version from payload (after header) */
+                        uint8_t hdrLen = (d[2] & 0x20) ? 5 : 4;
+                        if (len >= hdrLen + 4)
+                        {
+                            uint32_t ver = ((uint32_t)d[hdrLen] << 24) |
+                                           ((uint32_t)d[hdrLen+1] << 16) |
+                                           ((uint32_t)d[hdrLen+2] << 8) |
+                                           (uint32_t)d[hdrLen+3];
+                            g_ctx.cfgReadVersion = ver;
+                            APP_DBG_MSG("ActiveLook_Client: cfgRead version=%lu\n",
+                                        (unsigned long)ver);
+                            if (g_ctx.cfgReadCallback)
+                                g_ctx.cfgReadCallback(1, ver);
+                        }
+                    }
+                    else if (d[0] == 0xFF && d[1] == 0xE2)
+                    {
+                        uint8_t errCmd = (len > 4) ? d[4] : 0;
+                        uint8_t errCode = (len > 5) ? d[5] : 0;
+                        FS_Log_WriteEvent("AL TX err: cmd=0x%02X code=%d", errCmd, errCode);
+
+                        if (g_ctx.cfgReadPending)
+                        {
+                            g_ctx.cfgReadPending = 0;
+                            if (g_ctx.cfgReadCallback)
+                                g_ctx.cfgReadCallback(0, 0);
+                        }
+                    }
+                }
+                /* CTRL characteristic notifications (flow control) */
+                if (g_ctx.ctrlCharFound &&
+                    pNotif->Attribute_Handle == g_ctx.ctrlCharHandle &&
+                    pNotif->Attribute_Value_Length >= 1)
+                {
+                    uint8_t val = pNotif->Attribute_Value[0];
+                    switch (val)
+                    {
+                    case 0x01:
+                        g_ctx.flowCtrlPaused = 0;
+                        FS_Log_WriteEvent("AL CTRL: flow ON");
+                        break;
+                    case 0x02:
+                        g_ctx.flowCtrlPaused = 1;
+                        FS_Log_WriteEvent("AL CTRL: flow OFF");
+                        break;
+                    case 0x03:
+                        FS_Log_WriteEvent("AL CTRL err: corrupt cmd");
+                        break;
+                    case 0x04:
+                        FS_Log_WriteEvent("AL CTRL err: RX overflow");
+                        break;
+                    case 0x06:
+                        FS_Log_WriteEvent("AL CTRL err: missing cfgWrite");
+                        break;
+                    default:
+                        FS_Log_WriteEvent("AL CTRL unknown=0x%02X", val);
+                        break;
+                    }
+                }
             }
         }
         break;
 
         case ACI_ATT_FIND_INFO_RESP_VSEVT_CODE:
         {
-            /* This event is triggered during "aci_gatt_disc_all_char_desc(...)" */
-            if (g_ctx.discState == DISC_STATE_DESC_IN_PROGRESS)
+            if (g_ctx.discState == DISC_STATE_DESC_IN_PROGRESS ||
+                g_ctx.discState == DISC_STATE_TX_DESC_IN_PROGRESS ||
+                g_ctx.discState == DISC_STATE_CTRL_DESC_IN_PROGRESS)
             {
                 aci_att_find_info_resp_event_rp0 *resp =
                     (aci_att_find_info_resp_event_rp0 *)blecore_evt->data;
 
-                /* Typically format=0x01 => 16-bit UUID; format=0x02 => 128-bit */
                 if (resp->Format == 0x01)
                 {
-                    /* Each descriptor is 4 bytes: 2 for handle, 2 for UUID */
                     uint8_t numDesc = (resp->Event_Data_Length - 1) / 4;
                     uint8_t *ptr    = resp->Handle_UUID_Pair;
                     for (uint8_t i = 0; i < numDesc; i++)
@@ -509,16 +761,25 @@ void FS_ActiveLook_Client_EventHandler(void *p_blecore_evt, uint8_t hci_event_ev
                         uint16_t descUUID   = UNPACK_2_BYTE_PARAMETER(ptr);
                         ptr += 2;
 
-                        if (descUUID == 0x2902) /* CCC descriptor */
+                        if (descUUID == 0x2902)
                         {
-                            g_ctx.batteryCCCDHandle = descHandle;
-                            APP_DBG_MSG("ActiveLook_Client: Found Battery CCCD=0x%04X\n", descHandle);
+                            if (g_ctx.discState == DISC_STATE_DESC_IN_PROGRESS)
+                            {
+                                g_ctx.batteryCCCDHandle = descHandle;
+                                APP_DBG_MSG("ActiveLook_Client: Found Battery CCCD=0x%04X\n", descHandle);
+                            }
+                            else if (g_ctx.discState == DISC_STATE_TX_DESC_IN_PROGRESS)
+                            {
+                                g_ctx.txCCCDHandle = descHandle;
+                                APP_DBG_MSG("ActiveLook_Client: Found TX CCCD=0x%04X\n", descHandle);
+                            }
+                            else if (g_ctx.discState == DISC_STATE_CTRL_DESC_IN_PROGRESS)
+                            {
+                                g_ctx.ctrlCCCDHandle = descHandle;
+                                APP_DBG_MSG("ActiveLook_Client: Found CTRL CCCD=0x%04X\n", descHandle);
+                            }
                         }
                     }
-                }
-                else if (resp->Format == 0x02)
-                {
-                    /* 128-bit descriptors if needed... not typical for CCCD. */
                 }
             }
         }
@@ -585,6 +846,27 @@ tBleStatus FS_ActiveLook_Client_WriteWithoutResp(const uint8_t *data, uint16_t l
 }
 
 /******************************************************************************
+ * Write data to Rx characteristic (Write With Response)
+ ******************************************************************************/
+tBleStatus FS_ActiveLook_Client_WriteWithResp(const uint8_t *data, uint16_t length)
+{
+    if (!FS_ActiveLook_Client_IsReady())
+        return BLE_STATUS_FAILED;
+
+    if (g_ctx.writePending)
+        return BLE_STATUS_BUSY;
+
+    tBleStatus s = aci_gatt_write_char_value(g_ctx.connHandle,
+                                              g_ctx.rxCharHandle,
+                                              length,
+                                              (uint8_t*)data);
+    if (s == BLE_STATUS_SUCCESS)
+        g_ctx.writePending = 1;
+
+    return s;
+}
+
+/******************************************************************************
  * Enable battery notifications
  ******************************************************************************/
 tBleStatus FS_ActiveLook_Client_EnableBatteryNotifications(void)
@@ -624,5 +906,55 @@ tBleStatus FS_ActiveLook_Client_EnableBatteryNotifications(void)
  ******************************************************************************/
 uint8_t FS_ActiveLook_Client_GetBatteryLevel(void)
 {
-    return g_ctx.lastBatteryPercent; /* 0..100, or 255 if unknown */
+    return g_ctx.lastBatteryPercent;
 }
+
+void FS_ActiveLook_Client_ReadBatteryLevel(void)
+{
+    if (g_ctx.batteryCharFound && (g_ctx.batteryCharHandle != 0))
+    {
+        g_ctx.currentReadHandle = g_ctx.batteryCharHandle;
+        aci_gatt_read_char_value(g_ctx.connHandle, g_ctx.batteryCharHandle);
+    }
+}
+
+/******************************************************************************
+ * Send cfgRead command to query config version
+ ******************************************************************************/
+void FS_ActiveLook_Client_CfgRead(void (*callback)(uint8_t found, uint32_t version))
+{
+    g_ctx.cfgReadCallback = callback;
+    g_ctx.cfgReadPending = 1;
+
+    /* Build cfgRead frame: FF D1 00 [len] "FLYSIGHT\0\0\0\0" AA */
+    uint8_t packet[20];
+    uint8_t idx = 0;
+    packet[idx++] = 0xFF;
+    packet[idx++] = 0xD1;
+    packet[idx++] = 0x00;
+    uint8_t lenPos = idx++;
+
+    /* Config name padded to 12 bytes */
+    const char *name = "FLYSIGHT";
+    uint8_t nameLen = 8;
+    memcpy(&packet[idx], name, nameLen);
+    idx += nameLen;
+    for (uint8_t pad = nameLen; pad < 12; pad++)
+        packet[idx++] = 0x00;
+
+    packet[idx++] = 0xAA;
+    packet[lenPos] = idx;
+
+    FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
+}
+
+uint8_t FS_ActiveLook_Client_CanSend(void)
+{
+    return !g_ctx.flowCtrlPaused;
+}
+
+void FS_ActiveLook_Client_SetUploadActive(uint8_t active)
+{
+    g_ctx.uploadActive = active;
+}
+

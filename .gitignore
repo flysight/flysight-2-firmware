@@ -17,3 +17,10 @@ Deploy/Firmware_To_Deploy/*
 
 # Test build products
 Tests/*.exe
+
+# OS artifacts
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
