@@ -146,6 +146,12 @@ static const char defaultConfig[] =
 		"                 ;   -25200 = UTC-7 (MST, PDT)\n"
 		"                 ;   -28800 = UTC-8 (PST)\n"
 		"\n"
+		"; Metadata\n"
+		"\n"
+		"Name:             ; Configuration name\n"
+		"Description:      ; Configuration description\n"
+		"Labels:           ; Comma-separated labels\n"
+		"\n"
 		"; Initialization\n"
 		"\n"
 		"Init_Mode: 0     ; When the FlySight is powered on\n"
@@ -362,6 +368,11 @@ void FS_Config_Init(void)
 
 	// IMPORTANT: Navigation disabled by default
 	config.enable_nav     = 0;
+
+	// Initialize metadata fields
+	*(config.name) = '\0';
+	*(config.description) = '\0';
+	*(config.labels) = '\0';
 }
 
 static void FS_Config_WriteHex_32(char *result, const uint32_t *data, uint32_t count)
@@ -576,6 +587,24 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 			{
 				config.enable_nav = 1;
 			}
+		}
+
+		if (!strcmp(name, "Name"))
+		{
+			strncpy(config.name, result, sizeof(config.name) - 1);
+			config.name[sizeof(config.name) - 1] = '\0';
+		}
+
+		if (!strcmp(name, "Description"))
+		{
+			strncpy(config.description, result, sizeof(config.description) - 1);
+			config.description[sizeof(config.description) - 1] = '\0';
+		}
+
+		if (!strcmp(name, "Labels"))
+		{
+			strncpy(config.labels, result, sizeof(config.labels) - 1);
+			config.labels[sizeof(config.labels) - 1] = '\0';
 		}
 	}
 
