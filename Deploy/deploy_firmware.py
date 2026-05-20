@@ -98,7 +98,7 @@ def encrypt_firmware_with_key(
 
     # 7) Write .sfb file
     os.makedirs(output_dir, exist_ok=True)
-    output_file = f"{output_dir}/APP.sfb"
+    output_file = f"{output_dir}/{pk_name}_{fw_name}.sfb"
     with open(output_file, 'wb') as out:
         out.write(header_binary)
         out.write(fw_encrypted)
@@ -111,8 +111,11 @@ def main():
     ]
 
     pk_files = [
-        ('Public_Keys/pub_key_b4.bin', 'B4')
-        
+        ('Public_Keys/pub_key_b2.bin', 'B2'),
+        ('Public_Keys/pub_key_b3.bin', 'B3'),
+        ('Public_Keys/pub_key_b4.bin', 'B4'),
+        ('Public_Keys/pub_key_b5.bin', 'B5'),
+        ('Public_Keys/pub_key_b6.bin', 'B6')
     ]
 
     for fw_file, fw_name in fw_files:
