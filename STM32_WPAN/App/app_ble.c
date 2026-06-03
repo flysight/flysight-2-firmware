@@ -600,11 +600,12 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
           adv_report_data = (uint8_t*)(&le_advertising_event->Advertising_Report[0].Length_Data) + 1;
           k = 0;
 
-          // Define the target device name we are looking for
-          char targetDeviceName[14];
-          snprintf(targetDeviceName, sizeof(targetDeviceName),
-        		   "ENGO 2 %.*s", 6, FS_Config_Get()->al_id);
-          const size_t targetDeviceNameLen = strlen(targetDeviceName);
+          // Define the target device names we are looking for
+          char targetDeviceNames[2][14];
+          snprintf(targetDeviceNames[0], sizeof(targetDeviceNames[0]),
+                  "ENGO 2 %.*s", 6, FS_Config_Get()->al_id);
+          snprintf(targetDeviceNames[1], sizeof(targetDeviceNames[1]),
+                  "ENGO 3 %.*s", 6, FS_Config_Get()->al_id);
 
           // Flags to track if we found the required data within *this specific* advertising report
           uint8_t foundMfgData = 0; // Flag for correct manufacturer data
@@ -646,12 +647,18 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                 for(int i=0; i<name_len; i++) { APP_DBG_MSG("%c", name_data[i]); }
                 APP_DBG_MSG("'\n\r");
 
-                // Compare the found name with the target name
-                if ((name_len == targetDeviceNameLen) &&
-                		(memcmp(name_data, targetDeviceName, targetDeviceNameLen) == 0))
+                // Compare the found name with the target names
+                for (size_t i = 0; i < (sizeof(targetDeviceNames) / sizeof(targetDeviceNames[0])); i++)
                 {
-                   APP_DBG_MSG("-- Device Name matches target '%s'\n\r", targetDeviceName);
-                   foundDeviceName = 1; // Set flag indicating device name is correct
+                  const size_t targetDeviceNameLen = strlen(targetDeviceNames[i]);
+
+                  if ((name_len == targetDeviceNameLen) &&
+                      (memcmp(name_data, targetDeviceNames[i], targetDeviceNameLen) == 0))
+                  {
+                    APP_DBG_MSG("-- Device Name matches target '%s'\n\r", targetDeviceNames[i]);
+                    foundDeviceName = 1;
+                    break;
+                  }
                 }
               }
 
@@ -661,7 +668,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
             // Check if *both* flags are set after processing all AD structures in this report
             if (foundMfgData && foundDeviceName)
             {
-                APP_DBG_MSG("-- Found matching ENGO 2 device!\n\r");
+                APP_DBG_MSG("-- Found matching ENGO device!\n\r");
                 BleApplicationContext.EndDevice1Found = 0x01;
                 // Store the BD Address of this device
                 P2P_SERVER1_BDADDR[0] = le_advertising_event->Advertising_Report[0].Address[0];
