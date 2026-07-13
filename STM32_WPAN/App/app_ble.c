@@ -260,6 +260,7 @@ uint8_t request_pairing = 0;
 
 /* BD Address of device to be connected once discovered */
 tBDAddr P2P_SERVER1_BDADDR;
+uint8_t P2P_SERVER1_BDADDR_TYPE;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -677,10 +678,14 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification(void *p_Pckt)
                 P2P_SERVER1_BDADDR[3] = le_advertising_event->Advertising_Report[0].Address[3];
                 P2P_SERVER1_BDADDR[4] = le_advertising_event->Advertising_Report[0].Address[4];
                 P2P_SERVER1_BDADDR[5] = le_advertising_event->Advertising_Report[0].Address[5];
+                /* Report may give identity types 0x02/0x03; create_connection
+                   only accepts 0x00 (public) or 0x01 (random) */
+                P2P_SERVER1_BDADDR_TYPE = le_advertising_event->Advertising_Report[0].Address_Type & 0x01;
 
-                APP_DBG_MSG("   Address: %02X:%02X:%02X:%02X:%02X:%02X\n\r",
+                APP_DBG_MSG("   Address: %02X:%02X:%02X:%02X:%02X:%02X (%s)\n\r",
                             P2P_SERVER1_BDADDR[5], P2P_SERVER1_BDADDR[4], P2P_SERVER1_BDADDR[3],
-                            P2P_SERVER1_BDADDR[2], P2P_SERVER1_BDADDR[1], P2P_SERVER1_BDADDR[0]);
+                            P2P_SERVER1_BDADDR[2], P2P_SERVER1_BDADDR[1], P2P_SERVER1_BDADDR[0],
+                            P2P_SERVER1_BDADDR_TYPE == GAP_PUBLIC_ADDR ? "Public" : "Random");
             }
           } /* end if (event_type == ADV_IND) */
           break;
@@ -1711,7 +1716,7 @@ static void Connect_Request(void)
     /* USER CODE END APP_BLE_CONNECTED_SUCCESS_END_DEVICE_1 */
     result = aci_gap_create_connection(SCAN_P,
                                        SCAN_L,
-                                       GAP_PUBLIC_ADDR,
+                                       P2P_SERVER1_BDADDR_TYPE,
                                        P2P_SERVER1_BDADDR,
                                        CFG_BLE_ADDRESS_TYPE,
                                        0x0006,
