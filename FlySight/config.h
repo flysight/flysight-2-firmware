@@ -53,6 +53,8 @@
 #define FS_CONFIG_MODE_LEFT_RIGHT                10
 #define FS_CONFIG_MODE_DIVE_ANGLE                11
 #define FS_CONFIG_MODE_ALTITUDE                  12
+#define FS_CONFIG_MODE_COURSE                    13
+#define FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION   14
 
 #define FS_CONFIG_UNITS_KMH     0
 #define FS_CONFIG_UNITS_MPH     1
@@ -167,13 +169,14 @@ typedef struct
 	int32_t  lat;
 	int32_t  lon;
 	int16_t  bearing;
-	uint16_t end_nav;
+	int32_t  end_nav;
 	uint16_t max_dist;
 	uint16_t min_angle;
 
 	char     al_id[6];
 	uint8_t  al_mode;
 	uint32_t al_rate;
+	int32_t  altw_tau;
 
 	FS_Config_AL_Line_t al_lines[FS_CONFIG_MAX_AL_LINES];
 	uint8_t  num_al_lines;

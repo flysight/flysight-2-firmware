@@ -24,6 +24,9 @@
 #ifndef ACTIVELOOK_H_
 #define ACTIVELOOK_H_
 
+#include <stdint.h>
+#include "gnss.h"
+
 typedef enum {
     FS_AL_SETUP_IN_PROGRESS = 0,
     FS_AL_SETUP_DONE
@@ -31,5 +34,6 @@ typedef enum {
 
 void FS_ActiveLook_Init(void);
 void FS_ActiveLook_DeInit(void);
+void FS_ActiveLook_UpdateGNSS(const FS_GNSS_Data_t *data);
 
 #endif /* ACTIVELOOK_H_ */

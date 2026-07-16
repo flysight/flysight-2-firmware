@@ -25,11 +25,18 @@
 #define ACTIVELOOK_MODE0_H
 
 #include "activelook.h"
+#include "gnss.h"
 
 /**
  * Called once when the mode is selected, to reset and load config data.
  */
 void FS_ActiveLook_Mode0_Init(void);
+
+/**
+ * Called at the GNSS measurement rate with each new sample, to update
+ * the glide slope filter used by the altitude at destination line.
+ */
+void FS_ActiveLook_Mode0_UpdateGNSS(const FS_GNSS_Data_t *data);
 
 /**
  * Called repeatedly to perform multi-step layout setup. Each call

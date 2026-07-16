@@ -63,6 +63,12 @@ typedef struct {
 // Minimum announced altitude (mm)
 #define ALT_MIN_MM (1500L * 1000L)
 
+// Minimum filtered ground speed for altitude at destination (m/s)
+#define ALTW_MIN_GSPEED 2.0
+
+// GPS time of week rollover (ms)
+#define ITOW_ROLLOVER_MS 604800000UL
+
 /* --------------------------------------------------------------------------
    2. Data Structures for Each Line
    -------------------------------------------------------------------------- */
@@ -135,6 +141,31 @@ static double LN_Heading(const FS_GNSS_Data_t *d) {
     return (double)d->heading / 100000.0; // 1e-5 deg to deg
 }
 
+/*
+ * Glide slope filter for altitude at destination: velD and gSpeed are
+ * filtered separately with the same exponential time constant (AltW_Tau),
+ * so their ratio is exponentially-weighted altitude lost over distance
+ * travelled. Updated at the GNSS measurement rate by
+ * FS_ActiveLook_Mode0_UpdateGNSS(), independent of the display rate.
+ */
+static bool     s_altwFilterValid;
+static double   s_altwVelD;     // filtered down velocity (m/s)
+static double   s_altwGSpeed;   // filtered ground speed (m/s)
+static uint32_t s_altwLastITOW; // iTOW of last accepted sample (ms)
+
+// True when the filtered glide slope is usable for display
+static bool AltW_Valid(void) {
+    return s_altwFilterValid && (s_altwGSpeed >= ALTW_MIN_GSPEED);
+}
+
+static double LN_AltAtDest(const FS_GNSS_Data_t *d) {
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+    if (!AltW_Valid()) return 0.0; // Displayed as "----"
+    double altitude_agl_m = ((double)d->hMSL - (double)cfg->dz_elev) / 1000.0;
+    double distance_m = (double)calcDistance(d->lat, d->lon, cfg->lat, cfg->lon);
+    return altitude_agl_m - distance_m * (s_altwVelD / s_altwGSpeed);
+}
+
 /**
  * Updated table entry: includes unitType for conversion purposes.
  * 'units' field removed, as it's now dynamic based on user choice.
@@ -163,7 +194,8 @@ static const AL_Mode0_LineMap_t s_lineMap[] =
     // Mode 8, 9, 10?
     { FS_CONFIG_MODE_DIVE_ANGLE,               "Dive:", FS_UNIT_TYPE_ANGLE,    LN_DiveAngle    }, // 11
     { FS_CONFIG_MODE_ALTITUDE,                 "Alt:",  FS_UNIT_TYPE_ALTITUDE, LN_Altitude     }, // 12
-    { 13,                                      "Hdg:",  FS_UNIT_TYPE_ANGLE,    LN_Heading      }, // Mode 13 (Heading)
+    { FS_CONFIG_MODE_COURSE,                   "Hdg:",  FS_UNIT_TYPE_ANGLE,    LN_Heading      }, // 13
+    { FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION,  "AltW:", FS_UNIT_TYPE_ALTITUDE, LN_AltAtDest    }, // 14
 };
 static const unsigned s_lineMapCount = sizeof(s_lineMap) / sizeof(s_lineMap[0]);
 
@@ -503,6 +535,12 @@ void FS_ActiveLook_Mode0_Init(void)
 
     s_step = 0;
 
+    // Reset glide slope filter
+    s_altwFilterValid = false;
+    s_altwVelD        = 0.0;
+    s_altwGSpeed      = 0.0;
+    s_altwLastITOW    = 0;
+
     // For each line i, find its base label and store typeId
     for (int i = 0; i < cfg->num_al_lines; i++)
     {
@@ -517,6 +555,47 @@ void FS_ActiveLook_Mode0_Init(void)
             s_lineSpecs[i].label  = "?";
         }
     }
+}
+
+/**
+ * FS_ActiveLook_Mode0_UpdateGNSS()
+ *
+ * Called at the GNSS measurement rate (not the display rate) with each
+ * new GNSS sample. Updates the glide slope filter used by the altitude
+ * at destination line. The filter coefficient is computed from the time
+ * elapsed between accepted samples, so the time constant (AltW_Tau) is
+ * independent of the measurement rate, and data lost during a fix
+ * dropout is discounted in proportion to its age.
+ */
+void FS_ActiveLook_Mode0_UpdateGNSS(const FS_GNSS_Data_t *d)
+{
+    const FS_Config_Data_t *cfg = FS_Config_Get();
+
+    if (d->gpsFix != 3) return;
+
+    double velD   = (double)d->velD / 1000.0;  // mm/s to m/s
+    double gSpeed = (double)d->gSpeed / 100.0; // cm/s to m/s
+
+    if (!s_altwFilterValid) {
+        // Seed the filter with the first valid sample
+        s_altwVelD        = velD;
+        s_altwGSpeed      = gSpeed;
+        s_altwFilterValid = true;
+    } else {
+        double alpha = 1.0;
+        if (cfg->altw_tau > 0) {
+            // Time since last accepted sample, handling weekly rollover
+            uint32_t dt_ms = d->iTOW - s_altwLastITOW;
+            if (d->iTOW < s_altwLastITOW) {
+                dt_ms += ITOW_ROLLOVER_MS;
+            }
+            alpha = 1.0 - exp(-(double)dt_ms / (1000.0 * cfg->altw_tau));
+        }
+        s_altwVelD   += alpha * (velD   - s_altwVelD);
+        s_altwGSpeed += alpha * (gSpeed - s_altwGSpeed);
+    }
+
+    s_altwLastITOW = d->iTOW;
 }
 
 /**
@@ -575,13 +654,15 @@ FS_ActiveLook_SetupStatus_t FS_ActiveLook_Mode0_Setup(void)
         length = AL_BuildPage(10, buf); // Page ID 10 references layouts 10-13
         if (length > 0) {
             AL_SendRaw(buf, length);
-            s_step++;
+            s_step = 0; // Reset so setup can run again on reconnection
             status = FS_AL_SETUP_DONE; // Final step completed successfully
         } else {
              // Handle page build error?
+            s_step = 0;
             status = FS_AL_SETUP_DONE; // Consider setup failed/done
         }
-    } else { // Steps > 4: Already done
+    } else { // Shouldn't happen: reset and report done
+        s_step = 0;
         status = FS_AL_SETUP_DONE;
     }
 
@@ -631,7 +712,8 @@ void FS_ActiveLook_Mode0_Update(void)
                (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
                 mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
                 mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING ||
-                mapEntry->typeId == FS_CONFIG_MODE_LEFT_RIGHT))
+                mapEntry->typeId == FS_CONFIG_MODE_LEFT_RIGHT ||
+                mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION))
             {
                 display_invalid = true;
             }
@@ -653,11 +735,20 @@ void FS_ActiveLook_Mode0_Update(void)
                 }
             }
 
+            // Check glide slope filter for altitude at destination
+            if (!display_invalid &&
+                mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION) {
+                if (!AltW_Valid()) {
+                    display_invalid = true;
+                }
+            }
+
             // Check end_nav for Navigation parameters
             if (!display_invalid &&
                 (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
                  mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
-                 mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING))
+                 mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_BEARING ||
+                 mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION))
             {
                 // end_nav is in mm in config struct, compare directly
                 if ((cfg->end_nav != 0) && (altitude_agl_mm < cfg->end_nav)) {
@@ -668,7 +759,8 @@ void FS_ActiveLook_Mode0_Update(void)
             // Check max_dist for Destination parameters (only if not already invalid)
             if (!display_invalid &&
                 (mapEntry->typeId == FS_CONFIG_MODE_DIRECTION_TO_DESTINATION ||
-                 mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION))
+                 mapEntry->typeId == FS_CONFIG_MODE_DISTANCE_TO_DESTINATION ||
+                 mapEntry->typeId == FS_CONFIG_MODE_ALTITUDE_AT_DESTINATION))
             {
                 // baseVal for DistToDest is already the distance in meters
                 // For DirToDest, we need to recalculate distance if baseVal isn't distance

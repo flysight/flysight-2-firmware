@@ -254,6 +254,9 @@ static const char defaultConfig[] =
 		"                     0 = Not active\n"
 		"                     1 = Default mode\n"
 		"AL_Rate:    1000 ; ActiveLook rate (ms)\n"
+		"AltW_Tau:     10 ; Glide smoothing time constant (s)\n"
+		"                 ;   Used for altitude at destination\n"
+		"                 ;   0 = No smoothing\n"
 		"\n"
 		"AL_Line:       0 ; ActiveLook line value\n"
 		"                 ;   0 = Horizontal speed\n"
@@ -267,6 +270,7 @@ static const char defaultConfig[] =
 		"                 ;   11 = Dive angle\n"
 		"                 ;   12 = Altitude above DZ_Elev\n"
 		"                 ;   13 = Course\n"
+		"                 ;   14 = Altitude at destination\n"
 		"AL_Units:      0 ; ActiveLook units\n"
 		"                 ;   0 = km/h or m\n"
 		"                 ;   1 = mph or feet\n"
@@ -358,6 +362,7 @@ void FS_Config_Init(void)
 	*(config.al_id) = '\0';
 	config.al_mode        = 1;
 	config.al_rate        = 1000;
+	config.altw_tau       = 10;
 	config.num_al_lines   = 0;
 
 	// IMPORTANT: Navigation disabled by default
@@ -464,6 +469,7 @@ FS_Config_Result_t FS_Config_Read(const char *filename)
 
 		HANDLE_VALUE("AL_Mode",   config.al_mode,      val, val >= 0 && val <= 1);
 		HANDLE_VALUE("AL_Rate",   config.al_rate,      val, val >= 100);
+		HANDLE_VALUE("AltW_Tau",  config.altw_tau,     val, val >= 0);
 
 		#undef HANDLE_VALUE
 

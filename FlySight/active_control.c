@@ -24,6 +24,7 @@
 #include <stdbool.h>
 
 #include "main.h"
+#include "activelook.h"
 #include "app_common.h"
 #include "audio_control.h"
 #include "baro.h"
@@ -157,6 +158,12 @@ void FS_ActiveControl_DataReady_Callback(void)
 	{
 		// Update audio
 		FS_AudioControl_UpdateGNSS(data);
+	}
+
+	if (FS_Config_Get()->al_mode != 0)
+	{
+		// Update ActiveLook measurement filters
+		FS_ActiveLook_UpdateGNSS(data);
 	}
 
 	if (FS_Config_Get()->enable_logging)

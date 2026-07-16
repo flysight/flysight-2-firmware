@@ -43,6 +43,12 @@ typedef struct {
      * Called whenever we want the mode to redraw or update data.
      */
     void (*update)(void);
+
+    /**
+     * Called at the GNSS measurement rate with each new sample, so the
+     * mode can filter data independently of the display rate. Optional.
+     */
+    void (*gnss)(const FS_GNSS_Data_t *data);
 } FS_ActiveLook_ModeOps;
 
 static const FS_ActiveLook_ModeOps s_modeTable[] =
@@ -50,7 +56,8 @@ static const FS_ActiveLook_ModeOps s_modeTable[] =
    { // mode 0
         FS_ActiveLook_Mode0_Init,
         FS_ActiveLook_Mode0_Setup,
-        FS_ActiveLook_Mode0_Update
+        FS_ActiveLook_Mode0_Update,
+        FS_ActiveLook_Mode0_UpdateGNSS
    },
    // etc
 };
@@ -154,9 +161,6 @@ static void FS_ActiveLook_Task(void)
 
         /* Now send it with Write Without Response */
         FS_ActiveLook_Client_WriteWithoutResp(packet, idx);
-
-        /* Get mode from config file */
-        AL_SelectMode(FS_Config_Get()->al_mode - 1);
 
         /* Next config step */
         s_state = AL_STATE_SETUP;
@@ -267,10 +271,21 @@ static void FS_ActiveLook_Timer(void)
 /*******************************************************************************
  * Standard init/deinit for ActiveLook
  ******************************************************************************/
+void FS_ActiveLook_UpdateGNSS(const FS_GNSS_Data_t *data)
+{
+    if (s_currentMode && s_currentMode->gnss)
+        s_currentMode->gnss(data);
+}
+
 void FS_ActiveLook_Init(void)
 {
     /* Register the callback for discovery */
     FS_ActiveLook_Client_RegisterCb(&s_alk_cb);
+
+    /* Get mode from config file. Selected here (rather than on
+     * connection) so the mode's GNSS filters run from power-on and are
+     * warm by the time the glasses connect. */
+    AL_SelectMode(FS_Config_Get()->al_mode - 1);
 
     /* Register our local "task" with the sequencer */
     UTIL_SEQ_RegTask(1 << CFG_TASK_FS_ACTIVELOOK_ID, UTIL_SEQ_RFU, FS_ActiveLook_Task);
