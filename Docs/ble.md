@@ -332,7 +332,7 @@ Provides information about the device's current operational state and allows for
         *   **Write Operations (Central to FlySight):**
             *   `0x01` (`DS_CMD_GET_FW_VERSION`): Get firmware version string. Payload: none.
             *   `0x02` (`DS_CMD_REBOOT_DEVICE`): Gracefully return to sleep, then reset. Payload: none.
-            *   `0x03` (`DS_CMD_GET_DEVICE_ID`): Get device ID. Payload: none.
+            *   `0x03` (`DS_CMD_GET_DEVICE_ID`): Get device ID. Payload: none. Response data: 12 raw bytes, the three `uint32` words of the device ID in little-endian byte order (formatting each word as `%08x` reproduces the `Device_ID` string from `FLYSIGHT.TXT`).
             *   `0x04` (`DS_CMD_INSTALL_UPLOADED_FIRMWARE`): Gracefully return to sleep, write `STANDALONE_LOADER_DWL_REQ` to the bootloader mailbox, then reset. Payload: none.
             *   `0x10` (`DS_CMD_REQUEST_SLEEP`): Request sleep mode. Accepted from active, start, config, pairing, or sleep. Rejected from USB.
             *   `0x11` (`DS_CMD_REQUEST_ACTIVE`): Request active mode. Accepted only from sleep.

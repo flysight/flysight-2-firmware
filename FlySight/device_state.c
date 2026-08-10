@@ -101,21 +101,6 @@ void DeviceState_Init(void) {
                  hw_ts_SingleShot, response_fallback_timer);
 }
 
-// Helper to convert a uint32_t array (like device ID) to a hex string
-static void uint32_array_to_hex_string(const uint32_t *data, uint32_t count, char *out_str, size_t out_str_len) {
-    size_t offset = 0;
-    for (uint32_t i = 0; i < count; ++i) {
-        int written = snprintf(out_str + offset, out_str_len - offset, "%08lx", data[i]);
-        if (written < 0 || (size_t)written >= (out_str_len - offset)) {
-            // Buffer too small or error
-            if (offset < out_str_len) out_str[offset] = '\0'; // Ensure null termination if possible
-            return;
-        }
-        offset += written;
-    }
-}
-
-
 void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t length,
                                              uint16_t conn_handle, uint8_t notification_enabled_flag) {
     (void)conn_handle;
@@ -167,17 +152,12 @@ void DeviceState_Handle_DS_ControlPointWrite(const uint8_t *payload, uint8_t len
                 if (params_len != 0) {
                     status = CP_STATUS_INVALID_PARAMETER;
                 } else {
-                    char hex_id_str[25]; // 3 * 8 hex chars + null
-                    uint32_array_to_hex_string(FS_State_Get()->device_id, 3, hex_id_str, sizeof(hex_id_str));
-
-                    response_data_len = strlen(hex_id_str);
-                    if (response_data_len <= MAX_CP_OPTIONAL_RESPONSE_DATA_LEN) {
-                         memcpy(response_data_buf, hex_id_str, response_data_len);
-                         status = CP_STATUS_SUCCESS;
-                    } else {
-                        status = CP_STATUS_ERROR_UNKNOWN; // Buffer too small for ID string
-                        response_data_len = 0;
-                    }
+                    // 12 raw bytes: the previous 24-character hex string
+                    // exceeded MAX_CP_OPTIONAL_RESPONSE_DATA_LEN, so this
+                    // command could never succeed
+                    memcpy(response_data_buf, FS_State_Get()->device_id, 12);
+                    response_data_len = 12;
+                    status = CP_STATUS_SUCCESS;
                 }
                 break;
 
