@@ -72,6 +72,7 @@ extern "C" {
 
 #define SCSI_SEND_DIAGNOSTIC                        0x1DU
 #define SCSI_READ_FORMAT_CAPACITIES                 0x23U
+/* FlySight local patch: SYNCHRONIZE CACHE support (see usbd_msc_scsi.c SCSI_SynchronizeCache). */
 #define SCSI_SYNCHRONIZE_CACHE10                    0x35U
 #define SCSI_SYNCHRONIZE_CACHE16                    0x91U
 

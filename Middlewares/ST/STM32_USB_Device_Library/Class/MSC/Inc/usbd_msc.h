@@ -79,6 +79,7 @@ typedef struct _USBD_STORAGE
   int8_t (* Write)(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_len);
   int8_t (* GetMaxLun)(void);
   int8_t *pInquiry;
+  /* FlySight local patch: optional cache flush (see usbd_msc_scsi.c SCSI_SynchronizeCache). */
   int8_t (* Sync)(uint8_t lun);
 
 } USBD_StorageTypeDef;

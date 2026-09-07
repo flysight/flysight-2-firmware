@@ -87,6 +87,7 @@ static int8_t SCSI_StartStopUnit(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t 
 static int8_t SCSI_AllowPreventRemovable(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
 static int8_t SCSI_ModeSense6(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
 static int8_t SCSI_ModeSense10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
+/* FlySight local patch: SYNCHRONIZE CACHE support (see SCSI_SynchronizeCache). */
 static int8_t SCSI_SynchronizeCache(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
 static int8_t SCSI_SynchronizeStorage(USBD_HandleTypeDef *pdev, uint8_t lun);
 static int8_t SCSI_Write10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
@@ -192,14 +193,26 @@ int8_t SCSI_ProcessCmd(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *cmd)
       ret = SCSI_Verify10(pdev, lun, cmd);
       break;
 
+    /* FlySight local patch: SYNCHRONIZE CACHE support (see SCSI_SynchronizeCache). */
     case SCSI_SYNCHRONIZE_CACHE10:
     case SCSI_SYNCHRONIZE_CACHE16:
       ret = SCSI_SynchronizeCache(pdev, lun, cmd);
       break;
 
     default:
+      /* FlySight local patch: an unsupported opcode is a well-formed CBW that
+       * fails, not a protocol error. Upstream sets bot_status to
+       * USBD_BOT_STATUS_ERROR here, which stalls both endpoints and re-stalls
+       * them on every CLEAR_FEATURE, so the host never receives a CSW and the
+       * interface stays wedged until a Bulk-Only Mass Storage Reset. Leave
+       * bot_status alone so the host gets a failed CSW plus sense data. With
+       * no data phase, send the CSW directly instead of stalling IN first.
+       * CubeMX regeneration will revert this. */
       SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, INVALID_CDB);
-      hmsc->bot_status = USBD_BOT_STATUS_ERROR;
+      if (hmsc->cbw.dDataLength == 0U)
+      {
+        hmsc->bot_state = USBD_BOT_NO_DATA;
+      }
       ret = -1;
       break;
   }
@@ -646,9 +659,11 @@ static int8_t SCSI_StartStopUnit(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t 
     return -1;
   }
 
+  /* FlySight local patch: flush the write cache on STOP (see SCSI_SynchronizeCache). */
   if (((params[4] & 0x1U) == 0U) && (SCSI_SynchronizeStorage(pdev, lun) < 0))
   {
     SCSI_SenseCode(pdev, lun, HARDWARE_ERROR, WRITE_FAULT);
+    hmsc->bot_state = USBD_BOT_NO_DATA;
     return -1;
   }
 
@@ -676,6 +691,14 @@ static int8_t SCSI_StartStopUnit(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t 
 /**
   * @brief  SCSI_SynchronizeCache
   *         Process Synchronize Cache command
+  *
+  * FlySight local patch: not present in upstream ST middleware. Adds
+  * SYNCHRONIZE CACHE (10/16) handling and an optional Sync callback in
+  * USBD_StorageTypeDef so the block cache in usbd_storage_if.c is flushed on
+  * host request and on STOP UNIT. Related edits carry the same
+  * "FlySight local patch" tag in this file, usbd_msc_scsi.h and usbd_msc.h.
+  * CubeMX regeneration will revert all of them.
+  *
   * @param  lun: Logical unit number
   * @param  params: Command parameters
   * @retval status
@@ -699,18 +722,21 @@ static int8_t SCSI_SynchronizeCache(USBD_HandleTypeDef *pdev, uint8_t lun, uint8
   if (hmsc->scsi_medium_state == SCSI_MEDIUM_EJECTED)
   {
     SCSI_SenseCode(pdev, lun, NOT_READY, MEDIUM_NOT_PRESENT);
+    hmsc->bot_state = USBD_BOT_NO_DATA;
     return -1;
   }
 
   if (((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->IsReady(lun) != 0)
   {
     SCSI_SenseCode(pdev, lun, NOT_READY, MEDIUM_NOT_PRESENT);
+    hmsc->bot_state = USBD_BOT_NO_DATA;
     return -1;
   }
 
   if (SCSI_SynchronizeStorage(pdev, lun) < 0)
   {
     SCSI_SenseCode(pdev, lun, HARDWARE_ERROR, WRITE_FAULT);
+    hmsc->bot_state = USBD_BOT_NO_DATA;
     return -1;
   }
 
@@ -722,6 +748,7 @@ static int8_t SCSI_SynchronizeCache(USBD_HandleTypeDef *pdev, uint8_t lun, uint8
 /**
   * @brief  SCSI_SynchronizeStorage
   *         Calls the optional storage sync callback.
+  *         FlySight local patch (see SCSI_SynchronizeCache).
   * @param  lun: Logical unit number
   * @retval status
   */
