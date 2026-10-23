@@ -240,6 +240,33 @@ Known error codes:
 
 Clients should display the server-provided `message` when it is useful to the user, but should branch behavior using `code` rather than matching the message text.
 
+## Batch Keys Endpoint (Release Tooling)
+
+The site also publishes the list of device keys it serves firmware for. This exists for release tooling, such as a dashboard that checks what every hardware batch is offered. It is not for apps: an app sends the device's `FLYSIGHT.TXT` to the firmware endpoint and offers only what comes back, as described above. The keys are already public, since the firmware repository ships them in `Deploy/Public_Keys`.
+
+### Request
+
+- **URL:** `https://flysight.ca/wp-json/flysight/v1/keys`
+- **Method:** `GET`
+- **Authentication:** None
+
+### Successful Response
+
+```json
+{
+  "keys": [
+    { "batch": "B7", "pubkey_x": "728168718da35f7de7cf9ab6b10eb6d74f2cb31614daa2cc4e7963c2ab4e5b11" }
+  ]
+}
+```
+
+| Field | Description |
+| :--- | :--- |
+| `batch` | The hardware batch label, which is also the prefix of that batch's firmware file names. |
+| `pubkey_x` | The 64-character lowercase hex `Pubkey_X` that devices of this batch print in `FLYSIGHT.TXT`. It is the X coordinate of the public key in `Deploy/Public_Keys/pub_key_<batch>.bin`. |
+
+The list is ordered by batch label. A batch missing from it is not registered for downloads, and the firmware endpoint answers `unsupported_device` for its devices. The all-`f` entry is batch B1, whose public key is not published: B1 units report that value as their `Pubkey_X`, and the firmware endpoint treats firmware too old to print a `Pubkey_X` the same way (see Legacy Devices). The repository has no key file for it.
+
 ## Download and Verification Flow
 
 Use the following flow to determine and download compatible firmware:
