@@ -66,6 +66,7 @@ static volatile enum {
 } state = FS_CONTROL_INACTIVE;
 
 static uint8_t countdown;
+static volatile bool markPending;
 static FS_GNSS_Int_t gnss_int;
 static FS_GNSS_Time_t savedTime;
 static volatile bool rtcUpdated;
@@ -77,6 +78,7 @@ void FS_StartControl_TimeReady_Callback(bool validTime);
 void FS_StartControl_IntReady_Callback(void);
 
 void FS_StartControl_Update(void);
+static void FS_StartControl_Count(void);
 static void FS_StartControl_Count_Timer(void);
 
 static void FS_StartControl_LED_Timer(void)
@@ -89,6 +91,9 @@ void FS_StartControl_RegisterTasks(void)
 {
 	// Register update task
 	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_START_UPDATE_ID, UTIL_SEQ_RFU, FS_StartControl_Update);
+
+	// Register countdown task
+	UTIL_SEQ_RegTask(1<<CFG_TASK_FS_START_COUNT_ID, UTIL_SEQ_RFU, FS_StartControl_Count);
 }
 
 void FS_StartControl_Init(void)
@@ -112,6 +117,7 @@ void FS_StartControl_Init(void)
 	// Initialize state
 	hasFix = false;
 	rtcUpdated = false;
+	markPending = false;
 	state = FS_CONTROL_IDLE;
 
 	// Initialize saved GNSS time
@@ -188,8 +194,11 @@ void FS_StartControl_IntReady_Callback(void)
 	// Clear EXTINT
 	HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_RESET);
 
-	if (state == FS_CONTROL_COUNTING)
+	// Ignore time marks other than the one for the start tone
+	if ((state == FS_CONTROL_COUNTING) && markPending)
 	{
+		markPending = false;
+
 		// Copy interrupt data locally
 		memcpy(&gnss_int, FS_GNSS_GetInt(), sizeof(FS_GNSS_Int_t));
 
@@ -201,23 +210,53 @@ void FS_StartControl_IntReady_Callback(void)
 
 static void FS_StartControl_Count_Timer(void)
 {
+	// This runs in interrupt context, where the SD card can't be used, so
+	// audio is played from a task
+	UTIL_SEQ_SetTask(1<<CFG_TASK_FS_START_COUNT_ID, CFG_SCH_PRIO_0);
+}
+
+static void FS_StartControl_Mark(void)
+{
+	// Set EXTINT
+	markPending = true;
+	HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_SET);
+}
+
+static void FS_StartControl_Count(void)
+{
 	const FS_Config_Data_t *config = FS_Config_Get();
 	char filename[13];
+	bool interrupted;
 
-	if (state != FS_CONTROL_COUNTING) return;
+	if ((state != FS_CONTROL_COUNTING) || markPending) return;
 
 	if (--countdown == 0)
 	{
-		// Set EXTINT
-		HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_SET);
-
-		// Play tone
-		FS_Audio_Beep(TONE_MAX_PITCH, TONE_MAX_PITCH, 500, config->volume * 5);
-
 		// Stop countdown timer
 		HW_TS_Stop(count_timer_id);
+
+		if (!config->enable_audio)
+		{
+			// No tone to play
+			FS_StartControl_Mark();
+			return;
+		}
+
+		interrupted = !FS_Audio_IsIdle();
+
+		// Play tone, setting EXTINT as audio output begins
+		if (!FS_Audio_BeepSync(TONE_MAX_PITCH, TONE_MAX_PITCH, 500,
+				config->volume * 5, FS_StartControl_Mark))
+		{
+			FS_StartControl_Mark();
+			FS_Log_WriteEvent("Couldn't play start tone");
+		}
+		else if (interrupted)
+		{
+			FS_Log_WriteEvent("Start tone interrupted countdown audio");
+		}
 	}
-	else
+	else if (config->enable_audio)
 	{
 		// Play countdown value
 		filename[0] = '0' + countdown;
@@ -296,6 +335,11 @@ static uint8_t FS_StartControl_InitiateCommand(uint8_t cmd_opcode)
 		if (state == FS_CONTROL_COUNTING)
 		{
 			HW_TS_Stop(count_timer_id);
+
+			// Clear EXTINT in case tone has already started
+			markPending = false;
+			HAL_GPIO_WritePin(GNSS_EXTINT_GPIO_Port, GNSS_EXTINT_Pin, GPIO_PIN_RESET);
+
 			state = FS_CONTROL_IDLE;
 			return CP_STATUS_SUCCESS;
 		}

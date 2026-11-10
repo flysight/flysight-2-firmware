@@ -58,6 +58,7 @@
 
 #define AUDIO_OP_TIMEOUT    100
 #define AUDIO_RETRY_TIMEOUT 1000
+#define AUDIO_DRAIN_TIMEOUT 2
 
 static const int16_t sineTable[] =
 {
@@ -79,6 +80,7 @@ static const int16_t sineTable[] =
 	-12540, -11039,  -9512,  -7962,  -6393,  -4808,  -3212,  -1608
 };
 
+static uint32_t audioPhase;
 static uint32_t audioStep;
 static uint32_t audioChirp;
 static uint32_t audioLen = 0;
@@ -120,6 +122,7 @@ extern I2C_HandleTypeDef hi2c1;
 extern SAI_HandleTypeDef hsai_BlockA1;
 
 void FS_Audio_Stop(void);
+static void FS_Audio_Idle(void);
 static void FS_Audio_Timer(void);
 static void FS_Audio_Update(void);
 
@@ -367,18 +370,16 @@ void FS_Audio_DeInit(void)
 
 static void FS_Audio_LoadTone(void)
 {
-	static uint32_t phase = 0;
-
 	uint32_t size, i;
 
 	size = MIN(readPos + AUDIO_FRAME_LEN - writePos, audioLen);
 	size = MIN(AUDIO_FRAME_LEN, size);
 
-	for (i = 0; i < size; ++i, phase += audioStep, audioStep += audioChirp)
+	for (i = 0; i < size; ++i, audioPhase += audioStep, audioStep += audioChirp)
 	{
 		// Get sample value
-		const uint32_t index = phase >> (32 - AUDIO_INDEX_BITS);
-		const uint32_t a1 = (phase << AUDIO_INDEX_BITS) >> (32 - AUDIO_INTERPOLATE_BITS);
+		const uint32_t index = audioPhase >> (32 - AUDIO_INDEX_BITS);
+		const uint32_t a1 = (audioPhase << AUDIO_INDEX_BITS) >> (32 - AUDIO_INTERPOLATE_BITS);
 		const uint32_t a2 = (1 << AUDIO_INTERPOLATE_BITS) - a1;
 		const int16_t val1 = sineTable[index];
 		const int16_t val2 = sineTable[(index + 1) % (1 << AUDIO_INDEX_BITS)];
@@ -428,7 +429,7 @@ static void FS_Audio_Load(void)
 	}
 }
 
-static void FS_Audio_InitTransfer(
+static void FS_Audio_InitBuffer(
 		uint32_t bytes)
 {
 	// Initialize state
@@ -438,9 +439,31 @@ static void FS_Audio_InitTransfer(
 
 	// Initialize buffer
 	FS_Audio_Load();
+}
+
+static void FS_Audio_InitTransfer(
+		uint32_t bytes)
+{
+	// Initialize audio buffer
+	FS_Audio_InitBuffer(bytes);
 
 	// Begin DMA transfer
 	HAL_SAI_Transmit_DMA(&hsai_BlockA1, (uint8_t*) (audioBuffer + readPos), AUDIO_FRAME_LEN - readPos);
+}
+
+static void FS_Audio_InitTone(
+		uint32_t startFrequency,
+		uint32_t endFrequency,
+		uint32_t duration)
+{
+	// Remember frequency and duration
+	audioStep = ((uint64_t) startFrequency << 32) / AUDIO_SAMPLE_RATE;
+	audioLen = (duration * AUDIO_SAMPLE_RATE) / 1000;
+
+	// Calculate chirp
+	const uint32_t end_step = ((uint64_t) endFrequency << 32) / AUDIO_SAMPLE_RATE;
+	if (end_step > audioStep) audioChirp = (end_step - audioStep) / audioLen;
+	else                      audioChirp = 0 - (audioStep - end_step) / audioLen;
 }
 
 void FS_Audio_Beep(
@@ -460,13 +483,7 @@ void FS_Audio_Beep(
 	FS_Audio_SetVolume(volume);
 
 	// Remember frequency and duration
-	audioStep = ((uint64_t) startFrequency << 32) / AUDIO_SAMPLE_RATE;
-	audioLen = (duration * AUDIO_SAMPLE_RATE) / 1000;
-
-	// Calculate chirp
-	const uint32_t end_step = ((uint64_t) endFrequency << 32) / AUDIO_SAMPLE_RATE;
-	if (end_step > audioStep) audioChirp = (end_step - audioStep) / audioLen;
-	else                      audioChirp = 0 - (audioStep - end_step) / audioLen;
+	FS_Audio_InitTone(startFrequency, endFrequency, duration);
 
 	// Initialize audio buffer
 	FS_Audio_InitTransfer(audioLen);
@@ -476,6 +493,142 @@ void FS_Audio_Beep(
 
 	// Start audio update timer
 	HW_TS_Start(timer_id, AUDIO_UPDATE_RATE);
+}
+
+static void FS_Audio_SyncTxCplt(DMA_HandleTypeDef *hdma)
+{
+	SAI_HandleTypeDef *hsai = (SAI_HandleTypeDef *) hdma->Parent;
+
+	// Finish the frame started by FS_Audio_BeepSync the way the HAL would
+	hsai->XferCount = 0;
+	hsai->Instance->CR1 &= ~SAI_xCR1_DMAEN;
+	hsai->State = HAL_SAI_STATE_READY;
+
+	// Remaining frames use the normal path
+	HAL_SAI_TxCpltCallback(hsai);
+}
+
+bool FS_Audio_BeepSync(
+		uint32_t startFrequency,
+		uint32_t endFrequency,
+		uint32_t duration,
+		uint8_t volume,
+		void (*onStart)(void))
+{
+	SAI_HandleTypeDef *hsai = &hsai_BlockA1;
+	uint32_t primask_bit;
+	uint32_t timeout;
+
+	// Everything that takes a variable amount of time is done first, so the
+	// delay between onStart and the first sample of the tone is constant
+
+	if (hsai->State == HAL_SAI_STATE_RESET)
+	{
+		// Audio is not initialized
+		return false;
+	}
+
+	if (audioState != AUDIO_IDLE)
+	{
+		/* Enter critical section */
+		primask_bit = __get_PRIMASK();
+		__disable_irq();
+
+		// Stop DMA transfer, but unlike FS_Audio_Stop leave SAI enabled so
+		// the DAC keeps its clocks
+		hsai->Instance->CR1 &= ~SAI_xCR1_DMAEN;
+		HAL_DMA_Abort(hsai->hdmatx);
+		hsai->State = HAL_SAI_STATE_READY;
+
+		// Stop audio update timer
+		HW_TS_Stop(timer_id);
+
+		/* Exit critical section */
+		__set_PRIMASK(primask_bit);
+
+		// Go to idle state
+		FS_Audio_Idle();
+	}
+
+	if (hsai->State != HAL_SAI_STATE_READY)
+	{
+		return false;
+	}
+
+	audioState = AUDIO_PLAY_TONE;
+
+	// Make sure SAI is generating clocks
+	if ((hsai->Instance->CR1 & SAI_xCR1_SAIEN) == 0U)
+	{
+		__HAL_SAI_ENABLE(hsai);
+	}
+
+	// Set volume
+	FS_Audio_SetVolume(volume);
+
+	// Remember frequency and duration
+	FS_Audio_InitTone(startFrequency, endFrequency, duration);
+
+	// Start tone at a zero crossing
+	audioPhase = 0;
+
+	// Initialize audio buffer
+	FS_Audio_InitBuffer(audioLen);
+
+	// Arm DMA for the first frame. This is HAL_SAI_Transmit_DMA without its
+	// final step, so nothing is sent until SAI is allowed to request data.
+	hsai->pBuffPtr = (uint8_t*) (audioBuffer + readPos);
+	hsai->XferSize = AUDIO_FRAME_LEN - readPos;
+	hsai->XferCount = AUDIO_FRAME_LEN - readPos;
+	hsai->ErrorCode = HAL_SAI_ERROR_NONE;
+	hsai->State = HAL_SAI_STATE_BUSY_TX;
+
+	hsai->hdmatx->XferHalfCpltCallback = NULL;
+	hsai->hdmatx->XferCpltCallback = FS_Audio_SyncTxCplt;
+	hsai->hdmatx->XferErrorCallback = NULL;
+	hsai->hdmatx->XferAbortCallback = NULL;
+
+	if (HAL_DMA_Start_IT(hsai->hdmatx, (uint32_t) hsai->pBuffPtr,
+			(uint32_t) &hsai->Instance->DR, hsai->XferSize) != HAL_OK)
+	{
+		hsai->State = HAL_SAI_STATE_READY;
+		audioState = AUDIO_IDLE;
+		return false;
+	}
+
+	// Wait for samples left over from interrupted audio to be sent
+	timeout = HAL_GetTick() + AUDIO_DRAIN_TIMEOUT;
+	while ((hsai->Instance->SR & SAI_xSR_FLVL) != SAI_FIFOSTATUS_EMPTY)
+	{
+		if (HAL_GetTick() > timeout)
+		{
+			break;
+		}
+	}
+
+	/* Enter critical section */
+	primask_bit = __get_PRIMASK();
+	__disable_irq();
+
+	// Mark start of tone
+	if (onStart)
+	{
+		onStart();
+	}
+
+	// Begin DMA transfer
+	hsai->Instance->CR1 |= SAI_xCR1_DMAEN;
+
+	/* Exit critical section */
+	__set_PRIMASK(primask_bit);
+
+	// Reset last update call time
+	updateLastCall = 0;
+
+	// Start audio update timer
+	HW_TS_Start(timer_id, AUDIO_UPDATE_RATE);
+
+	return true;
 }
 
 static bool FS_Audio_PlayFile(
