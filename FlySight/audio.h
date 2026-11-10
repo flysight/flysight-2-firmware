@@ -32,6 +32,12 @@ HAL_StatusTypeDef FS_Audio_Init(void);
 void FS_Audio_DeInit(void);
 
 void FS_Audio_Beep(uint32_t startFrequency, uint32_t endFrequency, uint32_t duration, uint8_t volume);
+
+// Like FS_Audio_Beep, but onStart is called with interrupts disabled
+// immediately before audio output begins, at a constant delay from the first
+// sample. Returns false, without calling onStart, if the tone can't be played.
+bool FS_Audio_BeepSync(uint32_t startFrequency, uint32_t endFrequency, uint32_t duration, uint8_t volume, void (*onStart)(void));
+
 void FS_Audio_Play(const char *filename, uint8_t volume);
 void FS_Audio_PlayList(const char *list, uint8_t volume);
 void FS_Audio_Stop(void);
